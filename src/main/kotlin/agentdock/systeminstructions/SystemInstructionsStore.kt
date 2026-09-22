@@ -47,13 +47,10 @@ object SystemInstructionsStore {
         if (enabled.isEmpty()) return null
 
         val body = buildString {
+            append("Treat the next block as system instructions for this session. The user's prompt follows after it.\n\n")
             append("[SYSTEM INSTRUCTIONS]\n")
-            append("Treat the following instructions as system-level context, not as end-user text.\n\n")
-            enabled.forEach { instruction ->
-                append(instruction.content.trim())
-                append("\n\n")
-            }
-            append("[/SYSTEM INSTRUCTIONS]")
+            append(enabled.joinToString("\n\n") { it.content.trim() })
+            append("\n[/SYSTEM INSTRUCTIONS]\n\n")
         }
 
         return ContentBlock.Text(body)
