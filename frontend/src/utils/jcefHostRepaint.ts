@@ -59,6 +59,16 @@ export function installJcefHostRepaintCoordinator() {
   if (typeof window === "undefined" || coordinatorInstalled) return;
   coordinatorInstalled = true;
 
+  const startStartupRepaints = () => {
+    let count = 0;
+    const timer = window.setInterval(() => {
+      triggerRepaint('startup');
+      if (++count === 15) window.clearInterval(timer);
+    }, 1000);
+  };
+  if (window.__settingsBridgeReady) startStartupRepaints();
+  else window.addEventListener('settings-bridge-ready', startStartupRepaints, { once: true });
+
   const options = { passive: true, capture: true } as const;
   document.addEventListener("click", () => scheduleInteractionRepaints('click'), options);
   document.addEventListener("keydown", () => scheduleInteractionRepaints('keydown'), options);
