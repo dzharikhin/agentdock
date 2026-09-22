@@ -17,19 +17,21 @@ object FrontendSettings {
     var current: GlobalSettings = GlobalSettings()
         private set
 
-    private val listeners = mutableListOf<(GlobalSettings) -> Unit>()
+    private val listeners = mutableListOf<(GlobalSettings, GlobalSettings) -> Unit>()
 
     fun apply(updated: GlobalSettings) {
+        val previous = current
+        if (previous == updated) return
         current = updated
         val snapshot = synchronized(listeners) { listeners.toList() }
-        snapshot.forEach { listener -> runCatching { listener(updated) } }
+        snapshot.forEach { listener -> runCatching { listener(previous, updated) } }
     }
 
-    fun addListener(listener: (GlobalSettings) -> Unit) {
+    fun addListener(listener: (GlobalSettings, GlobalSettings) -> Unit) {
         synchronized(listeners) { listeners.add(listener) }
     }
 
-    fun removeListener(listener: (GlobalSettings) -> Unit) {
+    fun removeListener(listener: (GlobalSettings, GlobalSettings) -> Unit) {
         synchronized(listeners) { listeners.remove(listener) }
     }
 }

@@ -74,12 +74,21 @@ class AgentDockUiHost(
     private var dropTarget: DropTarget? = null
     private var openInEditor = FrontendSettings.current.openInEditor
 
-    private val settingsListener: (GlobalSettings) -> Unit = { settings ->
+    private val settingsListener: (GlobalSettings, GlobalSettings) -> Unit = { previous, settings ->
         ApplicationManager.getApplication().invokeLater({
             if (project.isDisposed) return@invokeLater
-            applyOpenInEditor(settings.openInEditor)
-            applyUiZoom(settings.uiZoomPercent)
-            bridge?.eval(IdeTheme.generateCssUpdateScript())
+            if (previous.openInEditor != settings.openInEditor) {
+                applyOpenInEditor(settings.openInEditor)
+            }
+            if (previous.uiZoomPercent != settings.uiZoomPercent) {
+                applyUiZoom(settings.uiZoomPercent)
+            }
+            if (previous.uiFontSizeOffsetPx != settings.uiFontSizeOffsetPx ||
+                previous.userMessageBackgroundStyle != settings.userMessageBackgroundStyle ||
+                previous.userMessageCustomColor != settings.userMessageCustomColor
+            ) {
+                bridge?.eval(IdeTheme.generateCssUpdateScript())
+            }
         }, ModalityState.any())
     }
 
