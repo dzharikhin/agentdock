@@ -143,16 +143,30 @@ internal object BridgeScripts {
     fun cursorTracking(): String = """
         window.__lastSentCursor = 'default';
         window.__cursorThrottleTimer = null;
+        function reportCursor(target) {
+          if (!target) return;
+          const cursor = window.getComputedStyle(target).cursor;
+          if (window.__lastSentCursor !== cursor) {
+            window.__lastSentCursor = cursor;
+            window.__agentDockInvoke('cursor', cursor);
+          }
+        }
         document.addEventListener('mousemove', function(e) {
           if (window.__cursorThrottleTimer !== null) return;
           window.__cursorThrottleTimer = setTimeout(function() {
             window.__cursorThrottleTimer = null;
-            const cursor = window.getComputedStyle(e.target).cursor;
-            if (window.__lastSentCursor !== cursor) {
-              window.__lastSentCursor = cursor;
-              window.__agentDockInvoke('cursor', cursor);
-            }
+            reportCursor(e.target);
           }, 50);
         });
+        // Image click handlers can stop propagation, so observe clicks in the capture phase.
+        document.addEventListener('click', function(e) {
+          if (window.__cursorThrottleTimer !== null) {
+            clearTimeout(window.__cursorThrottleTimer);
+            window.__cursorThrottleTimer = null;
+          }
+          requestAnimationFrame(function() {
+            reportCursor(document.elementFromPoint(e.clientX, e.clientY));
+          });
+        }, true);
     """.trimIndent()
 }
