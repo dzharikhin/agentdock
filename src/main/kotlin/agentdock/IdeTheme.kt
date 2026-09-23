@@ -146,7 +146,7 @@ object IdeTheme {
         sb.append("  --ide-user-message-blue-highlight-bg: ${toCssColor(blueHighlightUserMessageBackground)};\n")
         sb.append("  --ide-user-message-blue-bg: ${toCssColor(blueUserMessageBackground)};\n")
         sb.append("  --ide-surface-hover-filter: ${if (isDark) "brightness(1.2)" else "brightness(0.98)"};\n")
-        sb.append("  --ide-surface-active-filter: ${if (isDark) "brightness(1.75)" else "brightness(0.95)"};\n")
+        sb.append("  --ide-surface-active-filter: ${if (isDark) "brightness(1.5)" else "brightness(0.92)"};\n")
 
         // Dynamic border color (must be different from both backgrounds)
         val originalBorder = uiColor(

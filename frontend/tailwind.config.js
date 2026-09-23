@@ -92,7 +92,9 @@ export default {
     },
   },
   plugins: [
-    function({ addUtilities }) {
+    function({ addUtilities, addVariant }) {
+      addVariant('chat-max-400', '@container chat-input (max-width: 400px)');
+      addVariant('chat-max-600', '@container chat-input (max-width: 600px)');
       addUtilities({
         '.bg-hover': {
           'filter': 'var(--ide-surface-hover-filter)',

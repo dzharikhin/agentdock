@@ -50,7 +50,7 @@ function ActiveVoiceInputButton({ conversationId, insertText }: VoiceInputButton
     >
       <Tooltip variant="minimal" content={isRecording ? 'Stop recording' : 'Voice input'}>
         <div className="flex items-center">
-          <Mic size={16} className="block translate-y-px" />
+          <Mic size={15} className="block" />
           <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
         </div>
       </Tooltip>

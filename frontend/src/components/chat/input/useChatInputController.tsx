@@ -19,12 +19,7 @@ export function useChatInputController({
   inputValue,
   composerLoadRevision = 0,
   onInputChange,
-  isSending,
   selectedAgentId,
-  selectedModelId,
-  status,
-  modeOptions,
-  selectedModeId,
   availableCommands,
   attachments,
   onAttachmentsChange,
@@ -33,13 +28,11 @@ export function useChatInputController({
 }: ChatInputProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const inputRootRef = useRef<HTMLDivElement>(null);
-  const controlsRowRef = useRef<HTMLDivElement>(null);
   const slashMenuRef = useRef<HTMLDivElement>(null);
   const fileMenuRef = useRef<HTMLDivElement>(null);
   const lexicalEditorRef = useRef<LexicalEditor | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [promptLibraryItems, setPromptLibraryItems] = useState<PromptLibraryItem[]>([]);
-  const [containerWidth, setContainerWidth] = useState(0);
   const [composerRevision, setComposerRevision] = useState(0);
   const registeredNodeClassesRef = useRef({
     imageNode: ImageNode,
@@ -72,20 +65,6 @@ export function useChatInputController({
     window.addEventListener('drag-highlight', handleDragHighlight as EventListener);
     return () => window.removeEventListener('drag-highlight', handleDragHighlight as EventListener);
   }, []);
-
-  useEffect(() => {
-    const updateWidths = () => {
-      setContainerWidth(inputRootRef.current?.clientWidth ?? 0);
-    };
-
-    updateWidths();
-    const raf = requestAnimationFrame(updateWidths);
-    window.addEventListener('resize', updateWidths);
-    return () => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', updateWidths);
-    };
-  }, [selectedAgentId, selectedModelId, selectedModeId, modeOptions.length, status, isSending]);
 
   const handleOpenFile = useCallback((filePath: string, line?: number) => {
     openFile(filePath, line);
@@ -265,12 +244,9 @@ export function useChatInputController({
     );
   }, [lexicalEditorRef, onInputChange]);
 
-  const showAuxIndicators = containerWidth === 0 || containerWidth >= 320;
-
   return {
     editorContainerRef,
     inputRootRef,
-    controlsRowRef,
     slashMenuRef,
     fileMenuRef,
     composerRevision,
@@ -292,7 +268,6 @@ export function useChatInputController({
     setFileHighlightedIndex,
     applyFile,
     customHeight,
-    showAuxIndicators,
     insertText,
     agentSlashItems,
     promptLibrarySlashItems,

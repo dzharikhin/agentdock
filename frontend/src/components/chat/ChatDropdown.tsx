@@ -1,13 +1,16 @@
-import { KeyboardEvent, useState, useRef, useEffect } from 'react';
+import { KeyboardEvent, RefObject, useState, useRef, useEffect } from 'react';
 import { DropdownOption } from '../../types/chat';
 import { Tooltip } from './shared/Tooltip';
 
 export default function ChatDropdown({
+  containerRef,
   value,
   subValue,
   subValues,
   options,
   placeholder,
+  menuTitle,
+  triggerTooltip,
   disabled,
   direction = 'up',
   customTrigger,
@@ -16,11 +19,14 @@ export default function ChatDropdown({
   onSubChange,
   className = '',
 }: {
+  containerRef: RefObject<HTMLDivElement>;
   value: string;
   subValue?: string;
   subValues?: Record<string, string | undefined>;
   options: DropdownOption[];
   placeholder: string;
+  menuTitle?: string;
+  triggerTooltip?: string;
   disabled: boolean;
   direction?: 'up' | 'down';
   customTrigger?: React.ReactNode;
@@ -36,33 +42,44 @@ export default function ChatDropdown({
     prop: 'top' | 'bottom';
     offset: number;
     maxHeight: number;
+    minWidth?: number;
+    maxWidth?: number;
   }>({ prop: 'top', offset: 0, maxHeight: 150 });
   const rootRef = useRef<HTMLDivElement>(null);
   const popupRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const optionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const subOptionButtonRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const pointerTypeRef = useRef<string | null>(null);
+  const isCompact = () => (containerRef.current?.getBoundingClientRect().width ?? Infinity) <= 600;
 
   const applySubMenuPosition = (el: Element, popupEl: Element) => {
     const optionRect = el.getBoundingClientRect();
     const popupRect = popupEl.getBoundingClientRect();
-    const spaceUp = optionRect.bottom - 85; // Buffer for tab bar and window Chrome
-    const spaceDown = window.innerHeight - optionRect.top - 20;
-    const padding = 6; // Accounts for p-1.5 on the absolute container
+    const compact = isCompact();
+    const spaceUp = (compact ? optionRect.top : optionRect.bottom) - 85; // Buffer for tab bar and window Chrome
+    const spaceDown = window.innerHeight - (compact ? optionRect.bottom : optionRect.top) - 20;
+    const padding = compact ? 0 : 6; // Accounts for p-1.5 on the absolute container
+    const horizontal = {
+      minWidth: compact ? popupRect.width : undefined,
+      maxWidth: compact ? Math.max(0, window.innerWidth - popupRect.left - 8) : undefined,
+    };
 
     if (direction === 'up') {
       if (spaceUp < 150 && spaceDown > spaceUp) {
         // Fallback to DOWN if severely constrained going UP
         setSubMenuPosition({
+          ...horizontal,
           prop: 'top',
-          offset: optionRect.top - popupRect.top - padding,
+          offset: (compact ? optionRect.bottom : optionRect.top) - popupRect.top - padding,
           maxHeight: Math.max(spaceDown + padding, 150)
         });
       } else {
         // Prefer growing UP
         setSubMenuPosition({
+          ...horizontal,
           prop: 'bottom',
-          offset: popupRect.bottom - optionRect.bottom - padding,
+          offset: popupRect.bottom - (compact ? optionRect.top : optionRect.bottom) - padding,
           maxHeight: Math.max(spaceUp + padding, 150)
         });
       }
@@ -70,15 +87,17 @@ export default function ChatDropdown({
       if (spaceDown < 150 && spaceUp > spaceDown) {
         // Fallback to UP
         setSubMenuPosition({
+          ...horizontal,
           prop: 'bottom',
-          offset: popupRect.bottom - optionRect.bottom - padding,
+          offset: popupRect.bottom - (compact ? optionRect.top : optionRect.bottom) - padding,
           maxHeight: Math.max(spaceUp + padding, 150)
         });
       } else {
         // Prefer growing DOWN
         setSubMenuPosition({
+          ...horizontal,
           prop: 'top',
-          offset: optionRect.top - popupRect.top - padding,
+          offset: (compact ? optionRect.bottom : optionRect.top) - popupRect.top - padding,
           maxHeight: Math.max(spaceDown + padding, 150)
         });
       }
@@ -126,16 +145,16 @@ export default function ChatDropdown({
       window.addEventListener('resize', updateSize);
     }
 
-    const onPointerDown = (event: MouseEvent) => {
+    const onPointerDown = (event: PointerEvent) => {
       if (!rootRef.current) return;
       if (!rootRef.current.contains(event.target as Node)) {
         setOpen(false);
         setHoveredOptionId(null);
       }
     };
-    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('pointerdown', onPointerDown);
     return () => {
-      window.removeEventListener('mousedown', onPointerDown);
+      window.removeEventListener('pointerdown', onPointerDown);
       window.removeEventListener('resize', updateSize);
     };
   }, [open, direction]);
@@ -145,19 +164,26 @@ export default function ChatDropdown({
     setOpen((prev) => !prev);
   };
 
-  const focusMainOption = (index: number) => {
-    optionButtonRefs.current[index]?.focus();
+  const focusMainOption = (index: number, direction = 1) => {
+    for (let offset = 0; offset < options.length; offset++) {
+      const candidate = (index + direction * offset + options.length * 2) % options.length;
+      const button = optionButtonRefs.current[candidate];
+      if (button?.getClientRects().length) {
+        button.focus();
+        return;
+      }
+    }
   };
 
   const focusSubOption = (index: number) => {
     subOptionButtonRefs.current[index]?.focus();
   };
 
-  const openAndFocus = (mainIndex: number) => {
+  const openAndFocus = (mainIndex: number, direction = 1) => {
     setOpen(true);
-    setHoveredOptionId(options[mainIndex]?.id ?? null);
+    setHoveredOptionId(null);
     requestAnimationFrame(() => {
-      focusMainOption(mainIndex);
+      focusMainOption(mainIndex, direction);
     });
   };
 
@@ -170,7 +196,7 @@ export default function ChatDropdown({
     }
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      openAndFocus(options.length - 1);
+      openAndFocus(options.length - 1, -1);
     }
   };
 
@@ -183,7 +209,7 @@ export default function ChatDropdown({
     }
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      focusMainOption((index - 1 + options.length) % options.length);
+      focusMainOption((index - 1 + options.length) % options.length, -1);
       return;
     }
     if (event.key === 'ArrowRight' && option?.subOptions?.length) {
@@ -229,30 +255,38 @@ export default function ChatDropdown({
     }
   };
 
-  return (
-    <div ref={rootRef} className={`text-ide-small relative inline-flex min-w-0 items-stretch h-full overflow-visible ${className}`}>
-      <button ref={triggerRef} type="button" disabled={disabled} onClick={handleTriggerClick}
-        onKeyDown={handleTriggerKeyDown}
-        className={`inline-flex max-w-full min-w-0 appearance-none border-0 items-center justify-start gap-1
-          h-full py-1 px-1.5 rounded bg-background-secondary text-foreground transition-colors 
+  const trigger = (
+    <button ref={triggerRef} type="button" disabled={disabled} onClick={handleTriggerClick}
+      onKeyDown={handleTriggerKeyDown}
+      className={`inline-flex max-w-full min-w-0 appearance-none border-0 items-center justify-start gap-1
+          h-full py-1 px-1.5 rounded bg-background-secondary text-foreground transition-colors
           disabled:text-foreground-secondary disabled:cursor-not-allowed group disabled:pointer-events-none
           whitespace-nowrap outline-none focus-visible:bg-hover 
           focus-visible:text-foreground focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] 
           ${open ? 'bg-hover' : 'hover:text-foreground hover:bg-hover'}`}
-      >
-        {customTrigger ? (customTrigger) : (
-          <>
-            {renderIcon(selectedOption, "w-4 h-4 shrink-0 mr-0.5 opacity-80")}
-            <span className="min-w-0 truncate">{selectedText}</span>
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-              className="flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity"
-            >
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </>
-        )}
-      </button>
+    >
+      {customTrigger ? (customTrigger) : (
+        <>
+          {renderIcon(selectedOption, "w-4 h-4 shrink-0 mr-0.5 opacity-80")}
+          <span className="relative top-px min-w-0 truncate">{selectedText}</span>
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            className="flex-shrink-0 opacity-50 group-hover:opacity-100 transition-opacity"
+          >
+            <polyline points="6 9 12 15 18 9"></polyline>
+          </svg>
+        </>
+      )}
+    </button>
+  );
+
+  return (
+    <div ref={rootRef} className={`text-ide-small relative inline-flex min-w-0 items-stretch h-full overflow-visible ${className}`}>
+      {triggerTooltip ? (
+        <Tooltip variant="minimal" content={triggerTooltip} className="flex h-full min-w-0 max-w-full">
+          {trigger}
+        </Tooltip>
+      ) : trigger}
 
       {open && !disabled && (
         <div ref={popupRef} className={`absolute mb-[4px] z-[100] w-max rounded-md border border-border bg-background-secondary px-1 py-0.5 
@@ -267,9 +301,15 @@ export default function ChatDropdown({
               }
             }}
           >
+            {menuTitle && (
+              <div className="flex min-h-7 items-center px-2 text-ide-small text-[var(--ide-Label-disabledForeground)]">
+                {menuTitle}
+              </div>
+            )}
             {options.map((option, index) => (
-              <div key={option.id} data-option-id={option.id} className="relative"
-                onMouseEnter={(e) => {
+              <div key={option.id} data-option-id={option.id} className={`relative ${option.className ?? ''}`}
+                onPointerEnter={(e) => {
+                  if (e.pointerType !== 'mouse' || isCompact()) return;
                   setHoveredOptionId(option.id);
                   if (option.subOptions && popupRef.current) {
                     applySubMenuPosition(e.currentTarget, popupRef.current);
@@ -283,19 +323,34 @@ export default function ChatDropdown({
                         optionButtonRefs.current[index] = element;
                       }}
                       type="button"
+                      onPointerDown={(event) => { pointerTypeRef.current = event.pointerType; }}
+                      onPointerCancel={() => { pointerTypeRef.current = null; }}
                       onFocus={(e) => {
+                        if (isCompact()
+                          || (pointerTypeRef.current && pointerTypeRef.current !== 'mouse')
+                          || !e.currentTarget.matches(':focus-visible')) return;
                         setHoveredOptionId(option.id);
                         if (option.subOptions && popupRef.current) {
                           applySubMenuPosition(e.currentTarget.closest('[data-option-id]') as Element, popupRef.current);
                         }
                       }}
                       onKeyDown={(event) => handleMainOptionKeyDown(event, index)}
-                      onClick={() => {
-                        if (!option.subOptions) {
-                          onChange(option.id);
-                          setOpen(false);
-                          setHoveredOptionId(null);
+                      onClick={(event) => {
+                        const pointerType = pointerTypeRef.current;
+                        pointerTypeRef.current = null;
+                        if (option.subOptions) {
+                          if (isCompact() || (pointerType && pointerType !== 'mouse')) {
+                            const closing = hoveredOptionId === option.id;
+                            setHoveredOptionId(closing ? null : option.id);
+                            if (!closing && popupRef.current) {
+                              applySubMenuPosition(event.currentTarget.closest('[data-option-id]') as Element, popupRef.current);
+                            }
+                          }
+                          return;
                         }
+                        onChange(option.id);
+                        setOpen(false);
+                        setHoveredOptionId(null);
                       }}
                       className={`flex items-center w-full my-0.5 px-2 min-h-8 text-left transition-colors 
                         rounded min-w-[70px] outline-none 
@@ -308,7 +363,7 @@ export default function ChatDropdown({
                       {option.subOptions && (
                         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
                              stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-                             className="opacity-40 ml-4">
+                             className={`opacity-40 ml-4 transition-transform ${hoveredOptionId === option.id ? 'chat-max-600:-rotate-90' : ''}`}>
                           <polyline points="9 18 15 12 9 6"></polyline>
                         </svg>
                       )}
@@ -328,9 +383,10 @@ export default function ChatDropdown({
           </div>
 
           {hoveredOption?.subOptions && (
-            <div className={`absolute mb-[4px] left-full z-[101] ml-1 w-max rounded-md border border-border 
-              bg-background-secondary px-1 py-0.5 animate-in fade-in slide-in-from-left-1 duration-75`}
-              style={{[subMenuPosition.prop]: subMenuPosition.offset}}
+            <div className={`absolute mb-[4px] left-full z-[101] ml-1 w-max rounded-md border border-border
+              bg-background-secondary px-1 py-0.5 animate-in fade-in slide-in-from-left-1 duration-75
+              chat-max-600:left-0 chat-max-600:ml-0 chat-max-600:mb-0 ${hoveredOption.className ?? ''}`}
+              style={{[subMenuPosition.prop]: subMenuPosition.offset, minWidth: subMenuPosition.minWidth, maxWidth: subMenuPosition.maxWidth}}
             >
               <div className="overflow-y-auto" style={{ maxHeight: subMenuPosition.maxHeight }}>
                 {hoveredOption.subOptions.map((sub, index) => {

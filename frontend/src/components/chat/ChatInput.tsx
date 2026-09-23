@@ -52,7 +52,6 @@ export default function ChatInput(props: ChatInputProps) {
   const {
     editorContainerRef,
     inputRootRef,
-    controlsRowRef,
     slashMenuRef,
     fileMenuRef,
     composerRevision,
@@ -74,7 +73,6 @@ export default function ChatInput(props: ChatInputProps) {
     setFileHighlightedIndex,
     applyFile,
     customHeight,
-    showAuxIndicators,
     insertText,
     agentSlashItems,
     promptLibrarySlashItems,
@@ -88,7 +86,7 @@ export default function ChatInput(props: ChatInputProps) {
   const handleSubmit = isSending ? (() => onQueueDraft?.()) : onSend;
 
   return (
-    <div ref={inputRootRef} style={{ height: customHeight ? `${customHeight}px` : undefined }} className="relative flex-shrink-0 pb-2 pt-1">
+    <div ref={inputRootRef} style={{ height: customHeight ? `${customHeight}px` : undefined }} className="relative flex-shrink-0 pb-2 pt-1 [container-type:inline-size] [container-name:chat-input]">
       <div className="h-full w-full flex flex-col">
         <div className={`relative flex h-full flex-col rounded-ide border border-[var(--ide-Button-startBorderColor)]
           bg-background-secondary transition-all focus-within:ring-1 focus-within:[--tw-ring-color:color-mix(in_srgb,var(--ide-Button-default-focusColor)_70%,transparent)] ${
@@ -136,7 +134,7 @@ export default function ChatInput(props: ChatInputProps) {
           />
 
           <ChatInputControls
-            controlsRowRef={controlsRowRef}
+            containerRef={inputRootRef}
             sendMode={sendMode}
             setSendMode={setSendMode}
             plusMenuOptions={plusMenuOptions}
@@ -157,7 +155,6 @@ export default function ChatInput(props: ChatInputProps) {
             contextTokensUsed={contextTokensUsed}
             contextWindowSize={contextWindowSize}
             inputValue={inputValue}
-            showAuxIndicators={showAuxIndicators}
             voiceInputButton={
               <VoiceInputButton
                 conversationId={conversationId}

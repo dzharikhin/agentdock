@@ -203,6 +203,7 @@ export interface DropdownOption {
   id: string;
   label: string;
   description?: string;
+  className?: string;
   icon?: string | React.ReactNode;
   iconPath?: string;
   subOptions?: DropdownOption[];

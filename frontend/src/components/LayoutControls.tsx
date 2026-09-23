@@ -47,7 +47,7 @@ export function SidebarLayoutControls({
 
   return (
     <div className={`flex items-center gap-0.5 ${position === 'right' ? 'flex-row-reverse' : ''} ${floating
-      ? `fixed top-2 z-40 rounded-[5px] border border-border bg-background p-0.5 ${position === 'left' ? 'left-1.5' : 'right-1.5'}`
+      ? `fixed top-px z-40 rounded-[5px] border border-border bg-background p-0.5 ${position === 'left' ? 'left-1.5' : 'right-1.5'}`
       : ''}`}
     >
       <Tooltip variant="minimal" placement="bottom" content={hidden ? 'Show sidebar' : 'Hide sidebar'}>

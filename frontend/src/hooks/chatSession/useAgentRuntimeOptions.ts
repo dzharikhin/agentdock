@@ -118,11 +118,7 @@ export function useAgentRuntimeOptions({
     description: option.description,
   })) ?? [];
   const additionalConfigOptions = effectiveOptions
-    .filter((option) =>
-      option.id !== modelOption?.id
-      && option.id !== modeOption?.id
-      && option.id !== reasoningOption?.id
-    )
+    .filter((option) => option.id !== modelOption?.id)
     .map((option) => ({ ...option, currentValue: configValues[option.id] ?? option.currentValue ?? '' }));
 
   const handleSessionConfigOptions = useCallback((payload: SessionConfigOptionsPayload) => {

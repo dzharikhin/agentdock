@@ -287,7 +287,8 @@ export function SettingsView() {
               ariaLabel='Use sidebar layout'
             />
 
-            <SettingsField label='Sidebar Position' colon>
+            <div className='grid grid-cols-[max-content_max-content] items-center gap-x-2 gap-y-3'>
+              <span className='text-foreground'>Sidebar Position:</span>
               <DropdownSelect
                 value={globalSettings.settings.sidebarPosition}
                 onChange={(value) => updateGlobalSettings({
@@ -297,9 +298,16 @@ export function SettingsView() {
                 disabled={!globalSettings.settings.sidebarEnabled}
                 className='max-w-full'
               />
-            </SettingsField>
 
-            <SettingsField label='Zoom' colon>
+              <span className='text-foreground'>Base Font Size:</span>
+              <DropdownSelect
+                value={String(globalSettings.settings.uiFontSizeOffsetPx)}
+                onChange={(value) => updateGlobalSettings({ uiFontSizeOffsetPx: Number(value) })}
+                options={uiFontSizeSelectOptions}
+                className='max-w-full'
+              />
+
+              <span className='text-foreground'>Zoom:</span>
               <DropdownSelect
                 value={String(globalSettings.settings.uiZoomPercent)}
                 onChange={(value) => {
@@ -311,16 +319,7 @@ export function SettingsView() {
                 options={zoomSelectOptions(globalSettings.settings.uiZoomPercent)}
                 className='max-w-full'
               />
-            </SettingsField>
-
-            <SettingsField label='Base Font Size' colon>
-              <DropdownSelect
-                value={String(globalSettings.settings.uiFontSizeOffsetPx)}
-                onChange={(value) => updateGlobalSettings({ uiFontSizeOffsetPx: Number(value) })}
-                options={uiFontSizeSelectOptions}
-                className='max-w-full'
-              />
-            </SettingsField>
+            </div>
 
             <SettingsField
               label='User Message Background'

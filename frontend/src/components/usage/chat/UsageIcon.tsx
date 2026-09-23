@@ -1,6 +1,6 @@
 import { Tooltip } from '../../chat/shared/Tooltip';
 import React from 'react';
-import { QuotaMeter } from '../shared/QuotaMeter';
+import { QuotaGauge } from '../shared/QuotaGauge';
 import { ACPBridge } from '../../../utils/bridge';
 
 export function UsageIcon({
@@ -17,14 +17,20 @@ export function UsageIcon({
   const displayLabel = `${Math.round(percent)}%`;
 
   return (
-    <Tooltip content={children} onShow={() => ACPBridge.fetchAdapterUsage(adapterId)}>
-      <button className="flex items-center h-full ml-0.5 gap-1.5 rounded px-1.5 border-0 bg-background-secondary text-ide-small text-foreground transition-colors outline-none cursor-default hover:bg-hover hover:text-foreground focus-visible:bg-hover focus-visible:text-foreground focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]">
-        <div className="flex items-center gap-1">
-          <QuotaMeter percent={percent} size={12} className="mr-0.5 relative top-[-1px]" />
-          <span className="whitespace-nowrap">{displayLabel}</span>
-          <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
-        </div>
-      </button>
-    </Tooltip>
+    <div className="min-w-0 flex-1 max-w-max">
+      <Tooltip className="h-full" content={children} onShow={() => ACPBridge.fetchAdapterUsage(adapterId)}>
+        <button
+          aria-label={`Usage quota: ${displayLabel} used`}
+          className="flex h-full w-full min-w-0 items-center rounded border-0 bg-background-secondary px-1.5
+            text-ide-small text-foreground transition-colors outline-none cursor-default hover:bg-hover
+            hover:text-foreground focus-visible:bg-hover focus-visible:text-foreground">
+          <div className="flex min-w-0 items-center">
+            <QuotaGauge percent={percent} />
+            <span className="relative top-px ml-1 min-w-0 truncate chat-max-600:hidden">{displayLabel}</span>
+            <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
+          </div>
+        </button>
+      </Tooltip>
+    </div>
   );
 }

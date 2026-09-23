@@ -122,7 +122,7 @@ export function Sidebar({
             : `right-0 border-l border-border ${hidden ? 'translate-x-full' : 'translate-x-0'}`
         }`}
       >
-        <div className={`flex h-9 shrink-0 items-center px-2.5 ${position === 'right' ? 'justify-end' : ''}`}>
+        <div className={`flex h-9 shrink-0 items-center overflow-hidden px-2.5 ${position === 'right' ? 'justify-end' : ''}`}>
           <SidebarLayoutControls
             position={position}
             hidden={false}

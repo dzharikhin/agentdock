@@ -212,7 +212,7 @@ function App() {
   return (
     <div
       style={{ '--content-top-inset': sidebarEnabled && isWide ? '1rem' : '0px' } as CSSProperties}
-      className={`h-full bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'}`}
+      className={`relative h-full min-w-[300px] bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'}`}
     >
       {sidebarEnabled ? (
         <Sidebar
@@ -235,6 +235,14 @@ function App() {
           onTogglePosition={toggleSidebarPosition}
         />
       ) : <TabBar {...navigationProps} />}
+
+      {sidebarEnabled && !sidebarHidden && !isWide ? (
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 z-30"
+          onClick={() => setSidebarVisibility(true)}
+        />
+      ) : null}
 
       {sidebarEnabled && sidebarHidden ? (
         <SidebarLayoutControls

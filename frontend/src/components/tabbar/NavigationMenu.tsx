@@ -168,7 +168,7 @@ export function TabNavigationContent({
                     aria-expanded={openChatsExpanded}
                   >
                     {openChatsExpanded ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
-                    <span className="ml-1">Open Chats</span>
+                    <span className="ml-1 truncate">Open Chats</span>
                   </button>
                 ) : <span className="min-w-0 flex-1">Open Chats</span>}
                 {tabs.length > 0 ? (
@@ -368,7 +368,7 @@ export function TabNavigationContent({
                 aria-expanded={newChatExpanded}
               >
                 {newChatExpanded ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
-                <span className="ml-1">New Chat</span>
+                <span className="ml-1 truncate">New Chat</span>
               </button>
             ) : <span>New Chat</span>}
             {pinActionsToBottom && onNewTab ? (
@@ -464,7 +464,7 @@ export function TabNavigationContent({
             aria-expanded={sectionsExpanded}
           >
             {sectionsExpanded ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
-            <span className="ml-1">Sections</span>
+            <span className="ml-1 truncate">Sections</span>
           </button>
         ) : null}
         <div

@@ -100,15 +100,15 @@ export function GitCommitGenerationSettings({ settings, installedAgents, onChang
     >
       {settings.enabled && (
         <>
-          <SettingsField label='AI Agent' colon>
+          <div className='grid grid-cols-[max-content_max-content] items-center gap-x-2 gap-y-4'>
+            <span className='text-foreground'>AI Agent:</span>
             <DropdownSelect
               value={activeAgent.id}
               onChange={handleAgentChange}
               options={agentOptions}
               className='max-w-full'
             />
-          </SettingsField>
-          <SettingsField label='Model' colon>
+            <span className='text-foreground'>Model:</span>
             <DropdownSelect
               value={activeModelId}
               onChange={handleModelChange}
@@ -116,17 +116,18 @@ export function GitCommitGenerationSettings({ settings, installedAgents, onChang
               options={modelOptions}
               className='max-w-full'
             />
-          </SettingsField>
-          {reasoningOption && reasoningOption.options.length > 0 && (
-            <SettingsField label={reasoningOption.name || 'Reasoning Effort'} colon>
-              <DropdownSelect
-                value={reasoningEffortId}
-                onChange={(nextEffortId) => update({ reasoningEffortId: nextEffortId })}
-                options={reasoningOptions}
-                className='max-w-full'
-              />
-            </SettingsField>
-          )}
+            {reasoningOption && reasoningOption.options.length > 0 && (
+              <>
+                <span className='text-foreground'>{reasoningOption.name || 'Reasoning Effort'}:</span>
+                <DropdownSelect
+                  value={reasoningEffortId}
+                  onChange={(nextEffortId) => update({ reasoningEffortId: nextEffortId })}
+                  options={reasoningOptions}
+                  className='max-w-full'
+                />
+              </>
+            )}
+          </div>
           <SettingsField label='Custom Instructions (optional)' stacked>
             <textarea
               value={localInstructions}
