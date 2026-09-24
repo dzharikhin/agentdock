@@ -8,7 +8,7 @@ import { GitFork } from 'lucide-react';
 interface AssistantMessageProps {
   message: Message;
   onImageClick: (src: string) => void;
-  showBorder: boolean;
+  hasFollowingMessage: boolean;
   agentIconPath?: string;
   isActivePrompt?: boolean;
   onFork?: () => void;
@@ -68,7 +68,7 @@ function groupAssistantBlocks(blocks: RichContentBlock[]) {
   return groups;
 }
 
-export const AssistantMessage = memo(({ message, onImageClick, showBorder, agentIconPath, isActivePrompt = false, onFork }: AssistantMessageProps) => {
+export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessage, agentIconPath, isActivePrompt = false, onFork }: AssistantMessageProps) => {
   const renderContent = () => {
     if (message.contentBlocks && message.contentBlocks.length > 0) {
       const groupedBlocks = groupAssistantBlocks(message.contentBlocks);
@@ -150,56 +150,48 @@ export const AssistantMessage = memo(({ message, onImageClick, showBorder, agent
   );
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="flex justify-start mb-2">
-        <div className="w-full text-foreground">
-          <div className="break-words" onClick={handleReplyImageClick}>
-            {renderContent()}
-          </div>
-        </div>
+    <div className={`group/assistant animate-in fade-in slide-in-from-bottom-2 duration-300 ${hasFollowingMessage ? 'mb-8' : ''}`}>
+      <div className="break-words text-foreground" onClick={handleReplyImageClick}>
+        {renderContent()}
       </div>
 
-      <div className={showMeta || onFork || showBorder ? 'mt-8' : ''}>
-        {(showMeta || onFork) && (
-          <div className="flex justify-end items-center gap-2 mb-4 text-foreground-secondary">
-            {onFork && (
-              <Tooltip content="Fork from here" variant="minimal">
-                <button
-                  type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded text-foreground-secondary
-                  hover:bg-hover hover:text-foreground focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]
-                  focus-visible:outline-none"
-                  onClick={onFork}
-                  aria-label="Fork from here"
-                >
-                  <GitFork size={13} />
-                </button>
-              </Tooltip>
-            )}
-            {showMeta && (hasMetaTooltip ? (
-              <Tooltip
-                content={
-                  <div className="min-w-[190px] space-y-1.5">
-                    {tooltipRows.map((row) => (
-                      <div key={row.label} className="flex justify-between gap-2 text-xs">
-                        <span className="text-foreground-secondary">{row.label}</span>
-                        <span className="text-foreground text-right">{row.value}</span>
-                      </div>
-                    ))}
-                  </div>
-                }
+      {(showMeta || onFork) && (
+        <div className="ml-0.5 mt-2 flex items-center gap-2 text-foreground-secondary">
+          {showMeta && (hasMetaTooltip ? (
+            <Tooltip
+              content={
+                <div className="min-w-[190px] space-y-1.5">
+                  {tooltipRows.map((row) => (
+                    <div key={row.label} className="flex justify-between gap-2 text-xs">
+                      <span className="text-foreground-secondary">{row.label}</span>
+                      <span className="text-foreground text-right">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+              }
+            >
+              <div className="cursor-help">{agentBadge}</div>
+            </Tooltip>
+          ) : (
+            agentBadge
+          ))}
+          {onFork && (
+            <Tooltip content="Fork from here" variant="minimal">
+              <button
+                type="button"
+                className="inline-flex h-6 w-6 items-center justify-center rounded text-foreground-secondary
+                opacity-0 pointer-events-none transition-opacity group-hover/assistant:opacity-100
+                group-hover/assistant:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto
+                hover:bg-hover hover:text-foreground focus-visible:outline-none relative top-[1.5px]"
+                onClick={onFork}
+                aria-label="Fork from here"
               >
-                <div className="cursor-help">{agentBadge}</div>
-              </Tooltip>
-            ) : (
-              agentBadge
-            ))}
-          </div>
-        )}
-
-        {showBorder && <div className="border-b border-border -mx-4 mb-8" />}
-      </div>
+                <GitFork size={15} />
+              </button>
+            </Tooltip>
+          )}
+        </div>
+      )}
     </div>
   );
 });
-
