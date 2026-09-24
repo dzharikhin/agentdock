@@ -113,7 +113,7 @@ export const ImageOverlayModal: React.FC<ImageOverlayModalProps> = ({ src, onClo
         src={src}
         draggable={false}
         alt=""
-        className="max-h-full max-w-full min-h-0 min-w-0 object-contain rounded-lg shadow-2xl
+        className="max-h-full max-w-full min-h-0 min-w-0 object-contain rounded-lg
           animate-in zoom-in-95 duration-200"
       />
     </div>

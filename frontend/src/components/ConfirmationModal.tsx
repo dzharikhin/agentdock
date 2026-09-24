@@ -49,7 +49,7 @@ export default function ConfirmationModal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-200"
+      className="absolute inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 animate-in fade-in duration-200"
       onClick={onCancel}
     >
       <div
@@ -59,7 +59,7 @@ export default function ConfirmationModal({
         aria-labelledby="confirmation-dialog-title"
         tabIndex={-1}
         className="relative flex w-full max-w-[400px] flex-col rounded-[9px] border border-border
-          bg-[var(--ide-Panel-background)] text-foreground shadow-[0_18px_48px_rgba(0,0,0,0.38)]
+          bg-[var(--ide-Panel-background)] text-foreground
           animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
@@ -132,6 +132,6 @@ export default function ConfirmationModal({
         </div>
       </div>
     </div>,
-    document.body
+    document.getElementById('app-content') ?? document.body
   );
 }

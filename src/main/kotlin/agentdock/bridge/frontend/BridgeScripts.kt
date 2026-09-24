@@ -40,7 +40,10 @@ internal object BridgeScripts {
                 window[name] = window[name] || function() {};
             });
 
-            window.__notifyReady = function() { invoke('ready', ''); };
+            window.__notifyReady = function() {
+                var isDark = getComputedStyle(document.documentElement).getPropertyValue('--ide-theme-is-dark').trim();
+                invoke('ready', isDark === '0' ? 'light' : 'dark');
+            };
 
             window.__requestAdapters = function(forceRefresh) {
                 invoke('listAdapters', forceRefresh === true ? 'refresh' : '');

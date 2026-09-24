@@ -257,7 +257,7 @@ function App() {
         />
       ) : null}
 
-      <div className="flex-1 relative min-h-0 min-w-0">
+      <div id="app-content" className="flex-1 relative min-h-0 min-w-0">
         {/* Chat tabs stay mounted so their sessions and UI state are preserved. */}
         {tabs.map((tab) => {
           const isTabActive = tab.id === activeTabId;

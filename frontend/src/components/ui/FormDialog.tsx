@@ -53,7 +53,7 @@ export function FormDialog({
         aria-labelledby={titleId}
         tabIndex={-1}
         className={`relative flex w-full max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border
-         mx-4 bg-background text-foreground shadow-[0_18px_48px_rgba(0,0,0,0.42)] animate-in zoom-in-95 duration-150`}
+         mx-4 bg-background text-foreground animate-in zoom-in-95 duration-150`}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {

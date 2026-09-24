@@ -306,7 +306,8 @@ internal fun AcpBridge.installAdapterQueries() {
         scope.launch(Dispatchers.IO) { pushAdapters() }
     }
 
-    host.register("ready") {
+    host.register("ready") { theme ->
+        ClientTheme.update(theme)
         scope.launch(Dispatchers.IO) {
             startInitialAdapterRefresh()
             pushAllAvailableCommands()
