@@ -49,6 +49,9 @@ object GlobalSettingsStore {
             userMessageCustomColor = settings.userMessageCustomColor.takeIf { Regex("#[0-9a-fA-F]{6}").matches(it) } ?: "#193d70",
             sidebarPosition = normalizeSidebarPosition(settings.sidebarPosition),
             sidebarExpandedSections = settings.sidebarExpandedSections.filter { it in sidebarSectionIds }.distinct(),
+            adapterStartTimeoutSeconds = normalizeAdapterStartTimeoutSeconds(settings.adapterStartTimeoutSeconds),
+            adapterInitializeAttemptTimeoutSeconds =
+                normalizeAdapterInitializeAttemptTimeoutSeconds(settings.adapterInitializeAttemptTimeoutSeconds),
             audioTranscription = normalizeAudioTranscriptionSettings(settings.audioTranscription),
             gitCommitGeneration = settings.gitCommitGeneration.copy(
                 adapterId = settings.gitCommitGeneration.adapterId.trim(),
@@ -71,6 +74,11 @@ object GlobalSettingsStore {
     fun uiFontSizeOffsetPx(): Int = normalizeUiFontSizeOffsetPx(load().uiFontSizeOffsetPx)
 
     fun userMessageBackgroundStyle(): String = normalizeUserMessageBackgroundStyle(load().userMessageBackgroundStyle)
+
+    fun adapterStartTimeoutSeconds(): Int = normalizeAdapterStartTimeoutSeconds(load().adapterStartTimeoutSeconds)
+
+    fun adapterInitializeAttemptTimeoutSeconds(): Int =
+        normalizeAdapterInitializeAttemptTimeoutSeconds(load().adapterInitializeAttemptTimeoutSeconds)
 
     private inline fun <T> withStoreLock(action: () -> T): T = synchronized(storeLock) {
         val lockFile = File(AcpAdapterPaths.getBaseRuntimeDir(), "settings.lock")
@@ -135,6 +143,14 @@ object GlobalSettingsStore {
 
     private fun normalizeUiFontSizeOffsetPx(offset: Int?): Int {
         return (offset ?: 0).coerceIn(-3, 3)
+    }
+
+    private fun normalizeAdapterStartTimeoutSeconds(seconds: Int?): Int {
+        return (seconds ?: 300).coerceIn(30, 3600)
+    }
+
+    private fun normalizeAdapterInitializeAttemptTimeoutSeconds(seconds: Int?): Int {
+        return (seconds ?: 60).coerceIn(10, 1800)
     }
 
     private fun normalizeUserMessageBackgroundStyle(style: String?): String {

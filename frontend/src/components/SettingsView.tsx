@@ -34,6 +34,18 @@ const SIDEBAR_POSITION_OPTIONS: DropdownOption[] = [
   { value: 'left', label: 'Left' },
 ];
 
+function normalizeAdapterStartTimeoutSeconds(value: unknown): number {
+  const seconds = Math.round(Number(value));
+  if (!Number.isFinite(seconds)) return 300;
+  return Math.max(30, Math.min(3600, seconds));
+}
+
+function normalizeAdapterInitializeAttemptTimeoutSeconds(value: unknown): number {
+  const seconds = Math.round(Number(value));
+  if (!Number.isFinite(seconds)) return 60;
+  return Math.max(10, Math.min(1800, seconds));
+}
+
 function normalizeUiZoomPercent(value: unknown): number {
   const percent = Math.round(Number(value));
   if (!Number.isFinite(percent)) return 100;
@@ -84,7 +96,11 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
       sidebarPosition: payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left',
       sidebarExpandedSections: Array.isArray(payload?.settings?.sidebarExpandedSections)
         ? payload.settings.sidebarExpandedSections
-        : [...DEFAULT_SIDEBAR_EXPANDED_SECTIONS]
+        : [...DEFAULT_SIDEBAR_EXPANDED_SECTIONS],
+      adapterStartTimeoutSeconds: normalizeAdapterStartTimeoutSeconds(payload?.settings?.adapterStartTimeoutSeconds),
+      adapterInitializeAttemptTimeoutSeconds: normalizeAdapterInitializeAttemptTimeoutSeconds(
+        payload?.settings?.adapterInitializeAttemptTimeoutSeconds
+      )
     }
   };
 }
@@ -131,6 +147,43 @@ function applyUserMessageTheme(styleId: GlobalSettingsPayload['settings']['userM
     userMessageBackgroundOptions.find((option) => option.id === styleId) ?? userMessageBackgroundOptions[0];
   document.documentElement.style.setProperty('--ide-user-message-custom-bg', customColor);
   document.documentElement.style.setProperty('--user-message-bg', styleId === 'custom' ? 'var(--ide-user-message-custom-bg)' : selected.background);
+}
+
+interface TimeoutInputProps {
+  value: number;
+  min: number;
+  max: number;
+  ariaLabel: string;
+  onCommit: (value: number) => void;
+}
+
+// Free numeric input for seconds-based timeouts. Edits are held in a local draft so
+// partial typing is not clamped and saved per keystroke; the value commits on blur
+// or Enter, and invalid input reverts to the current value.
+function TimeoutInput({ value, min, max, ariaLabel, onCommit }: TimeoutInputProps) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    setDraft(null);
+    const parsed = Math.round(Number(draft));
+    if (!Number.isFinite(parsed)) return;
+    onCommit(Math.max(min, Math.min(max, parsed)));
+  };
+  return (
+    <input
+      type='number'
+      min={min}
+      max={max}
+      value={draft ?? String(value)}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
+      }}
+      aria-label={ariaLabel}
+      className='w-24 px-2 py-1'
+    />
+  );
 }
 
 export function SettingsView() {
@@ -387,6 +440,34 @@ export function SettingsView() {
               onToggle={() => updateGlobalSettings({ quotaWidgetEnabled: !globalSettings.settings.quotaWidgetEnabled })}
               ariaLabel='Enable status bar quota widget'
             />
+
+            <SettingsField
+              label='Agent Start Timeout'
+              colon
+              description='Overall time budget in seconds for launching an agent and completing the ACP handshake (30–3600)'
+            >
+              <TimeoutInput
+                value={globalSettings.settings.adapterStartTimeoutSeconds}
+                min={30}
+                max={3600}
+                ariaLabel='Agent start timeout in seconds'
+                onCommit={(seconds) => updateGlobalSettings({ adapterStartTimeoutSeconds: seconds })}
+              />
+            </SettingsField>
+
+            <SettingsField
+              label='Initialize Attempt Timeout'
+              colon
+              description='Max wait in seconds for the ACP initialize handshake per launch attempt (10–1800)'
+            >
+              <TimeoutInput
+                value={globalSettings.settings.adapterInitializeAttemptTimeoutSeconds}
+                min={10}
+                max={1800}
+                ariaLabel='Initialize attempt timeout in seconds'
+                onCommit={(seconds) => updateGlobalSettings({ adapterInitializeAttemptTimeoutSeconds: seconds })}
+              />
+            </SettingsField>
 
             <GitCommitGenerationSettings
               settings={globalSettings.settings.gitCommitGeneration}

@@ -1,6 +1,7 @@
 package agentdock.acp
 
 import agentdock.BuildConfig
+import agentdock.settings.GlobalSettingsStore
 import com.agentclientprotocol.client.Client
 import com.agentclientprotocol.client.ClientInfo
 import com.agentclientprotocol.model.ClientCapabilities
@@ -24,8 +25,6 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
 // Includes process launch, ACP initialize, and config-options discovery.
-private const val ADAPTER_INITIALIZATION_TIMEOUT_MS = 300_000L
-private const val ACP_INITIALIZE_ATTEMPT_TIMEOUT_MS = 60_000L
 private const val ACP_INITIALIZE_MAX_ATTEMPTS = 2
 private const val ACP_INITIALIZE_RETRY_DELAY_MS = 5_000L
 private const val CONFIG_OPTIONS_FETCH_TIMEOUT_MS = 120_000L
@@ -45,14 +44,18 @@ internal suspend fun AcpClientService.startAndInitializeSharedProcess(
         if (forceRestart) sharedProcess.stop()
         if (sharedProcess.isHealthy()) return@withLock
 
+        // Read once per start so changing the setting takes effect on the next adapter start
+        // without repeated disk reads inside the attempt loop.
+        val initializationTimeoutMs = GlobalSettingsStore.adapterStartTimeoutSeconds() * 1000L
+        val attemptTimeoutMs = GlobalSettingsStore.adapterInitializeAttemptTimeoutSeconds() * 1000L
         try {
-            val completed = withTimeoutOrNull(ADAPTER_INITIALIZATION_TIMEOUT_MS) {
-                initializeSharedProcessWithinBudget(sharedProcess, adapterInfo)
+            val completed = withTimeoutOrNull(initializationTimeoutMs) {
+                initializeSharedProcessWithinBudget(sharedProcess, adapterInfo, attemptTimeoutMs)
                 true
             }
             if (completed != true) {
                 throw TimeoutException(
-                    "Adapter initialization timed out after ${ADAPTER_INITIALIZATION_TIMEOUT_MS / 1000}s"
+                    "Adapter initialization timed out after ${initializationTimeoutMs / 1000}s"
                 )
             }
         } catch (error: Exception) {
@@ -65,7 +68,8 @@ internal suspend fun AcpClientService.startAndInitializeSharedProcess(
 @OptIn(com.agentclientprotocol.annotations.UnstableApi::class)
 private suspend fun AcpClientService.initializeSharedProcessWithinBudget(
     sharedProcess: AcpClientService.SharedProcess,
-    adapterInfo: AcpAdapterConfig.AdapterInfo
+    adapterInfo: AcpAdapterConfig.AdapterInfo,
+    attemptTimeoutMs: Long
 ) {
     val adapterId = adapterInfo.id
     val target = AcpAdapterPaths.getExecutionTarget()
@@ -91,7 +95,8 @@ private suspend fun AcpClientService.initializeSharedProcessWithinBudget(
                 adapterInfo = adapterInfo,
                 adapterRoot = adapterRoot,
                 command = command,
-                attempt = attempt
+                attempt = attempt,
+                attemptTimeoutMs = attemptTimeoutMs
             )
             lastError = null
             break
@@ -115,7 +120,8 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
     adapterInfo: AcpAdapterConfig.AdapterInfo,
     adapterRoot: String,
     command: List<String>,
-    attempt: Int
+    attempt: Int,
+    attemptTimeoutMs: Long
 ) {
     sharedProcess.stop()
     try {
@@ -204,7 +210,7 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
             AcpClientService.AdapterInitializationStatus.Initializing,
             detail = "Waiting for ACP initialize... (attempt $attempt/$ACP_INITIALIZE_MAX_ATTEMPTS)"
         )
-        val result = withTimeoutOrNull(ACP_INITIALIZE_ATTEMPT_TIMEOUT_MS) {
+        val result = withTimeoutOrNull(attemptTimeoutMs) {
             client.initialize(
                 ClientInfo(
                     PROTOCOL_VERSION_V1,
@@ -219,7 +225,7 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
                 )
             )
         } ?: throw TimeoutException(
-            "ACP initialize timed out after ${ACP_INITIALIZE_ATTEMPT_TIMEOUT_MS / 1000}s"
+            "ACP initialize timed out after ${attemptTimeoutMs / 1000}s"
         )
         sharedProcess.authMethods = result.authMethods
         sharedProcess.logoutAvailable = result.capabilities.auth.logout != null

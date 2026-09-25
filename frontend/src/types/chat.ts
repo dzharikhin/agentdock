@@ -523,6 +523,8 @@ export interface GlobalSettings {
   sidebarEnabled: boolean;
   sidebarPosition: 'left' | 'right';
   sidebarExpandedSections: SidebarSectionId[];
+  adapterStartTimeoutSeconds: number;
+  adapterInitializeAttemptTimeoutSeconds: number;
 }
 
 export interface GlobalSettingsPayload {

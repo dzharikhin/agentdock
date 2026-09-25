@@ -39,7 +39,11 @@ dependencies {
     implementation("io.github.java-diff-utils:java-diff-utils:4.15")
 
     intellijPlatform {
-        intellijIdea("2026.2")
+        // download.jetbrains.com is unreachable in some environments (HTTP 451);
+        // resolve the IDE from the IntelliJ Repository (Releases) Maven channel instead.
+        intellijIdea("2026.2") {
+            useInstaller = false
+        }
         jetbrainsRuntime()
         pluginModule(implementation(project(":shared")))
         pluginModule(implementation(project(":frontend")))

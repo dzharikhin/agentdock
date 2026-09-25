@@ -39,7 +39,15 @@ const EMPTY_ADAPTER_NAMES: string[] = [];
 const APPROVAL_MODE_STORAGE_KEY = 'chat-approval-mode';
 // The backend always reports a terminal status for a session start within its own
 // start timeout, so a deferred prompt that outlives it will never be sent.
-const PENDING_PROMPT_READY_TIMEOUT_MS = 375_000;
+const PENDING_PROMPT_READY_MARGIN_MS = 75_000;
+
+// Tracks the backend's configurable adapter start timeout (plus a margin) so the
+// watchdog stays valid when the user changes the setting.
+function pendingPromptReadyTimeoutMs(): number {
+  const seconds = ACPBridge.getGlobalSettingsSnapshot()?.settings?.adapterStartTimeoutSeconds;
+  const startTimeoutMs = Number.isFinite(seconds) ? Math.round(seconds!) * 1000 : 300_000;
+  return Math.max(30_000, startTimeoutMs) + PENDING_PROMPT_READY_MARGIN_MS;
+}
 
 function loadApprovalMode(): ApprovalMode {
   return localStorage.getItem(APPROVAL_MODE_STORAGE_KEY) === 'auto' ? 'auto' : 'ask';
@@ -326,7 +334,7 @@ export function useChatSession({
       pendingPromptWatchdogRef.current = null;
       if (!pendingPromptRef.current) return;
       failActivePromptLocally('The agent never became ready, so the message was not sent. Send it again to retry.');
-    }, PENDING_PROMPT_READY_TIMEOUT_MS);
+    }, pendingPromptReadyTimeoutMs());
   }, [clearPendingPromptWatchdog, failActivePromptLocally]);
 
   const requestRuntimeRecovery = useCallback((reason: string) => {

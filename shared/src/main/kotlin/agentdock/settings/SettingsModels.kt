@@ -76,7 +76,9 @@ data class GlobalSettings(
     val openInEditor: Boolean = true,
     val sidebarEnabled: Boolean = true,
     val sidebarPosition: String = "left",
-    val sidebarExpandedSections: List<String> = listOf("recent-chats", "sections")
+    val sidebarExpandedSections: List<String> = listOf("recent-chats", "sections"),
+    val adapterStartTimeoutSeconds: Int = 300,
+    val adapterInitializeAttemptTimeoutSeconds: Int = 60
 )
 
 @Serializable
