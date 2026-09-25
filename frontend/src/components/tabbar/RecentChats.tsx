@@ -65,7 +65,8 @@ export function RecentChats({
         <button
           type="button"
           onClick={() => onExpandedChange(!expanded)}
-          className="flex min-w-0 flex-1 items-center self-stretch text-left focus:outline-none"
+          className="flex min-w-0 flex-1 items-center self-stretch rounded-[4px] text-left focus:outline-none
+            focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
           aria-expanded={expanded}
         >
           {expanded ? <ChevronDown size={13} aria-hidden="true" /> : <ChevronRight size={13} aria-hidden="true" />}
@@ -77,7 +78,7 @@ export function RecentChats({
             onClick={onOpenHistory}
             className="flex h-5 w-6 items-center justify-center rounded text-foreground-secondary
               hover:bg-hover hover:text-foreground focus:outline-none
-              focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+              focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
             aria-label="View all project chats"
           >
             <History size={14} aria-hidden="true" />
@@ -104,7 +105,8 @@ export function RecentChats({
                 placeholder="Search…"
                 aria-label="Search recent chats by title"
                 className="h-8 w-full rounded-[4px] border border-border bg-input py-0 pl-2 pr-6 text-ide-small text-foreground
-                  placeholder:text-foreground-secondary focus:outline-none"
+                  placeholder:text-foreground-secondary focus:shadow-none focus:outline-none
+                  focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
               />
               {searchQuery ? (
                 <button
@@ -114,7 +116,8 @@ export function RecentChats({
                     setSearchQuery('');
                     searchInputRef.current?.focus();
                   }}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-[4px] p-0.5 text-foreground-secondary hover:text-foreground focus:outline-none"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 rounded-[4px] p-0.5 text-foreground-secondary hover:text-foreground focus:outline-none
+                    focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
                 >
                   <X size={11} aria-hidden="true" />
                 </button>
@@ -146,7 +149,8 @@ export function RecentChats({
                       title
                     )}
                     onClose={() => setRenamingId(null)}
-                    className="-ml-1 rounded-[3px] bg-background px-1 text-foreground"
+                    className="-ml-1 rounded-[3px] bg-background px-1 text-foreground
+                      focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
                   />
                 </div>
               ) : (
@@ -154,7 +158,7 @@ export function RecentChats({
                   type="button"
                   onClick={() => onOpenConversation(item)}
                   className="relative z-10 flex min-w-0 flex-1 items-center rounded-l-[4px] pl-3 pr-1 text-left focus:outline-none
-                    focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                    focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
                 >
                   <span className="mr-2 flex items-center justify-center">
                     {getAgentIcon(item.adapterName, agents)}
@@ -175,7 +179,7 @@ export function RecentChats({
                         onClick={() => setRenamingId(item.conversationId)}
                         className="flex min-h-8 w-6 shrink-0 items-center justify-center text-foreground-secondary
                           hover:text-foreground focus:outline-none
-                          focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                          focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
                         aria-label={`Rename ${item.title}`}
                       >
                         <Pencil size={12} strokeWidth={2.5} aria-hidden="true" />
@@ -194,7 +198,7 @@ export function RecentChats({
                           onClick={() => setPendingDeleteItem(item)}
                           className="flex min-h-8 w-6 shrink-0 items-center justify-center text-foreground-secondary
                             hover:text-error focus:outline-none
-                            focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                            focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
                           aria-label={`Delete ${item.title}`}
                         >
                           <Trash2 size={13} className="-translate-y-px" aria-hidden="true" />
@@ -214,7 +218,7 @@ export function RecentChats({
                           onClick={() => ACPBridge.openHistoryConversationCli(item.projectPath, item.conversationId)}
                           className="flex min-h-8 w-6 shrink-0 items-center justify-center text-foreground-secondary
                             hover:text-foreground focus:outline-none
-                            focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                            focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
                           aria-label={`Open ${item.title} in CLI`}
                         >
                           <Terminal className="h-4 w-4 translate-y-px" aria-hidden="true" />

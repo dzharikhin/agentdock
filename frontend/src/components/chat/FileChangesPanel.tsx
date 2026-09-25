@@ -118,7 +118,7 @@ const FileChangesPanel = memo(({
             </div>
           </div>
 
-          <div
+          <div {...(!expanded ? { inert: '' } : {})}
             className={`grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
           >
             <div className={`overflow-hidden bg-background-secondary border-t transition-colors duration-300 ${expanded ? 'border-border' : 'border-transparent'}`}>

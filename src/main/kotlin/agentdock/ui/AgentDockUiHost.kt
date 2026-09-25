@@ -333,6 +333,8 @@ class AgentDockUiHost(
                     return false
                 }
 
+                if (e.keyCode == KeyEvent.VK_WINDOWS) return true
+
                 if (e.isControlDown && !e.isAltDown && !e.isMetaDown && e.isZoomShortcut()) {
                     if (e.id == KeyEvent.KEY_PRESSED) {
                         applyZoomShortcut(e.keyCode)

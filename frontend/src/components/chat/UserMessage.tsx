@@ -234,7 +234,9 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber }: UserMe
                   <button
                     type="button" onClick={handleCopy}
                     aria-label={copied ? 'Prompt copied' : 'Copy prompt'}
-                    className="inline-flex items-center rounded-[4px] hover:text-foreground focus:outline-none relative top-px"
+                    className="inline-flex items-center rounded-[4px] hover:text-foreground focus:outline-none
+                      focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)]
+                      focus-visible:outline-offset-2 relative top-px"
                   >
                     {copied ? <Check size={12} /> : <Copy size={12} />}
                   </button>

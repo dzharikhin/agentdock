@@ -131,7 +131,7 @@ export const ExploringBlock: React.FC<Props> = ({ block, isActivePrompt = false 
         </span>
       </button>
 
-      <div className={`grid px-[1px] duration-300 ease-in-out w-full min-w-0 
+      <div {...(!isExpanded ? { inert: '' } : {})} className={`grid px-[1px] duration-300 ease-in-out w-full min-w-0 
         ${isExpanded ? 'opacity-100 translate-y-0 overflow-visible' : 'opacity-0 -translate-y-2 overflow-hidden'}`}
         style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
       >

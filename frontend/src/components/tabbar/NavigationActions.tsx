@@ -78,7 +78,7 @@ export function NavigationActions({
                 onAction?.();
               }}
               className="relative z-10 flex min-w-0 flex-1 items-center rounded-[4px] px-3 text-left focus:outline-none
-                focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
               role={onAction ? 'menuitem' : undefined}
               aria-current={isActive ? 'page' : undefined}
             >
@@ -99,7 +99,8 @@ export function NavigationActions({
                       onAction?.();
                     }}
                     className="flex min-h-8 w-5 shrink-0 items-center justify-center rounded-r-[4px]
-                      text-foreground-secondary hover:text-foreground focus:outline-none"
+                      text-foreground-secondary hover:text-foreground focus:outline-none
+                      focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
                     role={onAction ? 'menuitem' : undefined}
                     aria-label={`Close ${action.label}`}
                   >

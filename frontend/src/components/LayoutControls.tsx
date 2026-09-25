@@ -16,7 +16,7 @@ import { Tooltip } from './chat/shared/Tooltip';
 
 const buttonClassName = `flex h-7 w-7 items-center justify-center rounded-[4px] text-foreground-secondary
   hover:bg-hover hover:text-foreground focus:outline-none
-  focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)]`;
+  focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]`;
 
 interface SidebarLayoutControlsProps {
   position: GlobalSettings['sidebarPosition'];

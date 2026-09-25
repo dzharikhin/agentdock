@@ -178,9 +178,8 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
 
       {showMeta && (
         <div className="ml-0.5 mt-2 flex items-center gap-2 text-foreground-secondary">
-          {hasMetaTooltip ? (
-            <Tooltip
-              content={
+          <Tooltip
+            content={hasMetaTooltip ? (
                 <div className="min-w-[190px] space-y-1.5">
                   {tooltipRows.map((row) => (
                     <div key={row.label} className="flex justify-between gap-2 text-xs">
@@ -189,19 +188,22 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
                     </div>
                   ))}
                 </div>
-              }
+              ) : (message.agentName || 'Agent')}
+          >
+            <button type="button" aria-label={`${message.agentName || 'Agent'} details`}
+              className="inline-flex h-4 w-4 items-center justify-center rounded-[4px] cursor-help focus:outline-none
+                focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-0"
             >
-              <div className="cursor-help">{agentBadge}</div>
-            </Tooltip>
-          ) : (
-            agentBadge
-          )}
+              {agentBadge}
+            </button>
+          </Tooltip>
           {onFork && (
             <Tooltip content="Fork from here" variant="minimal">
               <button
                 type="button"
-                className="inline-flex h-4 w-5 items-center justify-center rounded text-foreground-secondary
-                hover:bg-hover hover:text-foreground focus-visible:outline-none relative top-[2px]"
+                className="inline-flex mx-0.5 h-4 w-4 items-center justify-center rounded text-foreground-secondary
+                hover:bg-hover hover:text-foreground focus-visible:outline focus-visible:outline-1
+                focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-0"
                 onClick={onFork}
                 aria-label="Fork from here"
               >
@@ -213,8 +215,9 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
             <Tooltip content={copied ? 'Copied' : 'Copy response'} variant="minimal">
               <button
                 type="button"
-                className="inline-flex h-4 w-5 items-center justify-center rounded text-foreground-secondary
-                hover:bg-hover hover:text-foreground focus-visible:outline-none relative top-px"
+                className="inline-flex mx-0.5 h-4 w-4 items-center justify-center rounded text-foreground-secondary
+                hover:bg-hover hover:text-foreground focus-visible:outline focus-visible:outline-1
+                focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-0"
                 onClick={handleCopy}
                 aria-label={copied ? 'Response copied' : 'Copy response'}
               >

@@ -187,7 +187,7 @@ export function PromptQueueList({
           </div>
         </div>
 
-        <div
+        <div {...(!expanded ? { inert: '' } : {})}
           className={`grid overflow-hidden transition-[grid-template-rows] duration-300 ease-in-out ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
         >
           <div className={`overflow-hidden border-t bg-background-secondary transition-colors duration-300 ${expanded ? 'border-border' : 'border-transparent'}`}>

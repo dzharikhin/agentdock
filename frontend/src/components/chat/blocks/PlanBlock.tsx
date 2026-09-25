@@ -99,7 +99,7 @@ export const PlanBlockComponent: React.FC<Props> = ({ block }) => {
         </div>
       </button>
 
-      <div className="grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden"
+      <div {...(!expanded ? { inert: '' } : {})} className="grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden"
         style={{ gridTemplateRows: expanded ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden">

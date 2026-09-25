@@ -49,7 +49,7 @@ export const SubAgentBlock: React.FC<Props> = ({ block }) => {
         </div>
       </button>
 
-      <div className="grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden text-ide-small"
+      <div {...(!isExpanded ? { inert: '' } : {})} className="grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden text-ide-small"
         style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden">

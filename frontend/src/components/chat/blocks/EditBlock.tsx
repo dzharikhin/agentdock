@@ -261,7 +261,7 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
       </button>
 
       {showInline && (
-        <div
+        <div {...(!isExpanded ? { inert: '' } : {})}
           className={`grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden ${isExpanded ? 'border-t border-border' : ''}`}
           style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
         >

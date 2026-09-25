@@ -148,7 +148,7 @@ export const OtherToolBlock: React.FC<Props> = ({ block, onImageClick }) => {
       </button>
 
       {hasContent && (
-        <div className="grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden"
+        <div {...(!isExpanded ? { inert: '' } : {})} className="grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden"
           style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
         >
           <div className="overflow-hidden">
