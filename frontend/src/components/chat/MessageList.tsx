@@ -211,9 +211,9 @@ function MessageList({
   const handleScroll = () => {
     const el = containerRef.current;
     if (!el) return;
-    // Only scrolling down to the bottom restores a lock released by user input.
-    // Layout changes and delayed programmatic scroll events cannot release it.
-    if (el.scrollTop > lastScrollTopRef.current && getDistanceFromBottom(el) < BOTTOM_PIN_THRESHOLD_PX) {
+    if (el.scrollTop < lastScrollTopRef.current) {
+      followBottomRef.current = false;
+    } else if (el.scrollTop > lastScrollTopRef.current && getDistanceFromBottom(el) < BOTTOM_PIN_THRESHOLD_PX) {
       followBottomRef.current = true;
     }
     lastScrollTopRef.current = el.scrollTop;

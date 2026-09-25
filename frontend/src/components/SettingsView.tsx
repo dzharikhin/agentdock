@@ -390,7 +390,7 @@ export function SettingsView() {
 
             <SettingsCheckbox
               title='System Instructions'
-              description='Manage custom instructions that are sent to AI agents in every session.'
+              description='Manage custom instructions that are sent to AI agents in every session'
               checked={globalSettings.settings.systemInstructionsEnabled}
               onToggle={() => updateGlobalSettings({ systemInstructionsEnabled: !globalSettings.settings.systemInstructionsEnabled })}
               ariaLabel='Enable system instructions'
