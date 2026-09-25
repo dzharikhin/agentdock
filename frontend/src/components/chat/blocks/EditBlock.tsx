@@ -24,6 +24,39 @@ interface DiffLine {
   hunkIndex: number;
 }
 
+const INLINE_DIFF_THRESHOLD = 100;
+const MAX_INLINE_DIFF_LINES = 1000;
+const CONTEXT_LINES = 3;
+
+function countLines(text: string): number {
+  if (!text) return 0;
+  let count = text.endsWith('\n') ? 0 : 1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '\n') count++;
+  }
+  return count;
+}
+
+function trimUnchangedEdges(oldText: string, newText: string): [string, string] {
+  const oldLines = oldText.split('\n');
+  const newLines = newText.split('\n');
+  let prefix = 0;
+  while (prefix < oldLines.length && prefix < newLines.length && oldLines[prefix] === newLines[prefix]) prefix++;
+
+  let oldEnd = oldLines.length - 1;
+  let newEnd = newLines.length - 1;
+  while (oldEnd >= prefix && newEnd >= prefix && oldLines[oldEnd] === newLines[newEnd]) {
+    oldEnd--;
+    newEnd--;
+  }
+
+  const start = Math.max(0, prefix - CONTEXT_LINES);
+  return [
+    oldLines.slice(start, oldEnd + CONTEXT_LINES + 1).join('\n'),
+    newLines.slice(start, newEnd + CONTEXT_LINES + 1).join('\n'),
+  ];
+}
+
 function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
@@ -48,19 +81,22 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
         ...item,
         type: 'diff',
         path: item.path || '',
-        oldText: item.oldText ?? null,
-        newText: item.newText ?? '',
+        oldText: item.oldText == null ? null : normalizeLineEndings(item.oldText),
+        newText: normalizeLineEndings(item.newText ?? ''),
       }))
-      .filter((entry) => normalizeLineEndings(entry.oldText ?? '') !== normalizeLineEndings(entry.newText ?? ''));
+      .filter((entry) => (entry.oldText ?? '') !== entry.newText);
 
     if (diffEntries.length === 0) return null;
 
     const filePath = block.entry.locations?.[0]?.path || diffEntries[0].path || block.entry.title || 'Unknown file';
     const language = getLanguageFromPath(filePath);
+    const trim = diffEntries.reduce((total, entry) =>
+      total + Math.max(countLines(entry.oldText ?? ''), countLines(entry.newText)), 0) >= INLINE_DIFF_THRESHOLD;
 
     let additions = 0;
     let deletions = 0;
     const lines: DiffLine[] = [];
+    let tooLarge = false;
 
     const addLines = (
       text: string,
@@ -69,9 +105,13 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
       newLineNumRef: { value: number },
       hunkIndex: number
     ) => {
-      const splitLines = normalizeLineEndings(text).split('\n');
+      const splitLines = text.split('\n');
       if (splitLines.length > 1 && splitLines[splitLines.length - 1] === '') {
         splitLines.pop();
+      }
+      if (lines.length + splitLines.length > MAX_INLINE_DIFF_LINES) {
+        tooLarge = true;
+        return;
       }
 
       splitLines.forEach((line) => {
@@ -101,9 +141,14 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
       });
     };
 
-    diffEntries.forEach((entry, hunkIndex) => {
-      const oldText = normalizeLineEndings(entry.oldText ?? '');
-      const newText = normalizeLineEndings(entry.newText ?? '');
+    for (const [hunkIndex, entry] of diffEntries.entries()) {
+      const [oldText, newText] = trim && entry.oldText !== null
+        ? trimUnchangedEdges(entry.oldText, entry.newText)
+        : [entry.oldText ?? '', entry.newText];
+      if (Math.max(countLines(oldText), countLines(newText)) > MAX_INLINE_DIFF_LINES) {
+        tooLarge = true;
+        break;
+      }
       const dmp = new diff_match_patch();
       const lineMode = dmp.diff_linesToChars_(oldText, newText);
       const diffs = dmp.diff_main(lineMode.chars1, lineMode.chars2, false);
@@ -111,14 +156,16 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
 
       const oldLineNumRef = { value: 1 };
       const newLineNumRef = { value: 1 };
-      diffs.forEach(([op, text]) => {
+      for (const [op, text] of diffs) {
         if (op === 1) addLines(text, 'added', oldLineNumRef, newLineNumRef, hunkIndex);
         else if (op === -1) addLines(text, 'removed', oldLineNumRef, newLineNumRef, hunkIndex);
         else addLines(text, 'context', oldLineNumRef, newLineNumRef, hunkIndex);
-      });
-    });
+        if (tooLarge) break;
+      }
+      if (tooLarge) break;
+    }
 
-    return { filePath, additions, deletions, lines };
+    return { filePath, additions, deletions, lines: tooLarge ? [] : lines, tooLarge };
   }, [block.entry.content, block.entry.title, block.entry.locations]);
 
   const fileName = useMemo(() => {
@@ -126,6 +173,7 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
     const parts = diffData.filePath.split(/[\\/]/);
     return parts[parts.length - 1];
   }, [diffData?.filePath]);
+  const showInline = !diffData?.tooLarge;
 
   const handleOpenFile = () => {
     const bestPath = block.entry.locations?.[0]?.path || diffData?.filePath || block.entry.title;
@@ -154,7 +202,7 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
   return (
     <div className="border border-border rounded-[6px] overflow-hidden mb-2">
       <button
-        onClick={toggle}
+        onClick={showInline ? toggle : undefined}
         className={`flex items-center gap-2 w-full px-3 h-9 bg-background-secondary ${chatInsetFocusClassName}`}
       >
         <div className="flex-shrink-0 text-foreground-secondary">
@@ -170,7 +218,7 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
           >
             {fileName}
           </span>
-          {diffData && (
+          {diffData && !diffData.tooLarge && (
             <div className="flex items-center gap-1.5 ml-1 flex-shrink-0 text-ide-small">
               {diffData.additions > 0 && (
                 <span className="font-bold text-added leading-none">
@@ -204,16 +252,19 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
               }`}
             />
           )}
-          <div className={`transition-transform duration-200 text-editor-fg opacity-50 ${isExpanded ? 'rotate-90' : ''}`}>
-            <ChevronRight size={14} />
-          </div>
+          {showInline && (
+            <div className={`transition-transform duration-200 text-editor-fg opacity-50 ${isExpanded ? 'rotate-90' : ''}`}>
+              <ChevronRight size={14} />
+            </div>
+          )}
         </div>
       </button>
 
-      <div
-        className={`grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden ${isExpanded ? 'border-t border-border' : ''}`}
-        style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
-      >
+      {showInline && (
+        <div
+          className={`grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden ${isExpanded ? 'border-t border-border' : ''}`}
+          style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
+        >
         <div className="overflow-hidden">
           {diffData && (
             <div tabIndex={-1} className="bg-editor-bg max-h-[400px] overflow-auto [&::-webkit-scrollbar]:!h-[7px]">
@@ -256,7 +307,8 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
             </div>
           )}
         </div>
-      </div>
+        </div>
+      )}
     </div>
   );
 };

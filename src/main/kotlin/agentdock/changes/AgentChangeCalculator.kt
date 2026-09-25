@@ -38,6 +38,7 @@ object AgentChangeCalculator {
         val currentContent = readCurrentFileContent(file)
 
         val originalContent = if (status == "A") "" else AgentDiffViewer.rebuildBeforeContent(currentContent, operations)
+            ?: return null
         return AgentFileSnapshot(beforeContent = originalContent, afterContent = currentContent)
     }
 
@@ -56,8 +57,16 @@ object AgentChangeCalculator {
                     || operations.lastOrNull()?.newText?.isEmpty() != true
             )) return null
 
-        val snapshot = buildSnapshot(project, filePath, status, operations) ?: return null
-        val lineStats = computeLineStats(snapshot.beforeContent, snapshot.afterContent)
+        val snapshot = buildSnapshot(project, filePath, status, operations)
+        val lineStats = if (snapshot != null) {
+            computeLineStats(snapshot.beforeContent, snapshot.afterContent)
+        } else {
+            // Keep unresolved edits visible until the user tries to undo or accepts them.
+            operations.map { computeLineStats(it.oldText, it.newText) }
+                .fold(AgentLineStats(0, 0)) { total, next ->
+                    AgentLineStats(total.additions + next.additions, total.deletions + next.deletions)
+                }
+        }
         return AgentFileStats(
             filePath = filePath,
             status = if (fileDeleted) "D" else status,

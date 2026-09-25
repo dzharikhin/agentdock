@@ -405,6 +405,7 @@ export interface UndoFileResultPayload {
   filePath: string;
   success: boolean;
   message: string;
+  reason?: 'conflict';
 }
 
 export interface UndoResultPayload {

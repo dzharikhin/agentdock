@@ -86,12 +86,15 @@ export default function ChatInput(props: ChatInputProps) {
   const handleSubmit = isSending ? (() => onQueueDraft?.()) : onSend;
 
   return (
-    <div ref={inputRootRef} style={{ height: customHeight ? `${customHeight}px` : undefined }} className="relative flex-shrink-0 pb-2 pt-1 [container-type:inline-size] [container-name:chat-input]">
+    <div
+      ref={inputRootRef}
+      style={{ height: customHeight ? `${customHeight}px` : undefined }}
+      className="relative flex-shrink-0 pb-[12px] pt-1 [container-type:inline-size] [container-name:chat-input]">
       <div className="h-full w-full flex flex-col">
         <div className={`relative flex h-full flex-col rounded-ide border border-[var(--ide-Button-startBorderColor)]
-          bg-background-secondary transition-all focus-within:ring-1 focus-within:[--tw-ring-color:color-mix(in_srgb,var(--ide-Button-default-focusColor)_70%,transparent)] ${
-            resizeHovered || isResizing ? 'border-t-[var(--ide-Button-default-focusColor)]' : ''
-          }`}>
+          bg-background-secondary transition-all focus-within:ring-1 
+          focus-within:[--tw-ring-color:color-mix(in_srgb,var(--ide-Button-default-focusColor)_70%,transparent)] 
+          ${resizeHovered || isResizing ? 'border-t-[var(--ide-Button-default-focusColor)]' : ''}`}>
           {onResizeStart && (
             <div
               role="separator"

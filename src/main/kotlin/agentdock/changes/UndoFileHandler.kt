@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets
 
 data class UndoOperation(val oldText: String, val newText: String)
 
-data class UndoFileResult(val filePath: String, val success: Boolean, val message: String)
+data class UndoFileResult(val filePath: String, val success: Boolean, val message: String, val reason: String? = null)
 
 data class UndoResult(
     val success: Boolean,
@@ -122,25 +122,33 @@ object UndoFileHandler {
         status: String,
         operations: List<UndoOperation>
     ): UndoFileResult {
-        val snapshot = AgentChangeCalculator.buildSnapshot(project, filePath, status, operations)
-            ?: return UndoFileResult(filePath = filePath, success = false, message = "Could not rebuild diff snapshot")
+        if (operations.isEmpty()) {
+            return UndoFileResult(filePath = filePath, success = false, message = "No agent edits to undo")
+        }
+        val file = File(filePath)
+        val app = ApplicationManager.getApplication()
+        val vf = if (app == null) null else LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
+        val doc = vf?.let { FileDocumentManager.getInstance().getDocument(it) }
+        val current = doc?.text ?: if (file.exists()) file.readText(StandardCharsets.UTF_8) else ""
+        val restored = AgentDiffViewer.rebuildBeforeContent(current, operations)
+            ?: return UndoFileResult(
+                filePath = filePath,
+                success = false,
+                message = "Edit conflict. The file was not changed.",
+                reason = "conflict"
+            )
 
-        if (status == "A" && snapshot.beforeContent.isEmpty()) {
+        if (status == "A" && restored.isEmpty()) {
             return deleteFile(project, filePath)
         }
+        if (restored == current) return UndoFileResult(filePath = filePath, success = true, message = "Already reverted")
 
-        val file = File(filePath)
-        val restored = snapshot.beforeContent.replace("\r\n", "\n").replace("\r", "\n")
-
-        if (ApplicationManager.getApplication() == null) {
+        if (app == null) {
             file.writeText(restored, StandardCharsets.UTF_8)
             return UndoFileResult(filePath = filePath, success = true, message = "Reverted $filePath")
         }
 
-        val vf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
-
         WriteCommandAction.runWriteCommandAction(project) {
-            val doc = vf?.let { FileDocumentManager.getInstance().getDocument(it) }
             if (vf != null && doc != null) {
                 doc.setText(restored)
                 FileDocumentManager.getInstance().saveDocument(doc)
@@ -152,37 +160,6 @@ object UndoFileHandler {
             }
         }
         return UndoFileResult(filePath = filePath, success = true, message = "Reverted $filePath")
-    }
-
-    /** Map (start index, length) in normalized string back to (start, length) in original. */
-    fun normalizedToOriginalRange(original: String, normStart: Int, normLen: Int): Pair<Int, Int> {
-        var normPos = 0
-        var origStart = -1
-        var origEnd = -1
-        var i = 0
-        while (i < original.length) {
-            if (original[i] == '\r' && i + 1 < original.length && original[i + 1] == '\n') {
-                if (normPos == normStart) origStart = i
-                normPos++
-                i += 2
-                if (normPos == normStart + normLen) {
-                    origEnd = i
-                    break
-                }
-                continue
-            }
-            if (original[i] == '\r' || original[i] == '\n') {
-                if (normPos == normStart) origStart = i
-                normPos++
-            } else {
-                if (normPos == normStart) origStart = i
-                normPos++
-            }
-            if (normPos == normStart + normLen) origEnd = i + 1
-            i++
-        }
-        if (origStart < 0 || origEnd < 0) return -1 to 0
-        return origStart to (origEnd - origStart)
     }
 
     internal fun isRestorablePath(filePath: String): Boolean {

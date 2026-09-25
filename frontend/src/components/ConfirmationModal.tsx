@@ -1,12 +1,12 @@
 import { X } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './ui/Button';
 
 interface ConfirmationModalProps {
   isOpen: boolean;
   title: string;
-  message: string;
+  message: ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   secondaryActionLabel?: string;
@@ -115,9 +115,9 @@ export default function ConfirmationModal({
           </div>
           <div className="min-w-0 flex-1">
             <div id="confirmation-dialog-title" className="font-semibold text-sm">{title}</div>
-            <p className="mt-1 min-w-0 max-w-full text-ide-small whitespace-pre-wrap break-words text-foreground [overflow-wrap:anywhere]">
+            <div className="mt-1 min-w-0 max-w-full max-h-[60vh] overflow-y-auto text-ide-small whitespace-pre-wrap break-words text-foreground [overflow-wrap:anywhere]">
               {message}
-            </p>
+            </div>
           </div>
         </div>
 

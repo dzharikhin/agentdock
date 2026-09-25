@@ -341,6 +341,7 @@ internal fun AcpBridge.pushUndoResult(chatId: String, result: agentdock.changes.
                 put("filePath", fileResult.filePath)
                 put("success", fileResult.success)
                 put("message", fileResult.message)
+                fileResult.reason?.let { put("reason", it) }
             }
         }))
     }.toString().jsStringLiteral()

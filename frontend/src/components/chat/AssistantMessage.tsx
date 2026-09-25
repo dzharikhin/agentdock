@@ -201,7 +201,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
               <button
                 type="button"
                 className="inline-flex h-4 w-5 items-center justify-center rounded text-foreground-secondary
-                hover:bg-hover hover:text-foreground focus-visible:outline-none relative top-px"
+                hover:bg-hover hover:text-foreground focus-visible:outline-none relative top-[2px]"
                 onClick={onFork}
                 aria-label="Fork from here"
               >

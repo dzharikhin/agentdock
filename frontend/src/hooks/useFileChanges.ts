@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { ToolCallEvent, FileChangeStatsPayload, FileChangeSummary, ProcessedFileState } from '../types/chat';
+import { ToolCallEvent, FileChangeStatsPayload, FileChangeSummary, ProcessedFileState, UndoFileResultPayload } from '../types/chat';
 import { ACPBridge } from '../utils/bridge';
 import { buildReplayToolCallEvents } from '../utils/replay';
 import { applyToolCallEvent, pendingToolCallEvents, stableToolCallEventId } from '../utils/toolCallUtils';
@@ -12,6 +12,8 @@ import { applyToolCallEvent, pendingToolCallEvents, stableToolCallEventId } from
  *  - Events that were denied / cancelled / failed are also hidden
  */
 const APPLIED_STATUSES = new Set(['success', 'completed']);
+
+type UndoError = { failures: UndoFileResultPayload[]; hadSuccess: boolean } | { message: string };
 
 /**
  * Check if two file paths refer to the same file.
@@ -48,7 +50,7 @@ export function useFileChanges(
   adapterName: string
 ) {
   const sessionEventPrefix = stableToolCallEventId(adapterName, sessionId, '');
-  const [undoErrorMessage, setUndoErrorMessage] = useState<string | null>(null);
+  const [undoError, setUndoError] = useState<UndoError | null>(null);
   const [computedStats, setComputedStats] = useState<Record<string, FileChangeStatsPayload> | null>(null);
   const [refreshRevision, setRefreshRevision] = useState(0);
   // Status-only tools may change files through the shell without supplying diffs.
@@ -88,7 +90,7 @@ export function useFileChanges(
     setRefreshRevision(0);
     setHasPluginEdits(false);
     setPendingUndoFilePaths(null);
-    setUndoErrorMessage(null);
+    setUndoError(null);
     initialHasPluginEditsRef.current = null;
     editToolCallIdsRef.current.clear();
     knownEditDeletedPathsRef.current.clear();
@@ -433,11 +435,9 @@ export function useFileChanges(
       }
 
       if (failedFileResults.length > 0) {
-        setUndoErrorMessage(failedFileResults
-          .map((fileResult) => `${fileResult.filePath}: ${fileResult.message}`)
-          .join('\n'));
+        setUndoError({ failures: failedFileResults, hadSuccess: successfulFilePaths.length > 0 });
       } else if (!e.detail.result.success) {
-        setUndoErrorMessage(e.detail.result.message);
+        setUndoError({ message: e.detail.result.message });
       }
 
       setPendingUndoFilePaths(null);
@@ -453,8 +453,8 @@ export function useFileChanges(
     fileChanges,
     totalAdditions,
     totalDeletions,
-    undoErrorMessage,
-    clearUndoError: () => setUndoErrorMessage(null),
+    undoError,
+    clearUndoError: () => setUndoError(null),
     handleUndoFile,
     handleUndoAllFiles,
     handleKeepFile,
