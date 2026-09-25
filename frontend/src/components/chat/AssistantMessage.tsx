@@ -1,9 +1,9 @@
-import { memo, useCallback, type MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useState, type MouseEvent } from 'react';
 import type { ExploringBlock, Message, RichContentBlock, TextBlock } from '../../types/chat';
 import { MarkdownMessage } from './MarkdownMessage';
 import { ContentBlockRenderer } from './blocks/ContentBlockRenderer';
 import { Tooltip } from './shared/Tooltip';
-import { GitFork } from 'lucide-react';
+import { Check, Copy, GitFork } from 'lucide-react';
 
 interface AssistantMessageProps {
   message: Message;
@@ -69,6 +69,27 @@ function groupAssistantBlocks(blocks: RichContentBlock[]) {
 }
 
 export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessage, agentIconPath, isActivePrompt = false, onFork }: AssistantMessageProps) => {
+  const [copied, setCopied] = useState(false);
+  const contentBlocks = message.contentBlocks?.length ? message.contentBlocks : message.blocks;
+  const copyText = contentBlocks?.length
+    ? contentBlocks.filter(isTextBlock).map((block) => block.text).join('\n\n')
+    : message.content;
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(copyText);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+
   const renderContent = () => {
     if (message.contentBlocks && message.contentBlocks.length > 0) {
       const groupedBlocks = groupAssistantBlocks(message.contentBlocks);
@@ -141,23 +162,23 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
   const hasMetaTooltip = tooltipRows.length > 0;
 
   const agentBadge = agentIconPath ? (
-    <img src={agentIconPath} alt={message.agentName || 'Agent'} className="w-4 h-4 opacity-80"/>
+    <img src={agentIconPath} alt={message.agentName || 'Agent'} className="w-4 h-4 opacity-60"/>
   ) : (
     <div className="w-4 h-4 rounded bg-background-secondary border border-border flex items-center justify-center
-      text-[9px] font-semibold uppercase opacity-80">
+      text-[9px] font-semibold uppercase opacity-60">
       {(message.agentName || '?').slice(0, 1)}
     </div>
   );
 
   return (
-    <div className={`group/assistant animate-in fade-in slide-in-from-bottom-2 duration-300 ${hasFollowingMessage ? 'mb-8' : ''}`}>
+    <div className={`animate-in fade-in slide-in-from-bottom-2 duration-300 ${hasFollowingMessage ? 'mb-8' : ''}`}>
       <div className="break-words text-foreground" onClick={handleReplyImageClick}>
         {renderContent()}
       </div>
 
-      {(showMeta || onFork) && (
+      {showMeta && (
         <div className="ml-0.5 mt-2 flex items-center gap-2 text-foreground-secondary">
-          {showMeta && (hasMetaTooltip ? (
+          {hasMetaTooltip ? (
             <Tooltip
               content={
                 <div className="min-w-[190px] space-y-1.5">
@@ -174,19 +195,30 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
             </Tooltip>
           ) : (
             agentBadge
-          ))}
+          )}
           {onFork && (
             <Tooltip content="Fork from here" variant="minimal">
               <button
                 type="button"
-                className="inline-flex h-6 w-6 items-center justify-center rounded text-foreground-secondary
-                opacity-0 pointer-events-none transition-opacity group-hover/assistant:opacity-100
-                group-hover/assistant:pointer-events-auto focus-visible:opacity-100 focus-visible:pointer-events-auto
-                hover:bg-hover hover:text-foreground focus-visible:outline-none relative top-[1.5px]"
+                className="inline-flex h-4 w-5 items-center justify-center rounded text-foreground-secondary
+                hover:bg-hover hover:text-foreground focus-visible:outline-none relative top-px"
                 onClick={onFork}
                 aria-label="Fork from here"
               >
                 <GitFork size={15} />
+              </button>
+            </Tooltip>
+          )}
+          {copyText && (
+            <Tooltip content={copied ? 'Copied' : 'Copy response'} variant="minimal">
+              <button
+                type="button"
+                className="inline-flex h-4 w-5 items-center justify-center rounded text-foreground-secondary
+                hover:bg-hover hover:text-foreground focus-visible:outline-none relative top-px"
+                onClick={handleCopy}
+                aria-label={copied ? 'Response copied' : 'Copy response'}
+              >
+                {copied ? <Check size={14} /> : <Copy size={14} />}
               </button>
             </Tooltip>
           )}

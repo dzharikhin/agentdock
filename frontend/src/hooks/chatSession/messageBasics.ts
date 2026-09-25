@@ -14,10 +14,11 @@ function codeReferenceText(path: string, startLine?: number, endLine?: number): 
     : `@${path}#L${startLine}-${endLine}`;
 }
 
-export function plainTextFromBlocks(blocks: any[]): string {
+export function plainTextFromBlocks(blocks: any[], imagePlaceholder = ''): string {
   return blocks.map((block) => {
     if (block.type === 'text') return block.text || '';
     if (block.type === 'code_ref') return codeReferenceText(block.path, block.startLine, block.endLine);
+    if (block.type === 'image') return imagePlaceholder;
     return '';
   }).join('');
 }

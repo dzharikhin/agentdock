@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { Message, RichContentBlock, TextBlock, ImageBlock, FileBlock, CodeReferenceBlock } from '../../types/chat';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { AttachmentItem } from './shared/AttachmentItem';
 import { CodeReferenceChip } from './shared/CodeReferenceChip';
+import { Tooltip } from './shared/Tooltip';
 import { openFile } from '../../utils/openFile';
+import { copyPrompt } from '../../utils/promptClipboard';
 
 interface UserMessageProps {
   message: Message;
@@ -47,6 +49,7 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber }: UserMe
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLargeContent, setIsLargeContent] = useState(false);
   const [contentHeight, setContentHeight] = useState<number | undefined>(undefined);
+  const [copied, setCopied] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -69,6 +72,20 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber }: UserMe
 
     return () => observer.disconnect();
   }, [message.content, message.blocks]);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = window.setTimeout(() => setCopied(false), 1400);
+    return () => window.clearTimeout(timer);
+  }, [copied]);
+
+  const handleCopy = () => {
+    try {
+      setCopied(copyPrompt(message));
+    } catch {
+      setCopied(false);
+    }
+  };
 
   const getBlocks = () => {
     const inline: RichContentBlock[] = [];
@@ -161,7 +178,6 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber }: UserMe
 
   const formattedTime = formatPromptTime(message.timestamp);
   const showCollapseToggle = isLargeContent;
-  const showFooter = showCollapseToggle || promptNumber !== undefined || !!formattedTime;
 
   const toggleExpanded = () => {
     if (contentRef.current) {
@@ -198,25 +214,33 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber }: UserMe
 
             {renderTrailingAttachments()}
 
-            {showFooter && (
-              <div className={`mt-2 flex items-center gap-3 ${showCollapseToggle ? 'justify-between' : 'justify-end'}`}>
-                {showCollapseToggle && (
-                  <button type="button" onClick={toggleExpanded}
-                    className="inline-flex items-center gap-1 text-xs text-foreground hover:underline
+            <div className={`mt-2 flex items-center gap-3 ${showCollapseToggle ? 'justify-between' : 'justify-end'}`}>
+              {showCollapseToggle && (
+                <button type="button" onClick={toggleExpanded}
+                  className="inline-flex items-center gap-1 text-xs text-foreground hover:underline
                     focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
-                  >
-                    {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    <span>{isExpanded ? 'Show less' : 'Show more'}</span>
-                  </button>
-                )}
+                >
+                  {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  <span>{isExpanded ? 'Show less' : 'Show more'}</span>
+                </button>
+              )}
 
-                <div className="flex items-center gap-1.5 text-xs text-foreground opacity-80">
-                  {promptNumber !== undefined && <span>{`#${promptNumber}`}</span>}
-                  {promptNumber !== undefined && formattedTime && <span aria-hidden="true">•</span>}
-                  {formattedTime && <span>{formattedTime}</span>}
-                </div>
+              <div className="flex items-center gap-1.5 text-xs text-foreground opacity-80">
+                {promptNumber !== undefined && <span>{`#${promptNumber}`}</span>}
+                {promptNumber !== undefined && formattedTime && <span aria-hidden="true">•</span>}
+                {formattedTime && <span>{formattedTime}</span>}
+                {(promptNumber !== undefined || formattedTime) && <span aria-hidden="true">•</span>}
+                <Tooltip variant="minimal" content={copied ? 'Copied' : 'Copy prompt'}>
+                  <button
+                    type="button" onClick={handleCopy}
+                    aria-label={copied ? 'Prompt copied' : 'Copy prompt'}
+                    className="inline-flex items-center rounded-[4px] hover:text-foreground focus:outline-none relative top-px"
+                  >
+                    {copied ? <Check size={12} /> : <Copy size={12} />}
+                  </button>
+                </Tooltip>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

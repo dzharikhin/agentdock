@@ -17,11 +17,13 @@ import {
   FORMAT_TEXT_COMMAND,
   KEY_ENTER_COMMAND,
   PASTE_COMMAND,
-  LexicalEditor
+  LexicalEditor,
+  LexicalNode
 } from 'lexical';
 import { $createImageNode, ImageNode } from './ImageNode';
 import { CodeReferenceNode, $createCodeReferenceNode, $isCodeReferenceNode } from './CodeReferenceNode';
-import { ChatAttachment } from '../../../types/chat';
+import { ChatAttachment, RichContentBlock } from '../../../types/chat';
+import { pastedPrompt, PROMPT_MIME } from '../../../utils/promptClipboard';
 
 export function AttachmentsSyncPlugin({ attachments, onAttachmentsChange }: {
   attachments: ChatAttachment[],
@@ -70,7 +72,53 @@ export function AttachmentsSyncPlugin({ attachments, onAttachmentsChange }: {
   return null;
 }
 
-export function PasteLogPlugin({ onImagePaste }: { onImagePaste: (file: File, editor: LexicalEditor) => void }) {
+function insertPrompt(editor: LexicalEditor, blocks: RichContentBlock[], attachments: ChatAttachment[], onAttachmentsChange: (items: ChatAttachment[]) => void) {
+  const nodes: Array<() => LexicalNode> = [];
+  const added: ChatAttachment[] = [];
+
+  for (const block of blocks) {
+    if (block.type === 'text') {
+      block.text.split('\n').forEach((part, index) => {
+        if (index > 0) nodes.push(() => $createLineBreakNode());
+        if (part) nodes.push(() => $createTextNode(part));
+      });
+    } else if (block.type === 'code_ref') {
+      const id = crypto.randomUUID();
+      added.push({ id, name: block.name, path: block.path, mimeType: 'application/x-code-reference', attachmentType: 'code_ref', isInline: true, startLine: block.startLine, endLine: block.endLine });
+      nodes.push(() => $createCodeReferenceNode(id, block.path, block.name, block.startLine, block.endLine));
+    } else if (block.type === 'image' || block.type === 'audio' || block.type === 'video' || block.type === 'file') {
+      const id = crypto.randomUUID();
+      const isInline = block.type === 'image' && block.isInline !== false;
+      added.push({
+        id,
+        name: block.type === 'file' ? block.name : block.type === 'video' ? block.name || 'video' : block.type === 'image' ? 'Image' : 'audio',
+        mimeType: block.mimeType,
+        data: block.data,
+        path: block.type === 'file' || block.type === 'video' ? block.path : undefined,
+        isInline,
+      });
+      if (isInline) nodes.push(() => $createImageNode(id));
+    }
+  }
+
+  if (added.length > 0) onAttachmentsChange([...attachments, ...added]);
+  if (nodes.length > 0) {
+    editor.update(() => {
+      let selection = $getSelection();
+      if (!$isRangeSelection(selection)) {
+        $getRoot().selectEnd();
+        selection = $getSelection();
+      }
+      if ($isRangeSelection(selection)) selection.insertNodes(nodes.map((create) => create()));
+    });
+  }
+}
+
+export function PasteLogPlugin({ onImagePaste, attachments, onAttachmentsChange }: {
+  onImagePaste: (file: File, editor: LexicalEditor) => void;
+  attachments: ChatAttachment[];
+  onAttachmentsChange: (items: ChatAttachment[]) => void;
+}) {
   const [editor] = useLexicalComposerContext();
 
   const handlePaste = useCallback((e: ClipboardEvent) => {
@@ -99,6 +147,15 @@ export function PasteLogPlugin({ onImagePaste }: { onImagePaste: (file: File, ed
     return editor.registerCommand(
       PASTE_COMMAND,
       (event: ClipboardEvent) => {
+        const plainText = event.clipboardData?.getData('text/plain');
+        const prompt = pastedPrompt(event.clipboardData?.getData(PROMPT_MIME) || '')
+          || pastedPrompt(plainText || '');
+        if (prompt) {
+          event.preventDefault();
+          insertPrompt(editor, prompt, attachments, onAttachmentsChange);
+          return true;
+        }
+
         const items = event.clipboardData?.items;
         if (items) {
           for (let i = 0; i < items.length; i++) {
@@ -108,7 +165,6 @@ export function PasteLogPlugin({ onImagePaste }: { onImagePaste: (file: File, ed
           }
         }
 
-        const plainText = event.clipboardData?.getData('text/plain');
         if (!plainText) return false;
 
         const normalizedText = plainText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -130,7 +186,7 @@ export function PasteLogPlugin({ onImagePaste }: { onImagePaste: (file: File, ed
       },
       COMMAND_PRIORITY_HIGH
     );
-  }, [editor]);
+  }, [editor, attachments, onAttachmentsChange]);
 
   return null;
 }

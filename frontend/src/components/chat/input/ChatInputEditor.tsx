@@ -99,7 +99,7 @@ export function ChatInputEditor({
             inputValue={inputValue}
             attachments={attachments}
           />
-          <PasteLogPlugin onImagePaste={onImagePaste} />
+          <PasteLogPlugin onImagePaste={onImagePaste} attachments={attachments} onAttachmentsChange={onAttachmentsChange} />
           <KeyboardPlugin onSend={onSend} sendMode={sendMode} disabled={isSlashMenuOpen} />
           <PlainTextFormattingGuardPlugin />
           <InlineAttachmentBackspacePlugin />
