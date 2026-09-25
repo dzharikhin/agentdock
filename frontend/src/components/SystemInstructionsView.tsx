@@ -126,7 +126,7 @@ export function SystemInstructionsView() {
             <FileText size={28} strokeWidth={1.5} />
             <span>No system instructions configured</span>
             <p className="max-w-[400px] text-center mt-2">
-              Enabled instructions are sent to the AI agent at the start of a conversation as system instructions.
+              Enabled instructions are added before your message in the first prompt of each new session.
             </p>
           </div>
         )}

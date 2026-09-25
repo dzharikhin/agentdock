@@ -519,6 +519,7 @@ export interface GlobalSettings {
   userMessageCustomColor: string;
   audioTranscription: AudioTranscriptionSettings;
   gitCommitGeneration: GitCommitGenerationSettings;
+  systemInstructionsEnabled: boolean;
   quotaWidgetEnabled: boolean;
   openInEditor: boolean;
   sidebarEnabled: boolean;

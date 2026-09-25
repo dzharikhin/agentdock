@@ -59,7 +59,6 @@ internal fun AcpClientService.prompt(chatId: String, blocks: List<ContentBlock>)
         if (injectedBlock != null) {
             listOf(injectedBlock) + blocks
         } else {
-            systemInstructionsInjectedSessionIds.remove(sessionId)
             blocks
         }
     } else {

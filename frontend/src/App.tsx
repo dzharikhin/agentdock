@@ -30,6 +30,9 @@ function App() {
   const [openInEditor, setOpenInEditor] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.openInEditor ?? true
   );
+  const [systemInstructionsEnabled, setSystemInstructionsEnabled] = useState(
+    () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.systemInstructionsEnabled ?? false
+  );
   const [sidebarEnabled, setSidebarEnabled] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.sidebarEnabled ?? true
   );
@@ -70,6 +73,7 @@ function App() {
 
     const applyGlobalSettings = (payload: { settings?: Partial<GlobalSettings> } | undefined) => {
       setOpenInEditor(payload?.settings?.openInEditor ?? true);
+      setSystemInstructionsEnabled(payload?.settings?.systemInstructionsEnabled ?? false);
       const nextSidebarEnabled = payload?.settings?.sidebarEnabled ?? true;
       setSidebarEnabled(nextSidebarEnabled);
       if (!nextSidebarEnabled) setSidebarHidden(false);
@@ -145,11 +149,16 @@ function App() {
     handleCancelAgentSwitch,
   } = useAppController();
 
+  useEffect(() => {
+    if (!systemInstructionsEnabled && activeSection === 'system-instructions') closeActiveSection();
+  }, [systemInstructionsEnabled, activeSection, closeActiveSection]);
+
   const navigationProps: TabBarProps = {
     isIslandsTheme,
     tabs,
     activeTabId,
     activeSection,
+    systemInstructionsEnabled,
     tabUi,
     onSelectTab: handleSelectTab,
     onReorderTabs: handleReorderTabs,

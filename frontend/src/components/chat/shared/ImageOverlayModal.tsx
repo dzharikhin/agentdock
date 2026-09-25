@@ -26,6 +26,7 @@ export const ImageOverlayModal: React.FC<ImageOverlayModalProps> = ({ src, onClo
   }, []);
 
   useEffect(() => {
+    setStatus(null);
     if (!src) return;
     prevFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const focusTimer = window.setTimeout(() => containerRef.current?.focus(), 0);

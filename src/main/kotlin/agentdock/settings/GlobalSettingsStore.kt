@@ -18,6 +18,9 @@ object GlobalSettingsStore {
     @Volatile
     private var gitCommitGenerationEnabled = false
 
+    @Volatile
+    private var systemInstructionsEnabled: Boolean? = null
+
     private val json = Json {
         ignoreUnknownKeys = true
         prettyPrint = true
@@ -34,6 +37,7 @@ object GlobalSettingsStore {
 
         val loaded = decodeSettings(file)
         gitCommitGenerationEnabled = loaded.gitCommitGeneration.enabled
+        systemInstructionsEnabled = loaded.systemInstructionsEnabled
         loaded
     }
 
@@ -61,10 +65,13 @@ object GlobalSettingsStore {
         file.parentFile?.mkdirs()
         file.atomicWriteText(json.encodeToString(normalized))
         gitCommitGenerationEnabled = normalized.gitCommitGeneration.enabled
+        systemInstructionsEnabled = normalized.systemInstructionsEnabled
         return normalized
     }
 
     fun isGitCommitGenerationEnabled(): Boolean = gitCommitGenerationEnabled
+
+    fun isSystemInstructionsEnabled(): Boolean = systemInstructionsEnabled ?: load().systemInstructionsEnabled
 
     fun areAudioNotificationsEnabled(): Boolean = load().audioNotificationsEnabled
 

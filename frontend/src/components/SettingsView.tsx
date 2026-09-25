@@ -78,6 +78,7 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
         providers: payload?.settings?.audioTranscription?.providers ?? {}
       },
       gitCommitGeneration: normalizeGitCommitGenerationSettings(payload?.settings?.gitCommitGeneration),
+      systemInstructionsEnabled: payload?.settings?.systemInstructionsEnabled ?? false,
       quotaWidgetEnabled: payload?.settings?.quotaWidgetEnabled ?? false,
       openInEditor: payload?.settings?.openInEditor ?? true,
       sidebarEnabled: payload?.settings?.sidebarEnabled ?? true,
@@ -385,6 +386,14 @@ export function SettingsView() {
               checked={globalSettings.settings.quotaWidgetEnabled}
               onToggle={() => updateGlobalSettings({ quotaWidgetEnabled: !globalSettings.settings.quotaWidgetEnabled })}
               ariaLabel='Enable status bar quota widget'
+            />
+
+            <SettingsCheckbox
+              title='System Instructions'
+              description='Manage custom instructions that are sent to AI agents in every session.'
+              checked={globalSettings.settings.systemInstructionsEnabled}
+              onToggle={() => updateGlobalSettings({ systemInstructionsEnabled: !globalSettings.settings.systemInstructionsEnabled })}
+              ariaLabel='Enable system instructions'
             />
 
             <GitCommitGenerationSettings

@@ -13,6 +13,7 @@ export interface TabBarProps {
   tabs: ChatTab[];
   activeTabId: string;
   activeSection: SectionType | null;
+  systemInstructionsEnabled: boolean;
   tabUi?: Record<string, TabUiFlags>;
   onSelectTab: (id: string) => void;
   onReorderTabs: (draggedId: string, targetId: string, position: 'before' | 'after') => void;
@@ -40,6 +41,7 @@ export default function TabBar({
   tabs,
   activeTabId,
   activeSection,
+  systemInstructionsEnabled,
   tabUi = {},
   onSelectTab,
   onReorderTabs,
@@ -228,6 +230,7 @@ export default function TabBar({
               tabUi={tabUi}
               activeTabId={activeTabId}
               activeSection={activeSection}
+              systemInstructionsEnabled={systemInstructionsEnabled}
               agents={agents}
               runnableAgents={runnableAgents}
               onSelectTab={onSelectTab}

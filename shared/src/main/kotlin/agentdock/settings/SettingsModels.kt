@@ -72,6 +72,7 @@ data class GlobalSettings(
     val userMessageCustomColor: String = "#193d70",
     val audioTranscription: AudioTranscriptionSettings = AudioTranscriptionSettings(),
     val gitCommitGeneration: GitCommitGenerationSettings = GitCommitGenerationSettings(),
+    val systemInstructionsEnabled: Boolean = false,
     val quotaWidgetEnabled: Boolean = false,
     val openInEditor: Boolean = true,
     val sidebarEnabled: Boolean = true,

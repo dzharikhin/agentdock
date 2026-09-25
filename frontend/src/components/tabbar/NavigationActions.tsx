@@ -21,6 +21,7 @@ type MenuAction = {
 
 export interface NavigationActionsProps {
   activeSection: SectionType | null;
+  systemInstructionsEnabled: boolean;
   onCloseActiveSection: () => void;
   onOpenHistory: () => void;
   onOpenManagement: () => void;
@@ -35,6 +36,7 @@ export interface NavigationActionsProps {
 
 export function NavigationActions({
   activeSection,
+  systemInstructionsEnabled,
   onCloseActiveSection,
   onAction,
   onOpenHistory,
@@ -53,7 +55,7 @@ export function NavigationActions({
     { type: 'management', label: 'Service Providers', icon: <ManagementTabIcon />, onClick: onOpenManagement },
     { type: 'settings', label: 'Settings', icon: <SettingsTabIcon />, onClick: onOpenSettings },
     { type: 'prompt-library', label: 'Prompt Library', icon: <PromptLibraryTabIcon />, onClick: onOpenPromptLibrary },
-    { type: 'system-instructions', label: 'System Instructions', icon: <SystemInstructionsTabIcon />, onClick: onOpenSystemInstructions },
+    ...(systemInstructionsEnabled ? [{ type: 'system-instructions' as const, label: 'System Instructions', icon: <SystemInstructionsTabIcon />, onClick: onOpenSystemInstructions }] : []),
     { type: 'mcp', label: 'MCP Servers', icon: <McpTabIcon />, onClick: onOpenMcp },
     { type: 'custom-acp', label: 'Custom ACP', icon: <CustomAcpTabIcon />, onClick: onOpenCustomAcp },
     ...(isDev ? [{ type: 'design' as const, label: 'Design System', icon: <DesignTabIcon />, onClick: onOpenDesignSystem }] : []),

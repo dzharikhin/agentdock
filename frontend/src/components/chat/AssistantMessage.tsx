@@ -165,7 +165,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
     <img src={agentIconPath} alt={message.agentName || 'Agent'} className="w-4 h-4 opacity-60"/>
   ) : (
     <div className="w-4 h-4 rounded bg-background-secondary border border-border flex items-center justify-center
-      text-[9px] font-semibold uppercase opacity-60">
+      text-[9px] font-semibold uppercase opacity-80">
       {(message.agentName || '?').slice(0, 1)}
     </div>
   );
@@ -205,7 +205,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
                 onClick={onFork}
                 aria-label="Fork from here"
               >
-                <GitFork size={15} />
+                <GitFork size={14} />
               </button>
             </Tooltip>
           )}
@@ -218,7 +218,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
                 onClick={handleCopy}
                 aria-label={copied ? 'Response copied' : 'Copy response'}
               >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
+                {copied ? <Check size={13} /> : <Copy size={13} />}
               </button>
             </Tooltip>
           )}
