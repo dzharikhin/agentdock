@@ -6,10 +6,14 @@ import com.agentclientprotocol.model.PermissionOptionId
 import com.agentclientprotocol.model.RequestPermissionOutcome
 import com.agentclientprotocol.model.RequestPermissionResponse
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withTimeoutOrNull
 import agentdock.systeminstructions.SystemInstructionsStore
+
+private const val SESSION_CLOSE_TIMEOUT_MS = 3_000L
 
 internal fun AcpClientService.respondToPermissionRequest(requestId: String, decision: String) {
     for (context in sessions.values) {
@@ -112,9 +116,32 @@ internal suspend fun AcpClientService.cancelWithContext(context: AcpClientServic
 
 internal suspend fun AcpClientService.stopAgent(chatId: String) {
     val context = sessions[chatId] ?: return
-    cancel(chatId)
-    sessions.remove(chatId)
-    context.stop()
+    context.lifecycleMutex.withLock {
+        try {
+            context.ignoreUpdatesUntilPrompt = true
+            context.pendingRequests.values.forEach {
+                it.complete(RequestPermissionResponse(RequestPermissionOutcome.Cancelled))
+            }
+            context.pendingRequests.clear()
+            try {
+                context.session?.cancel()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                // Still attempt to close the remote session if cancelling its prompt failed.
+            }
+            val sharedProcess = context.sharedProcess
+            val sessionId = context.sessionIdRef.get()
+            if (sharedProcess?.sessionCloseAvailable == true && sessionId != null) {
+                withTimeoutOrNull(SESSION_CLOSE_TIMEOUT_MS) {
+                    sharedProcess.protocol?.closeAcpSession(sessionId)
+                }
+            }
+        } finally {
+            sessions.remove(chatId, context)
+            context.stop()
+        }
+    }
 }
 
 internal fun AcpClientService.stopSharedProcess(adapterName: String) {
