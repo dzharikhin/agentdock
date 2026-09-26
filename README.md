@@ -15,7 +15,7 @@ Built-in AI agent integrations:
 - Grok Build
 - Kilo
 - Kimi Code
-- OpenCode v2
+- OpenCode
 - Qoder
 
 Any other ACP-compatible agent can be added through the custom configuration option.
