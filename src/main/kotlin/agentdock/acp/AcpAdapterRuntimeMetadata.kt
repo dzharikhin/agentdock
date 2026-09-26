@@ -2,6 +2,7 @@ package agentdock.acp
 
 import agentdock.history.AgentDockHistoryService
 import agentdock.history.GrokSessionHistory
+import agentdock.history.SessionListDeleteSupport
 import com.agentclientprotocol.protocol.Protocol
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -42,7 +43,7 @@ internal suspend fun AcpClientService.fetchAdapterRuntimeMetadata(
     } finally {
         try {
             withContext(NonCancellable) {
-                cleanupProbeSessions(adapterInfo, sessionId)
+                cleanupProbeSessions(protocol, adapterInfo, sessionId)
             }
         } finally {
             configProbeSessionKeys.remove(probeSessionKey)
@@ -51,6 +52,7 @@ internal suspend fun AcpClientService.fetchAdapterRuntimeMetadata(
 }
 
 private suspend fun AcpClientService.cleanupProbeSessions(
+    protocol: Protocol,
     adapterInfo: AcpAdapterConfig.AdapterInfo,
     currentSessionId: String
 ) {
@@ -73,14 +75,25 @@ private suspend fun AcpClientService.cleanupProbeSessions(
     }
     sessionIds.remove(currentSessionId)
     sessionIds.add(currentSessionId)
+    val sessionDeleteAvailable = canDeleteHistorySession(adapterInfo.id)
+    val sessionCloseAvailable = canCloseHistorySession(adapterInfo.id)
+    val useAcpCleanup = SessionListDeleteSupport.usesAcpProbeSessionCleanup(
+        adapterName = adapterInfo.id,
+        sessionDeleteAvailable = sessionDeleteAvailable,
+        sessionCloseAvailable = sessionCloseAvailable
+    )
 
     sessionIds.forEach { sessionId ->
         try {
             withTimeoutOrNull(PROBE_SESSION_OPERATION_TIMEOUT_MS) {
-                if (adapterInfo.sessionDeleteMethod == "grokCliSessionDelete") {
-                    GrokSessionHistory.grokCliSessionDelete(adapterInfo.id, probeProjectPath, sessionId)
-                } else {
-                    AgentDockHistoryService.deleteSessionImmediately(
+                when {
+                    adapterInfo.sessionDeleteMethod == "grokCliSessionDelete" ->
+                        GrokSessionHistory.grokCliSessionDelete(adapterInfo.id, probeProjectPath, sessionId)
+                    useAcpCleanup -> {
+                        val deleted = sessionDeleteAvailable && protocol.deleteAcpSession(sessionId)
+                        deleted || (sessionCloseAvailable && protocol.closeAcpSession(sessionId))
+                    }
+                    else -> AgentDockHistoryService.deleteSessionImmediately(
                         projectPath = resolveSessionCwd(probeProjectPath),
                         sessionId = sessionId,
                         adapterName = adapterInfo.id,

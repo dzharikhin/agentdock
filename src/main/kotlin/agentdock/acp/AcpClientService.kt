@@ -209,6 +209,7 @@ class AcpClientService private constructor(val project: Project) {
         @Volatile var logoutAvailable: Boolean = false
         @Volatile var sessionListAvailable: Boolean = false
         @Volatile var sessionDeleteAvailable: Boolean = false
+        @Volatile var sessionCloseAvailable: Boolean = false
         @Volatile var protocolScope: CoroutineScope? = null
         @Volatile var isInitialized: Boolean = false
         @Volatile var sessionUpdateWrapped: Boolean = false
@@ -245,6 +246,7 @@ class AcpClientService private constructor(val project: Project) {
             logoutAvailable = false
             sessionListAvailable = false
             sessionDeleteAvailable = false
+            sessionCloseAvailable = false
             protocolScope?.coroutineContext?.cancel()
             protocolScope = null
             isInitialized = false

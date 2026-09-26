@@ -6,7 +6,9 @@ import agentdock.history.fallbackHistoryTitle
 import agentdock.history.historyComparablePath
 import agentdock.history.parseHistoryTimestamp
 import com.agentclientprotocol.annotations.UnstableApi
+import com.agentclientprotocol.protocol.Protocol
 import com.agentclientprotocol.rpc.MethodName
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.toList
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -48,6 +50,9 @@ internal fun AcpClientService.canListHistorySessions(adapterInfo: AcpAdapterConf
 
 internal fun AcpClientService.canDeleteHistorySession(adapterName: String): Boolean =
     activeProcesses[processKey(adapterName)]?.sessionDeleteAvailable == true
+
+internal fun AcpClientService.canCloseHistorySession(adapterName: String): Boolean =
+    activeProcesses[processKey(adapterName)]?.sessionCloseAvailable == true
 
 @OptIn(UnstableApi::class)
 private suspend fun AcpClientService.acpSessionList(
@@ -94,11 +99,26 @@ internal suspend fun AcpClientService.deleteHistorySession(adapterName: String, 
     val sharedProc = activeProcesses[processKey(adapterName)]?.takeIf { it.isHealthy() } ?: return false
     if (!sharedProc.sessionDeleteAvailable) return false
     val protocol = sharedProc.protocol ?: return false
-    return runCatching {
-        protocol.sendRequestRaw(
-            MethodName("session/delete"),
-            buildJsonObject { put("sessionId", sessionId) }
-        )
-        true
-    }.getOrDefault(false)
+    return protocol.deleteAcpSession(sessionId)
+}
+
+@OptIn(UnstableApi::class)
+internal suspend fun Protocol.deleteAcpSession(sessionId: String): Boolean =
+    sendSessionLifecycleRequest("session/delete", sessionId)
+
+@OptIn(UnstableApi::class)
+internal suspend fun Protocol.closeAcpSession(sessionId: String): Boolean =
+    sendSessionLifecycleRequest("session/close", sessionId)
+
+@OptIn(UnstableApi::class)
+private suspend fun Protocol.sendSessionLifecycleRequest(method: String, sessionId: String): Boolean = try {
+    sendRequestRaw(
+        MethodName(method),
+        buildJsonObject { put("sessionId", sessionId) }
+    )
+    true
+} catch (error: CancellationException) {
+    throw error
+} catch (_: Exception) {
+    false
 }

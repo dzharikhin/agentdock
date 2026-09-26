@@ -21,6 +21,20 @@ internal object SessionListDeleteSupport {
         }
     }
 
+    fun usesAcpProbeSessionCleanup(
+        adapterName: String,
+        sessionDeleteAvailable: Boolean,
+        sessionCloseAvailable: Boolean
+    ): Boolean {
+        val method = runCatching { AcpAdapterConfig.getAdapterInfo(adapterName).sessionDeleteMethod }.getOrNull()
+        return when (method) {
+            "acp" -> true
+            "antigravitySessionDelete", "grokCliSessionDelete" -> false
+            null -> !hasDefaultDeleteMethod(adapterName) && (sessionDeleteAvailable || sessionCloseAvailable)
+            else -> false
+        }
+    }
+
     fun resolveSourceFilePath(projectPath: String, adapterName: String, sessionId: String): String {
         return when (adapterName) {
             "claude-code" -> resolveClaudeSourceFilePath(projectPath, sessionId)

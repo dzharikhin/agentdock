@@ -225,6 +225,7 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
         sharedProcess.logoutAvailable = result.capabilities.auth.logout != null
         sharedProcess.sessionListAvailable = result.capabilities.sessionCapabilities.list != null
         sharedProcess.sessionDeleteAvailable = result.capabilities.sessionCapabilities.delete != null
+        sharedProcess.sessionCloseAvailable = result.capabilities.sessionCapabilities.close != null
     } catch (error: Exception) {
         if (error is CancellationException) {
             sharedProcess.stop()
