@@ -215,6 +215,7 @@ export interface TabUiFlags {
   canMarkRead: boolean;
   warning: boolean;
   processing: boolean;
+  queued: boolean;
 }
 
 export type SectionType = 'management' | 'design' | 'history' | 'mcp' | 'custom-acp' | 'system-instructions' | 'prompt-library' | 'settings';

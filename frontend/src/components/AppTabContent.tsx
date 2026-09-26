@@ -13,6 +13,7 @@ interface AppTabContentProps {
   onCanMarkReadChange: (canMarkRead: boolean) => void;
   onPermissionRequestChange: (hasPendingPermission: boolean) => void;
   onProcessingChange: (isProcessing: boolean) => void;
+  onQueuedChange: (hasQueuedPrompts: boolean) => void;
   onAgentChangeRequest: Parameters<typeof ChatSessionView>[0]['onAgentChangeRequest'];
   onForkRequest: Parameters<typeof ChatSessionView>[0]['onForkRequest'];
   onHandoffConsumed: (handoffId: string) => void;
@@ -31,6 +32,7 @@ export function AppTabContent({
   onCanMarkReadChange,
   onPermissionRequestChange,
   onProcessingChange,
+  onQueuedChange,
   onAgentChangeRequest,
   onForkRequest,
   onHandoffConsumed,
@@ -57,6 +59,7 @@ export function AppTabContent({
         onCanMarkReadChange={onCanMarkReadChange}
         onPermissionRequestChange={onPermissionRequestChange}
         onProcessingChange={onProcessingChange}
+        onQueuedChange={onQueuedChange}
         onAgentChangeRequest={onAgentChangeRequest}
         onForkRequest={onForkRequest}
         onHandoffConsumed={onHandoffConsumed}

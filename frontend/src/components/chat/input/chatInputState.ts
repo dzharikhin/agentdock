@@ -15,7 +15,9 @@ export interface ChatInputProps {
   composerLoadRevision?: number;
   onInputChange: (val: string) => void;
   onSend: () => void;
-  onQueueDraft?: () => void;
+  scheduleEnabled?: boolean;
+  onScheduleModeChange?: (enabled: boolean) => void;
+  queueError?: string;
   onStop: () => void;
   isSending: boolean;
   promptQueueEnabled?: boolean;

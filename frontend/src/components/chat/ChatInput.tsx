@@ -18,7 +18,9 @@ export default function ChatInput(props: ChatInputProps) {
     composerLoadRevision = 0,
     onInputChange,
     onSend,
-    onQueueDraft,
+    scheduleEnabled = false,
+    onScheduleModeChange,
+    queueError,
     onStop,
     isSending,
     promptQueueEnabled,
@@ -83,8 +85,6 @@ export default function ChatInput(props: ChatInputProps) {
     setLexicalEditor,
   } = useChatInputController(props);
 
-  const handleSubmit = isSending ? (() => onQueueDraft?.()) : onSend;
-
   return (
     <div
       ref={inputRootRef}
@@ -107,6 +107,7 @@ export default function ChatInput(props: ChatInputProps) {
             />
           )}
 
+          {queueError && <div role="alert" className="px-3 pt-2 text-ide-small text-error">{queueError}</div>}
           <AttachmentBar
             attachments={attachments}
             onRemove={(id) => onAttachmentsChange(attachments.filter(a => a.id !== id))}
@@ -131,7 +132,7 @@ export default function ChatInput(props: ChatInputProps) {
             onOpenFile={handleOpenFile}
             onHeightChange={onHeightChange}
             onImagePaste={handleImagePaste}
-            onSend={handleSubmit}
+            onSend={onSend}
             onKeyDownCapture={combinedHandleKeyDownCapture}
             onEditorReady={setLexicalEditor}
           />
@@ -174,7 +175,9 @@ export default function ChatInput(props: ChatInputProps) {
             onConfigOptionChange={onConfigOptionChange}
             onApprovalModeChange={onApprovalModeChange}
             onSend={onSend}
-            onQueueDraft={onQueueDraft}
+            scheduleEnabled={scheduleEnabled}
+            onScheduleModeChange={onScheduleModeChange}
+            hasAttachments={attachments.length > 0}
             onStop={onStop}
             promptQueueEnabled={promptQueueEnabled}
           />

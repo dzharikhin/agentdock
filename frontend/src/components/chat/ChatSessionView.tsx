@@ -12,6 +12,7 @@ import {
 import { ACPBridge } from '../../utils/bridge';
 import MessageList from './MessageList';
 import ChatInput from './ChatInput';
+import { ScheduleBar } from './input/ScheduleBar';
 import { PromptQueueList } from './input/PromptQueueList';
 import PermissionBar from './PermissionBar';
 import FileChangesPanel from './FileChangesPanel';
@@ -29,6 +30,7 @@ interface ChatSessionProps extends UseChatSessionOptions {
   onCanMarkReadChange?: (canMarkRead: boolean) => void;
   onPermissionRequestChange?: (hasPendingPermission: boolean) => void;
   onProcessingChange?: (isProcessing: boolean) => void;
+  onQueuedChange?: (hasQueuedPrompts: boolean) => void;
   inheritedHandoffText?: string;
   onAgentChangeRequest?: (payload: { agentId: string; handoffText: string }) => void;
   onForkRequest?: (payload: { agentId: string; messages: Message[]; handoffText: string }) => void;
@@ -112,6 +114,7 @@ export default function ChatSessionView({
   onCanMarkReadChange,
   onPermissionRequestChange,
   onProcessingChange,
+  onQueuedChange,
   onAgentChangeRequest,
   onForkRequest,
   onHandoffConsumed,
@@ -122,6 +125,12 @@ export default function ChatSessionView({
     inputValue,
     setInputValue,
     composerLoadRevision,
+    scheduleEnabled,
+    setScheduleMode,
+    scheduledAt,
+    setScheduledAt,
+    scheduleDraftRevision,
+    queueError,
     status,
     isSending,
     isHistoryReplaying,
@@ -146,7 +155,6 @@ export default function ChatSessionView({
     setApprovalMode,
     permissionRequest,
     handleSend,
-    handleQueueDraft,
     handleStop,
     handlePermissionDecision,
     hasSelectedAgent,
@@ -169,6 +177,10 @@ export default function ChatSessionView({
     onHandoffConsumed,
     onUserMessageSent
   });
+
+  useEffect(() => {
+    onQueuedChange?.(queuedPrompts.length > 0);
+  }, [onQueuedChange, queuedPrompts.length]);
 
   const {
     hasPluginEdits,
@@ -347,6 +359,15 @@ export default function ChatSessionView({
           />
         )}
 
+        {scheduleEnabled && (
+          <ScheduleBar
+            key={`${composerLoadRevision}-${scheduleDraftRevision}`}
+            scheduledAt={scheduledAt}
+            onScheduledAtChange={setScheduledAt}
+            onClose={() => setScheduleMode(false)}
+          />
+        )}
+
         <div style={{ height: `${inputHeight}px` }} className="flex flex-col">
           <ChatInput
             onResizeStart={startResizing}
@@ -358,7 +379,9 @@ export default function ChatSessionView({
             composerLoadRevision={composerLoadRevision}
             onInputChange={setInputValue}
             onSend={handleSend}
-            onQueueDraft={handleQueueDraft}
+            scheduleEnabled={scheduleEnabled}
+            onScheduleModeChange={setScheduleMode}
+            queueError={queueError}
             onStop={handleStop}
             isSending={isSending}
             promptQueueEnabled

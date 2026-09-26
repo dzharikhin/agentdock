@@ -33,7 +33,7 @@ import {useAgentRuntimeOptions} from './chatSession/useAgentRuntimeOptions';
 import {useAvailableCommands} from './chatSession/useAvailableCommands';
 import {useBufferedMessageChunks} from './chatSession/useBufferedMessageChunks';
 import {usePromptQueue} from './chatSession/usePromptQueue';
-import {QueuedPrompt} from './chatSession/promptQueueTypes';
+import {QueuePromptDraft} from './chatSession/promptQueueTypes';
 
 const EMPTY_ADAPTER_NAMES: string[] = [];
 const APPROVAL_MODE_STORAGE_KEY = 'chat-approval-mode';
@@ -92,6 +92,10 @@ export function useChatSession({
   const [historyMessages, setHistoryMessages] = useState<Message[]>(initialMessages);
   const [liveMessages, setLiveMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
+  const [scheduleEnabled, setScheduleEnabled] = useState(false);
+  const [scheduledAt, setScheduledAt] = useState<number>();
+  const [scheduleDraftRevision, setScheduleDraftRevision] = useState(0);
+  const [queueError, setQueueError] = useState('');
   const [composerLoadRevision, setComposerLoadRevision] = useState(0);
   const [status, setStatus] = useState<string>('not started');
   const [isSending, setIsSending] = useState(false);
@@ -720,7 +724,7 @@ export function useChatSession({
   }, [status, conversationId, selectedAgentId,
       adapterDisplayName, selectedModelId, selectedModeId, selectedReasoningEffortId, configValues, selectedConfigOptions, armPendingPromptWatchdog, restartSessionForPendingPrompt, consumeHandoff, failActivePromptLocally, requestRuntimeRecovery, onUserMessageSent]);
 
-  const canDrainQueuedPrompts = status === 'ready'
+  const canDrainQueuedPrompts = (status === 'ready' || (status === 'not started' && !!selectedAgent?.downloaded))
     && !isSending
     && !isHistoryReplaying
     && !pendingPromptRef.current;
@@ -730,8 +734,11 @@ export function useChatSession({
     && !isHistoryReplaying
     && !pendingPromptRef.current;
 
-  const handleDrainQueuedPrompt = useCallback((prompt: QueuedPrompt) => {
-    sendPreparedPrompt(prompt.blocks, prompt.blocks, prompt.text);
+  const handleDrainQueuedPrompt = useCallback((prompt: QueuePromptDraft) => {
+    const outgoingBlocks = pendingHandoffRef.current
+      ? prependHandoffContext(prompt.blocks, pendingHandoffRef.current.text, pendingHandoffRef.current.sourceConversationTitle)
+      : prompt.blocks;
+    sendPreparedPrompt(prompt.blocks, outgoingBlocks, prompt.text);
   }, [sendPreparedPrompt]);
 
   const preemptActivePromptForQueue = useCallback(() => {
@@ -767,50 +774,49 @@ export function useChatSession({
     if (!prompt) return;
     setInputValue(prompt.composerText);
     setAttachments([...prompt.attachments]);
+    setScheduleEnabled(prompt.scheduledAt !== undefined);
+    setScheduledAt(prompt.scheduledAt);
+    setQueueError('');
     setComposerLoadRevision((revision) => revision + 1);
   }, [takeQueuedPrompt]);
 
+  const setScheduleMode = useCallback((enabled: boolean) => {
+    setScheduleEnabled(enabled);
+    setScheduledAt(enabled ? new Date().setSeconds(0, 0) : undefined);
+  }, []);
+
   const handleSend = useCallback(() => {
+    const time = scheduleEnabled && scheduledAt !== undefined && scheduledAt > Date.now() ? scheduledAt : undefined;
     const text = inputValue.trim();
-    if ((!text && attachments.length === 0) || isSending || status === 'prompting') return;
-
-    const normalizedBlocks = normalizeOutgoingBlocks(buildPromptBlocks(inputValue, attachments));
-    if (normalizedBlocks.length === 0) return;
-    const outgoingBlocks = pendingHandoffRef.current
-      ? prependHandoffContext(
-        normalizedBlocks,
-        pendingHandoffRef.current.text,
-        pendingHandoffRef.current.sourceConversationTitle,
-      )
-      : normalizedBlocks;
-
-    sendPreparedPrompt(normalizedBlocks, outgoingBlocks, plainTextFromBlocks(normalizedBlocks));
-    setInputValue('');
-    setAttachments([]);
-  }, [inputValue, attachments, isSending, status, sendPreparedPrompt]);
-
-  const handleQueueDraft = useCallback(() => {
-    const text = inputValue.trim();
-    if (!isSending && status !== 'prompting') return;
     if (!text && attachments.length === 0) return;
 
     const normalizedBlocks = normalizeOutgoingBlocks(buildPromptBlocks(inputValue, attachments));
     if (normalizedBlocks.length === 0) return;
-
-    const enqueued = enqueuePrompt({
+    const draft = {
       text: plainTextFromBlocks(normalizedBlocks),
       composerText: inputValue,
       blocks: normalizedBlocks,
-      attachments: [...attachments],
-    });
-    if (!enqueued) return;
-
+      attachments,
+      scheduledAt: time,
+    };
+    if (time !== undefined || isSending || status === 'prompting') {
+      if (!enqueuePrompt(draft)) {
+        setQueueError('The queue is full. Remove a message before adding another.');
+        return;
+      }
+    } else {
+      handleDrainQueuedPrompt(draft);
+    }
+    setQueueError('');
     setInputValue('');
     setAttachments([]);
-  }, [attachments, enqueuePrompt, inputValue, isSending, status]);
+    setScheduledAt(scheduleEnabled ? new Date().setSeconds(0, 0) : undefined);
+    if (scheduleEnabled) setScheduleDraftRevision((revision) => revision + 1);
+  }, [attachments, enqueuePrompt, handleDrainQueuedPrompt, inputValue, isSending, scheduleEnabled, scheduledAt, status]);
 
   const handleStop = () => {
     clearQueue();
+    setQueueError('');
 
     if (pendingPromptRef.current && status !== 'prompting') {
       pendingPromptRef.current = null;
@@ -870,6 +876,12 @@ export function useChatSession({
     messages,
     inputValue,
     setInputValue,
+    scheduleEnabled,
+    setScheduleMode,
+    scheduledAt,
+    setScheduledAt,
+    scheduleDraftRevision,
+    queueError,
     composerLoadRevision,
     status,
     isSending,
@@ -895,7 +907,6 @@ export function useChatSession({
     setApprovalMode,
     permissionRequest,
     handleSend,
-    handleQueueDraft,
     handleStop,
     handlePermissionDecision,
     hasSelectedAgent: !!resolvedSelectedAgent,

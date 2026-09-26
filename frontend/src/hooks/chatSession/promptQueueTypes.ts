@@ -1,14 +1,11 @@
 import { ChatAttachment, RichContentBlock } from '../../types/chat';
 
-export interface QueuedPrompt {
+export interface QueuedPrompt extends QueuePromptDraft {
   id: string;
-  text: string;
-  composerText: string;
-  blocks: RichContentBlock[];
-  attachments: ChatAttachment[];
 }
 
 export interface QueuePromptDraft {
+  scheduledAt?: number;
   text: string;
   composerText: string;
   blocks: RichContentBlock[];

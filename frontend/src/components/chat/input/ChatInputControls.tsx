@@ -1,6 +1,8 @@
 import { ReactNode, RefObject } from 'react';
 import {
+  AlarmClockOff,
   CornerDownLeft,
+  Clock,
   Ellipsis,
   Keyboard as KeyboardIcon,
   ListPlus,
@@ -53,9 +55,11 @@ interface ChatInputControlsProps {
   onConfigOptionChange: (configId: string, value: string) => void;
   onApprovalModeChange: (mode: ApprovalMode) => void;
   onSend: () => void;
-  onQueueDraft?: () => void;
   onStop: () => void;
   promptQueueEnabled?: boolean;
+  scheduleEnabled?: boolean;
+  onScheduleModeChange?: (enabled: boolean) => void;
+  hasAttachments?: boolean;
 }
 
 export function ChatInputControls({
@@ -91,11 +95,13 @@ export function ChatInputControls({
   onConfigOptionChange,
   onApprovalModeChange,
   onSend,
-  onQueueDraft,
   onStop,
   promptQueueEnabled = false,
+  scheduleEnabled = false,
+  onScheduleModeChange,
+  hasAttachments = false,
 }: ChatInputControlsProps) {
-  const hasInput = !!inputValue.trim();
+  const hasInput = !!inputValue.trim() || hasAttachments;
   const fastModeOption = additionalConfigOptions.find((option) => {
     if ((option.id !== 'fast' && option.id !== 'fast-mode') || option.type !== 'select' || option.options.length !== 2) return false;
     const values = option.options.map((value) => value.value);
@@ -204,10 +210,7 @@ export function ChatInputControls({
               hover:bg-hover focus-visible:bg-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-[var(--ide-Button-default-focusColor)]
               disabled:cursor-not-allowed ${fastModeEnabled ? 'text-primary' : 'text-foreground'}`}
           >
-            <Tooltip content={<>
-              <div>Fast mode: {fastModeEnabled ? 'On' : 'Off'}</div>
-              {fastModeDescription && <div>{fastModeDescription}</div>}
-            </>}>
+            <Tooltip variant="minimal" content={`Fast mode: ${fastModeEnabled ? 'On' : 'Off'}${fastModeDescription ? `, ${fastModeDescription}` : ''}`}>
               <Zap size={15} fill={fastModeEnabled ? 'currentColor' : 'none'} aria-hidden="true" />
             </Tooltip>
           </button>
@@ -216,11 +219,20 @@ export function ChatInputControls({
           containerRef={containerRef}
           value=""
           subValues={{
+            'schedule-send': scheduleEnabled ? 'on' : 'off',
             'send-mode': sendMode,
             approvals: approvalMode,
             ...Object.fromEntries(additionalConfigOptions.map((option) => [option.id, option.currentValue])),
           }}
           options={[
+            ...(onScheduleModeChange ? [{
+              id: 'schedule-send',
+              label: 'Schedule send',
+              subOptions: [
+                { id: 'on', label: 'On', icon: <Clock className="w-4 h-4" /> },
+                { id: 'off', label: 'Off', icon: <AlarmClockOff className="w-4 h-4" /> },
+              ],
+            }] : []),
             {
               id: 'send-mode',
               label: 'Send mode',
@@ -280,7 +292,9 @@ export function ChatInputControls({
           }
           onChange={() => {}}
           onSubChange={(parentId, subId) => {
-            if (parentId === 'send-mode') {
+            if (parentId === 'schedule-send') {
+              onScheduleModeChange?.(subId === 'on');
+            } else if (parentId === 'send-mode') {
               setSendMode(subId as 'enter' | 'ctrl-enter');
               localStorage.setItem('chat-send-mode', subId);
             } else if (parentId === 'approvals') {
@@ -309,21 +323,21 @@ export function ChatInputControls({
         {isSending ? (
           <>
           {promptQueueEnabled && hasInput && (
-            <button key="queue-button" type="button" onClick={onQueueDraft}
-              className={`flex items-center h-full px-1.5 rounded appearance-none border-0 bg-background-secondary outline-none
-                text-ide-small focus-visible:bg-hover focus-visible:text-foreground
-                focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]
-                hover:bg-hover hover:text-foreground text-foreground-secondary`}
-            >
-              <Tooltip variant="minimal" content="Add to queue">
+            <Tooltip variant="minimal" content="Add to queue" className="h-full">
+              <button key="queue-button" type="button" onClick={onSend} aria-label="Add to queue"
+                className={`flex items-center h-full px-1.5 rounded appearance-none border-0 bg-background-secondary outline-none
+                  text-ide-small focus-visible:bg-hover focus-visible:text-foreground
+                  focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]
+                  hover:bg-hover hover:text-foreground text-foreground-secondary`}
+              >
                 <div className="flex items-center">
                   <ListPlus size={16} className="block" strokeWidth={2} />
                   <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
                 </div>
-              </Tooltip>
-            </button>
+              </button>
+            </Tooltip>
           )}
-          <button key="stop-button" type="button" onClick={onStop}
+          <button key="stop-button" type="button" onClick={onStop} aria-label="Cancel"
             className="flex items-center h-full px-1.5 rounded appearance-none border-0 bg-background-secondary
                 outline-none text-ide-small text-error hover:bg-hover focus-visible:bg-hover
                 focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
@@ -337,20 +351,20 @@ export function ChatInputControls({
           </button>
           </>
         ) : (
-          <button key="send-button" type="button" onClick={onSend} disabled={!hasInput}
-            className={`flex items-center h-full px-1.5 rounded appearance-none border-0 bg-background-secondary outline-none
-              text-ide-small focus-visible:bg-hover focus-visible:text-foreground
-              focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]
-              hover:bg-hover disabled:pointer-events-none hover:text-foreground
-              ${hasInput ? 'text-foreground-secondary' : 'text-[var(--ide-Label-disabledForeground)]'}`}
-          >
-            <Tooltip variant="minimal" content={hasInput ? 'Send' : null}>
+          <Tooltip variant="minimal" content={hasInput ? 'Send' : null} className="h-full">
+            <button key="send-button" type="button" onClick={onSend} disabled={!hasInput} aria-label="Send"
+              className={`flex items-center h-full px-1.5 rounded appearance-none border-0 bg-background-secondary outline-none
+                text-ide-small focus-visible:bg-hover focus-visible:text-foreground
+                focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]
+                hover:bg-hover disabled:pointer-events-none hover:text-foreground
+                ${hasInput ? 'text-foreground-secondary' : 'text-[var(--ide-Label-disabledForeground)]'}`}
+            >
               <div className="flex items-center">
                 <SendHorizontal width={16} height={18} className="block" strokeWidth={2} />
                 <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
               </div>
-            </Tooltip>
-          </button>
+            </button>
+          </Tooltip>
         )}
       </div>
     </div>

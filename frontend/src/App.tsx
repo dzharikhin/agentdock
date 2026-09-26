@@ -144,6 +144,7 @@ function App() {
     handleCanMarkReadChange,
     handlePermissionRequestChange,
     handleProcessingChange,
+    handleQueuedChange,
     requestAgentSwitch,
     handleHandoffConsumed,
     handleForkRequest,
@@ -289,6 +290,7 @@ function App() {
               onCanMarkReadChange={(canMarkRead) => handleCanMarkReadChange(tab.id, canMarkRead)}
               onPermissionRequestChange={(hasPendingPermission) => handlePermissionRequestChange(tab.id, hasPendingPermission)}
               onProcessingChange={(isProcessing) => handleProcessingChange(tab.id, isProcessing)}
+              onQueuedChange={(hasQueuedPrompts) => handleQueuedChange(tab.id, hasQueuedPrompts)}
               onAgentChangeRequest={(payload) => requestAgentSwitch(tab.id, payload)}
               onForkRequest={(payload) => handleForkRequest(tab.id, payload)}
               onHandoffConsumed={(handoffId) => handleHandoffConsumed(tab.id, handoffId)}

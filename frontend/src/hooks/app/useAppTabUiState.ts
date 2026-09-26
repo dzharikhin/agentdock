@@ -1,7 +1,7 @@
 import { MutableRefObject, useCallback, useEffect, useRef, useState } from 'react';
 import { TabUiFlags } from '../../types/chat';
 
-const DEFAULT_TAB_UI: TabUiFlags = { unread: false, atBottom: true, canMarkRead: true, warning: false, processing: false };
+const DEFAULT_TAB_UI: TabUiFlags = { unread: false, atBottom: true, canMarkRead: true, warning: false, processing: false, queued: false };
 
 export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRefObject<string>) {
   const [tabUi, setTabUi] = useState<Record<string, TabUiFlags>>({});
@@ -129,6 +129,14 @@ export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRef
     });
   }, []);
 
+  const handleQueuedChange = useCallback((tabId: string, hasQueuedPrompts: boolean) => {
+    setTabUi(prev => {
+      const current = prev[tabId] ?? DEFAULT_TAB_UI;
+      if (current.queued === hasQueuedPrompts) return prev;
+      return { ...prev, [tabId]: { ...current, queued: hasQueuedPrompts } };
+    });
+  }, []);
+
   const handlePermissionRequestChange = useCallback((tabId: string, hasPendingPermission: boolean) => {
     pendingPermissionRef.current[tabId] = hasPendingPermission;
     setTabUi(prev => {
@@ -170,5 +178,6 @@ export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRef
     handleCanMarkReadChange,
     handlePermissionRequestChange,
     handleProcessingChange,
+    handleQueuedChange,
   };
 }

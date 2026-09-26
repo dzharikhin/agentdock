@@ -95,6 +95,7 @@ export function useAppController() {
     handleCanMarkReadChange,
     handlePermissionRequestChange,
     handleProcessingChange,
+    handleQueuedChange,
   } = useAppTabUiState(activeTabId, activeTabIdRef);
 
   const cleanupTabUi = useCallback((id: string) => {
@@ -583,6 +584,7 @@ export function useAppController() {
     handleCanMarkReadChange,
     handlePermissionRequestChange,
     handleProcessingChange,
+    handleQueuedChange,
     requestAgentSwitch,
     handleHandoffConsumed,
     handleForkRequest,

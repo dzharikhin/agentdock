@@ -126,7 +126,7 @@ export function TabNavigationContent({
   };
   const handleOpenChatPointerDown = (id: string, event: ReactPointerEvent<HTMLDivElement>) => {
     if (!pinActionsToBottom || event.button !== 0
-      || (event.target as HTMLElement).closest('[data-open-chat-action], input')) {
+      || (event.target as HTMLElement).closest('[data-open-chat-action], [data-open-chat-status], input')) {
       return;
     }
     startReordering(id, event);
@@ -303,8 +303,9 @@ export function TabNavigationContent({
                     const flags = tabUi[tab.id];
                     const hasWarning = flags?.warning;
                     const hasProcessing = flags?.processing;
+                    const hasQueued = flags?.queued && !hasProcessing;
                     const hasUnread = flags?.unread;
-                    const hasStatus = hasWarning || hasProcessing || hasUnread;
+                    const hasStatus = hasWarning || hasProcessing || hasQueued || hasUnread;
                     const conversationId = tab.historySession?.conversationId || tab.conversationId;
                     const deleteProjectPath = tab.historySession?.projectPath
                       || historyByConversationId.get(conversationId)?.projectPath;
@@ -317,6 +318,12 @@ export function TabNavigationContent({
                       <span className="relative z-10 ml-1 mr-2 flex shrink-0 self-center text-foreground-secondary">
                         <ChatSpinnerIcon size={14} />
                       </span>
+                    ) : hasQueued ? (
+                      <Tooltip variant="minimal" placement={tooltipPlacement} content="Queued prompts"
+                        className="relative z-10 ml-1 mr-3 shrink-0 self-center cursor-default">
+                        <span data-open-chat-status role="img" aria-label="Queued prompts"
+                          className="block h-2 w-2 rounded-full border border-current text-foreground-secondary" />
+                      </Tooltip>
                     ) : hasUnread ? (
                       <span className="relative z-10 ml-1 mr-3 h-2 w-2 shrink-0 self-center rounded-full bg-sky-500" />
                     ) : null;

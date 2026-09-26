@@ -1,5 +1,6 @@
 import { KeyboardEvent, useRef, useState } from 'react';
-import { ChevronRight, GripVertical, ListOrdered, Pencil, SendHorizontal, Trash2 } from 'lucide-react';
+import { ChevronRight, Clock, GripVertical, ListOrdered, Pencil, SendHorizontal, Trash2 } from 'lucide-react';
+import { formatScheduledTime } from './scheduledTime';
 import { ChatAttachment } from '../../../types/chat';
 import { QueuedPrompt } from '../../../hooks/chatSession/promptQueueTypes';
 import { chatFocusClassName, chatInsetFocusClassName } from '../shared/focusStyles';
@@ -227,7 +228,11 @@ export function PromptQueueList({
                         {preview}
                       </span>
                     </Tooltip>
-
+                    {item.scheduledAt !== undefined && (
+                      <span className="flex min-w-0 max-w-[45%] shrink items-center gap-1 text-ide-small text-foreground-secondary">
+                        <Clock size={13} className="shrink-0" /><span className="truncate whitespace-nowrap">{formatScheduledTime(item.scheduledAt)}</span>
+                      </span>
+                    )}
                     <div className="flex shrink-0 items-center gap-1">
                       <Tooltip
                         variant="minimal"

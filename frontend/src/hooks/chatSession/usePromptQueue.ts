@@ -24,7 +24,12 @@ export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreem
   const onDrainRef = useRef(onDrain);
   const onPreemptRef = useRef(onPreempt);
   const preemptingRef = useRef(false);
+  const drainingRef = useRef(false);
   const [isPreempting, setIsPreempting] = useState(false);
+
+  useEffect(() => {
+    if (!canDrain) drainingRef.current = false;
+  }, [canDrain]);
 
   const setPreempting = useCallback((next: boolean) => {
     preemptingRef.current = next;
@@ -67,16 +72,20 @@ export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreem
       return false;
     }
 
-    updateItems((prev) => [
-      ...prev,
-      {
+    updateItems((prev) => {
+      const item = {
+        ...draft,
         id: nextQueuedPromptId(),
-        text: draft.text,
-        composerText: draft.composerText,
-        blocks: draft.blocks,
         attachments: [...draft.attachments],
-      },
-    ]);
+      };
+      const scheduledAt = draft.scheduledAt;
+      const index = scheduledAt === undefined ? -1 : prev.findIndex(
+        (queued) => queued.scheduledAt !== undefined && queued.scheduledAt > scheduledAt,
+      );
+      const next = [...prev];
+      next.splice(index === -1 ? next.length : index, 0, item);
+      return next;
+    });
     return true;
   }, [enabled, updateItems]);
 
@@ -112,27 +121,18 @@ export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreem
     });
   }, [updateItems]);
 
-  const drainNextQueuedPrompt = useCallback(() => {
-    if (!enabled || !canDrain || isPreempting) return false;
-    const next = itemsRef.current[0];
-    if (!next) return false;
-
-    updateItems((prev) => prev.slice(1));
-    onDrainRef.current(next);
-    return true;
-  }, [canDrain, enabled, isPreempting, updateItems]);
-
   const sendQueuedPromptNow = useCallback((id: string) => {
     const item = itemsRef.current.find((queued) => queued.id === id);
     if (!item) return;
 
-    if (canDrain) {
+    if (canDrain && !drainingRef.current) {
+      drainingRef.current = true;
       updateItems((prev) => prev.filter((queued) => queued.id !== id));
       onDrainRef.current(item);
       return;
     }
 
-    updateItems((prev) => [item, ...prev.filter((queued) => queued.id !== id)]);
+    updateItems((prev) => [{ ...item, scheduledAt: undefined }, ...prev.filter((queued) => queued.id !== id)]);
     if (!enabled || !canPreempt || preemptingRef.current) return;
 
     setPreempting(true);
@@ -144,9 +144,34 @@ export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreem
     });
   }, [canDrain, canPreempt, enabled, setPreempting, updateItems]);
 
+  const firstPrompt = items[0];
   useEffect(() => {
-    drainNextQueuedPrompt();
-  }, [drainNextQueuedPrompt, items.length]);
+    if (!enabled || !canDrain || isPreempting || !firstPrompt) return;
+    let timer: number | undefined;
+    const drainWhenDue = () => {
+      window.clearTimeout(timer);
+      if (drainingRef.current) return;
+      const next = itemsRef.current[0];
+      if (!next) return;
+      const remaining = (next.scheduledAt ?? 0) - Date.now();
+      if (remaining > 0) {
+        // Browser timeouts use a signed 32-bit delay. Recheck the wall clock on wake.
+        timer = window.setTimeout(drainWhenDue, Math.min(remaining, 2_147_483_647));
+      } else {
+        drainingRef.current = true;
+        updateItems((prev) => prev.slice(1));
+        onDrainRef.current(next);
+      }
+    };
+    drainWhenDue();
+    window.addEventListener('focus', drainWhenDue);
+    document.addEventListener('visibilitychange', drainWhenDue);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('focus', drainWhenDue);
+      document.removeEventListener('visibilitychange', drainWhenDue);
+    };
+  }, [canDrain, enabled, isPreempting, firstPrompt, updateItems]);
 
   return {
     queuedPrompts: items,
