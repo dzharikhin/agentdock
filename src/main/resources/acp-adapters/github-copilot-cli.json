@@ -7,7 +7,7 @@
   "sessionListPosixCwd": true,
   "distribution": {
     "type": "npm",
-    "version": "1.0.75",
+    "version": "latest",
     "minimumVersion": "1.0.75",
     "packageName": "@github/copilot"
   },
@@ -15,10 +15,6 @@
   "args": [
     "--acp",
     "--stdio"
-  ],
-  "patchRoot": "runtime",
-  "patches": [
-    "@patches/github-copilot-cli/acp-load-session-reuse.patch"
   ],
   "disabledModes": [],
   "disabledModels": [],
