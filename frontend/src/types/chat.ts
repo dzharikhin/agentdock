@@ -523,6 +523,7 @@ export interface GlobalSettings {
   systemInstructionsEnabled: boolean;
   quotaWidgetEnabled: boolean;
   openInEditor: boolean;
+  promptNavigationHoverOnly: boolean;
   sidebarEnabled: boolean;
   sidebarPosition: 'left' | 'right';
   sidebarExpandedSections: SidebarSectionId[];

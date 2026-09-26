@@ -30,7 +30,7 @@ export function AttachmentItem({ att, onRemove, onImageClick }: AttachmentItemPr
   return (
     <div className={`group relative min-h-[22px] inline-flex min-w-0 max-w-[200px] flex-shrink-0 items-center 
       gap-1.5 rounded-[6px] border border-[var(--ide-Button-startBorderColor)] bg-background px-2 py-1 mb-1 mx-0.5 transition-all 
-      focus-within:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]`}
+      has-[:focus-visible]:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]`}
     >
       <button type="button" onClick={onClick}
         className={`flex min-w-0 items-center gap-1.5 overflow-hidden rounded-sm text-left outline-none

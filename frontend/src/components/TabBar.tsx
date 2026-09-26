@@ -165,16 +165,19 @@ export default function TabBar({
       {/* Controls: new chat and navigation */}
       <div className="flex shrink-0 items-center bg-background pl-1 pr-2 gap-0.5 z-10 shadow-[-10px_0_10px_-5px_var(--background)]">
         {/* New Tab (+ matches default agent) */}
-        <button
-          onClick={onNewTab}
-          onFocus={() => setTabFocusedControl(lastInteractionWasTabRef.current ? 'new' : null)}
-          onBlur={() => setTabFocusedControl((current) => current === 'new' ? null : current)}
-          className={`flex items-center justify-center w-[28px] h-[24px] rounded bg-background hover:text-foreground 
-            hover:bg-hover transition-[filter,color] focus:outline-none 
-            ${tabFocusedControl === 'new' ? 'shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]' : ''}`}
-        >
-          <Plus size={14} strokeWidth={2.5} aria-hidden="true" />
-        </button>
+        <Tooltip variant="minimal" placement="bottom" content="New chat" className="flex">
+          <button
+            onClick={onNewTab}
+            onFocus={() => setTabFocusedControl(lastInteractionWasTabRef.current ? 'new' : null)}
+            onBlur={() => setTabFocusedControl((current) => current === 'new' ? null : current)}
+            className={`flex items-center justify-center w-[28px] h-[24px] rounded bg-background hover:text-foreground
+              hover:bg-hover transition-[filter,color] focus:outline-none
+              ${tabFocusedControl === 'new' ? 'shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]' : ''}`}
+            aria-label="New chat"
+          >
+            <Plus size={14} strokeWidth={2.5} aria-hidden="true" />
+          </button>
+        </Tooltip>
 
         <Tooltip variant="minimal" placement="bottom" content="History" className="flex">
           <button

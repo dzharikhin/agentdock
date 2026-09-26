@@ -23,6 +23,7 @@ import { useChatSessionNotifications } from './session/useChatSessionNotificatio
 
 interface ChatSessionProps extends UseChatSessionOptions {
   isActive?: boolean;
+  promptNavigationHoverOnly: boolean;
   onAssistantActivity?: () => void;
   onAtBottomChange?: (isAtBottom: boolean) => void;
   onCanMarkReadChange?: (canMarkRead: boolean) => void;
@@ -104,6 +105,7 @@ export default function ChatSessionView({
   inheritedAdapterNames,
   forkBase,
   isActive = false,
+  promptNavigationHoverOnly,
   onUserMessageSent,
   onAssistantActivity,
   onAtBottomChange,
@@ -301,6 +303,7 @@ export default function ChatSessionView({
     <div className="flex flex-col h-full relative overflow-hidden bg-background">
           <MessageList 
             messages={messages} 
+            promptNavigationHoverOnly={promptNavigationHoverOnly}
             onImageClick={setPreviewImage} 
             onAtBottomChange={handleAtBottomChange}
             onCanMarkReadChange={handleCanMarkReadChange}

@@ -33,6 +33,9 @@ function App() {
   const [systemInstructionsEnabled, setSystemInstructionsEnabled] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.systemInstructionsEnabled ?? false
   );
+  const [promptNavigationHoverOnly, setPromptNavigationHoverOnly] = useState(
+    () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.promptNavigationHoverOnly ?? true
+  );
   const [sidebarEnabled, setSidebarEnabled] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.sidebarEnabled ?? true
   );
@@ -74,6 +77,7 @@ function App() {
     const applyGlobalSettings = (payload: { settings?: Partial<GlobalSettings> } | undefined) => {
       setOpenInEditor(payload?.settings?.openInEditor ?? true);
       setSystemInstructionsEnabled(payload?.settings?.systemInstructionsEnabled ?? false);
+      setPromptNavigationHoverOnly(payload?.settings?.promptNavigationHoverOnly ?? true);
       const nextSidebarEnabled = payload?.settings?.sidebarEnabled ?? true;
       setSidebarEnabled(nextSidebarEnabled);
       if (!nextSidebarEnabled) setSidebarHidden(false);
@@ -277,6 +281,7 @@ function App() {
               tab={tab}
               isActive={isTabActive}
               runnableAgents={runnableAgents}
+              promptNavigationHoverOnly={promptNavigationHoverOnly}
               pendingHandoff={pendingHandoffsByTab[tab.id]}
               onUserMessageSent={() => handleUserMessageSent(tab.id)}
               onAssistantActivity={() => handleAssistantActivity(tab.id)}

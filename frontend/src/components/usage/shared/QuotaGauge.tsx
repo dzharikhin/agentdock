@@ -2,7 +2,7 @@ import { clampPercent, getUsageSeverity } from './quotaVisuals';
 
 const gaugePath = 'M4.5 14.062 A7 7 0 1 1 11.5 14.062';
 
-export function QuotaGauge({ percent, size = 16, className = '' }: {
+export function QuotaGauge({ percent, size = 15, className = '' }: {
   percent?: number | null;
   size?: number;
   className?: string;

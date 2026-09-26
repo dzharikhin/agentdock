@@ -75,6 +75,7 @@ data class GlobalSettings(
     val systemInstructionsEnabled: Boolean = false,
     val quotaWidgetEnabled: Boolean = false,
     val openInEditor: Boolean = true,
+    val promptNavigationHoverOnly: Boolean = true,
     val sidebarEnabled: Boolean = true,
     val sidebarPosition: String = "left",
     val sidebarExpandedSections: List<String> = listOf("recent-chats", "sections")

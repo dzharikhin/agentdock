@@ -9,7 +9,7 @@ interface TooltipProps {
   showOnFocus?: boolean;
   contentClassName?: string;
   variant?: 'default' | 'minimal';
-  placement?: 'top' | 'bottom';
+  placement?: 'top' | 'bottom' | 'right';
   onShow?: () => void;
 }
 
@@ -39,8 +39,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
     if (triggerRef.current) {
       const rect = triggerRef.current.getBoundingClientRect();
       setCoords({
-        x: rect.left + rect.width / 2,
-        y: placement === 'bottom' ? rect.bottom : rect.top
+        x: placement === 'right' ? rect.right : rect.left + rect.width / 2,
+        y: placement === 'right' ? rect.top + rect.height / 2 : placement === 'bottom' ? rect.bottom : rect.top
       });
     }
   };
@@ -49,18 +49,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
     if (visible && tooltipRef.current) {
       const rect = tooltipRef.current.getBoundingClientRect();
       const margin = 12;
-      const leftOverflow = rect.left - margin;
-      const rightOverflow = rect.right - (window.innerWidth - margin);
-
-      if (leftOverflow < 0) {
-        setOffset(Math.abs(leftOverflow));
-      } else if (rightOverflow > 0) {
-        setOffset(-rightOverflow);
-      } else {
-        setOffset(0);
-      }
+      const startOverflow = (placement === 'right' ? rect.top : rect.left) - margin;
+      const endOverflow = (placement === 'right' ? rect.bottom - window.innerHeight : rect.right - window.innerWidth) + margin;
+      setOffset(startOverflow < 0 ? -startOverflow : endOverflow > 0 ? -endOverflow : 0);
     }
-  }, [visible, coords.x]);
+  }, [visible, coords.x, coords.y, placement]);
 
   const handleMouseEnter = () => {
     setOffset(0);
@@ -119,9 +112,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
           style={{ 
             left: coords.x, 
             top: coords.y,
-            transform: placement === 'bottom'
-              ? `translate(calc(-50% + ${offset}px), 6px)`
-              : `translate(calc(-50% + ${offset}px), calc(-100% - 6px))`,
+            transform: placement === 'right'
+              ? `translate(6px, calc(-50% + ${offset}px))`
+              : placement === 'bottom'
+                ? `translate(calc(-50% + ${offset}px), 6px)`
+                : `translate(calc(-50% + ${offset}px), calc(-100% - 6px))`,
             animation: 'tooltip-in 250ms ease-out forwards',
           }}
         >

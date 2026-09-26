@@ -81,6 +81,7 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
       systemInstructionsEnabled: payload?.settings?.systemInstructionsEnabled ?? false,
       quotaWidgetEnabled: payload?.settings?.quotaWidgetEnabled ?? false,
       openInEditor: payload?.settings?.openInEditor ?? true,
+      promptNavigationHoverOnly: payload?.settings?.promptNavigationHoverOnly ?? true,
       sidebarEnabled: payload?.settings?.sidebarEnabled ?? true,
       sidebarPosition: payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left',
       sidebarExpandedSections: Array.isArray(payload?.settings?.sidebarExpandedSections)
@@ -321,6 +322,13 @@ export function SettingsView() {
                 className='max-w-full'
               />
             </div>
+
+            <SettingsCheckbox
+              title='Show prompt navigation markers only on hover'
+              checked={globalSettings.settings.promptNavigationHoverOnly}
+              onToggle={() => updateGlobalSettings({ promptNavigationHoverOnly: !globalSettings.settings.promptNavigationHoverOnly })}
+              ariaLabel='Show prompt navigation on hover'
+            />
 
             <SettingsField
               label='User Message Background'

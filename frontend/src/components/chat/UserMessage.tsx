@@ -11,9 +11,10 @@ interface UserMessageProps {
   message: Message;
   onImageClick: (src: string) => void;
   promptNumber?: number;
+  onElementChange?: (id: string, element: HTMLDivElement | null) => void;
 }
 
-function formatPromptTime(timestamp?: number): string | null {
+export function formatPromptTime(timestamp?: number): string | null {
   if (timestamp === undefined) return null;
 
   try {
@@ -45,7 +46,7 @@ function formatPromptTime(timestamp?: number): string | null {
   }
 }
 
-export const UserMessage = memo(({ message, onImageClick, promptNumber }: UserMessageProps) => {
+export const UserMessage = memo(({ message, onImageClick, promptNumber, onElementChange }: UserMessageProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLargeContent, setIsLargeContent] = useState(false);
   const [contentHeight, setContentHeight] = useState<number | undefined>(undefined);
@@ -187,7 +188,7 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber }: UserMe
   };
 
   return (
-    <div className="flex flex-col mb-8 animate-in fade-in slide-in-from-bottom-2">
+    <div ref={(element) => onElementChange?.(message.id, element)} className="flex flex-col mb-8 animate-in fade-in slide-in-from-bottom-2">
       <div className="flex justify-end relative">
         <div className="user-message-bubble bg-accent rounded-[6px] group max-w-[80%] px-4 pt-3 pb-2 text-foreground"
           style={{backgroundColor: 'var(--user-message-bg)',}}
@@ -218,7 +219,7 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber }: UserMe
               {showCollapseToggle && (
                 <button type="button" onClick={toggleExpanded}
                   className="inline-flex items-center gap-1 text-xs text-foreground hover:underline
-                    focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
+                    focus-visible:rounded-[4px] focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
                 >
                   {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   <span>{isExpanded ? 'Show less' : 'Show more'}</span>

@@ -1,14 +1,43 @@
 import { useLayoutEffect, useRef, memo, useState, useMemo, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { Message, RichContentBlock, ExploringBlock, ToolCallBlock, PlanBlock, AgentOption } from '../../types/chat';
-import { UserMessage } from './UserMessage';
+import { UserMessage, formatPromptTime } from './UserMessage';
 import { AssistantMessage } from './AssistantMessage';
 import { ChatLoadingIndicator } from './ChatLoadingIndicator';
+import { Tooltip } from './shared/Tooltip';
 import { Button } from '../ui/Button';
 
 const BOTTOM_PIN_THRESHOLD_PX = 10;
 const READ_ACK_THRESHOLD_PX = 48;
 const EARLIER_PROMPTS_BATCH_SIZE = 20;
+
+function promptPreview(message: Message): string {
+  const blocks = message.blocks?.length ? message.blocks : message.contentBlocks;
+  let text = message.content.slice(0, 161);
+  if (blocks?.length) {
+    text = '';
+    for (const block of blocks) {
+      const part = block.type === 'text' ? block.text : block.type === 'image' ? ' [image] ' : '';
+      text += part.slice(0, 161 - text.length);
+      if (text.length > 160) break;
+    }
+  }
+  const preview = text.slice(0, 160).replace(/\s+/g, ' ').trim();
+  if (preview || !blocks?.length) return preview + (text.length > 160 ? '…' : '');
+  const attachment = blocks.find((block) => block.type === 'file' || block.type === 'code_ref');
+  if (attachment?.type === 'file' || attachment?.type === 'code_ref') return attachment.name;
+  return 'Attachment';
+}
+
+function PromptTooltip({ message, number }: { message: Message; number: number }) {
+  const time = formatPromptTime(message.timestamp);
+  return (
+    <>
+      <div className="text-xs text-foreground-secondary">#{number}{time && ` · ${time}`}</div>
+      <div className="mt-1">{promptPreview(message)}</div>
+    </>
+  );
+}
 
 function countUserMessages(messages: Message[], endExclusive: number): number {
   let count = 0;
@@ -37,6 +66,7 @@ function expandCutoffByPromptCount(messages: Message[], cutoffIndex: number, pro
 interface MessageListProps {
   footer?: ReactNode;
   messages: Message[];
+  promptNavigationHoverOnly: boolean;
   onImageClick: (src: string) => void;
   onAtBottomChange?: (isAtBottom: boolean) => void;
   onCanMarkReadChange?: (canMarkRead: boolean) => void;
@@ -53,6 +83,7 @@ interface MessageListProps {
 function MessageList({ 
   footer,
   messages,
+  promptNavigationHoverOnly,
   onImageClick,
   onAtBottomChange,
   onCanMarkReadChange,
@@ -68,6 +99,14 @@ function MessageList({
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLDivElement>(null);
+  const navigationRef = useRef<HTMLElement>(null);
+  const navigationScrollIntentRef = useRef(false);
+  const promptElementsRef = useRef(new Map<string, HTMLDivElement>());
+  const pendingPromptIdRef = useRef<string | null>(null);
+  const registerPromptElement = useCallback((id: string, element: HTMLDivElement | null) => {
+    if (element) promptElementsRef.current.set(id, element);
+    else promptElementsRef.current.delete(id);
+  }, []);
   const followBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
   const atBottomChangeRef = useRef(onAtBottomChange);
@@ -81,6 +120,8 @@ function MessageList({
   const touchStartYRef = useRef<number | null>(null);
 
   const [revealedPromptCount, setRevealedPromptCount] = useState(0);
+  const [hasNavigationRoom, setHasNavigationRoom] = useState(false);
+  const [navigationEdges, setNavigationEdges] = useState({ atTop: true, atBottom: true });
 
   useEffect(() => {
     atBottomChangeRef.current = onAtBottomChange;
@@ -195,25 +236,111 @@ function MessageList({
     };
   }, [messages, revealedPromptCount]);
 
-  const userPromptNumberById = useMemo(() => {
+  const { userPromptNumberById, prompts } = useMemo(() => {
     const numbering = new Map<string, number>();
+    const prompts: Message[] = [];
     let promptNumber = 0;
 
     messages.forEach((message) => {
       if (message.role !== 'user') return;
-      promptNumber += 1;
+      promptNumber++;
       numbering.set(message.id, promptNumber);
+      prompts.push(message);
     });
 
-    return numbering;
+    return { userPromptNumberById: numbering, prompts };
   }, [messages]);
+  const previousPromptCountRef = useRef(prompts.length);
+
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    const content = contentRef.current;
+    if (!el || !content) return;
+    const updateNavigationRoom = () => {
+      const maxWidth = Number.parseFloat(getComputedStyle(content).maxWidth);
+      const contentRect = content.getBoundingClientRect();
+      const leftGutter = contentRect.left - el.getBoundingClientRect().left;
+      setHasNavigationRoom(Number.isFinite(maxWidth) && contentRect.width >= maxWidth - 1 && leftGutter >= 28);
+    };
+    const observer = new ResizeObserver(updateNavigationRoom);
+    observer.observe(el);
+    updateNavigationRoom();
+    return () => observer.disconnect();
+  }, []);
+
+  const showNavigation = prompts.length > 1 && !isHistoryReplaying;
+  const navigationHiddenUntilHover = !hasNavigationRoom || promptNavigationHoverOnly;
+
+  const updateNavigationEdges = useCallback(() => {
+    const el = navigationRef.current;
+    if (!el) return;
+    const atTop = el.scrollTop <= 1;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
+    setNavigationEdges((previous) =>
+      previous.atTop === atTop && previous.atBottom === atBottom ? previous : { atTop, atBottom }
+    );
+  }, []);
+
+  const markNavigationScrollIntent = () => {
+    const el = navigationRef.current;
+    if (el && el.scrollHeight > el.clientHeight) navigationScrollIntentRef.current = true;
+  };
+
+  useLayoutEffect(() => {
+    const el = navigationRef.current;
+    if (!el) {
+      navigationScrollIntentRef.current = false;
+      return;
+    }
+    const syncNavigation = () => {
+      if (!navigationScrollIntentRef.current) el.scrollTop = el.scrollHeight;
+      updateNavigationEdges();
+    };
+    const observer = new ResizeObserver(syncNavigation);
+    observer.observe(el);
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    syncNavigation();
+    return () => observer.disconnect();
+  }, [showNavigation, prompts.length, updateNavigationEdges]);
+
+  const navigationFade = navigationEdges.atTop
+    ? navigationEdges.atBottom
+      ? ''
+      : '[mask-image:linear-gradient(to_bottom,black_calc(100%-12px),transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black_calc(100%-12px),transparent)]'
+    : navigationEdges.atBottom
+      ? '[mask-image:linear-gradient(to_bottom,transparent,black_12px)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_12px)]'
+      : '[mask-image:linear-gradient(to_bottom,transparent,black_12px,black_calc(100%-12px),transparent)] [-webkit-mask-image:linear-gradient(to_bottom,transparent,black_12px,black_calc(100%-12px),transparent)]';
+
+  const scrollToPrompt = (id: string) => {
+    const el = containerRef.current;
+    const target = promptElementsRef.current.get(id);
+    if (!el || !target) return;
+    el.scrollTop += target.getBoundingClientRect().top - el.getBoundingClientRect().top;
+    lastScrollTopRef.current = el.scrollTop;
+    publishViewportState(el);
+  };
+
+  const handlePromptClick = (message: Message, promptNumber: number) => {
+    handleUserIntentScrollUp();
+    if (promptElementsRef.current.has(message.id)) {
+      scrollToPrompt(message.id);
+      return;
+    }
+    pendingPromptIdRef.current = message.id;
+    setRevealedPromptCount((count) => count + hiddenPromptCount - promptNumber + 1);
+  };
+
+  useLayoutEffect(() => {
+    const id = pendingPromptIdRef.current;
+    if (!id || !promptElementsRef.current.has(id)) return;
+    pendingPromptIdRef.current = null;
+    scrollToPrompt(id);
+  }, [visibleMessages]);
 
   const handleScroll = () => {
     const el = containerRef.current;
     if (!el) return;
-    if (el.scrollTop < lastScrollTopRef.current) {
-      followBottomRef.current = false;
-    } else if (el.scrollTop > lastScrollTopRef.current && getDistanceFromBottom(el) < BOTTOM_PIN_THRESHOLD_PX) {
+    if (el.scrollTop > lastScrollTopRef.current && getDistanceFromBottom(el) < BOTTOM_PIN_THRESHOLD_PX) {
       followBottomRef.current = true;
     }
     lastScrollTopRef.current = el.scrollTop;
@@ -312,6 +439,8 @@ function MessageList({
   useLayoutEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    const newPrompt = prompts.length > previousPromptCountRef.current;
+    previousPromptCountRef.current = prompts.length;
 
     if (
       scrollToBottomOnInitialMessages &&
@@ -327,14 +456,14 @@ function MessageList({
 
     const historyJustFinished = prevIsReplaying.current && !isHistoryReplaying;
     const sendingJustStarted = !prevIsSendingForScroll.current && isSending;
-    if (historyJustFinished || sendingJustStarted) {
+    if (historyJustFinished || sendingJustStarted || (newPrompt && !isHistoryReplaying)) {
       followBottomRef.current = true;
     }
 
     updateViewport();
     prevIsReplaying.current = isHistoryReplaying;
     prevIsSendingForScroll.current = isSending;
-  }, [messages, revealedPromptCount, isHistoryReplaying, isSending, scrollToBottomOnInitialMessages, updateViewport]);
+  }, [messages, prompts.length, revealedPromptCount, isHistoryReplaying, isSending, scrollToBottomOnInitialMessages, updateViewport]);
 
   useEffect(() => {
     const wasSending = prevIsSendingForCollapse.current;
@@ -360,6 +489,41 @@ function MessageList({
             {`Connect to ${agentName || 'agent'}...`}
           </div>
         </div>
+      )}
+      {showNavigation && (
+        <nav
+          ref={navigationRef}
+          aria-label="Conversation prompts"
+          onScroll={updateNavigationEdges}
+          onWheel={markNavigationScrollIntent}
+          onTouchMove={markNavigationScrollIntent}
+          onKeyDown={(event) => {
+            if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(event.key)) {
+              markNavigationScrollIntent();
+            }
+          }}
+          className={`absolute top-[45px] bottom-[45px] z-30 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${hasNavigationRoom ? 'left-[4px] w-[20px]' : 'left-0 w-[12px]'} ${navigationHiddenUntilHover ? 'opacity-0 transition-opacity duration-75 hover:duration-200 hover:opacity-100 hover:delay-200 focus-within:opacity-100 focus-within:delay-0' : ''} ${navigationFade}`}
+        >
+          <div className="flex min-h-full flex-col items-center justify-center">
+            {prompts.map((message, index) => (
+              <Tooltip
+                key={message.id}
+                placement="right"
+                content={<PromptTooltip message={message} number={index + 1} />}
+                contentClassName="max-w-[min(280px,calc(100vw-48px))]"
+              >
+                <button
+                  type="button"
+                  aria-label={`Go to prompt ${index + 1}`}
+                  onClick={() => handlePromptClick(message, index + 1)}
+                  className={`group flex h-[8px] shrink-0 cursor-pointer items-center justify-center rounded-sm border border-transparent focus-visible:border-[var(--ide-Button-default-focusColor)] ${hasNavigationRoom ? 'w-[20px]' : 'w-[12px]'}`}
+                >
+                  <span className="h-[2px] w-[6px] bg-foreground-secondary opacity-60 group-hover:opacity-100" />
+                </button>
+              </Tooltip>
+            ))}
+          </div>
+        </nav>
       )}
       <div
         ref={containerRef}
@@ -406,11 +570,12 @@ function MessageList({
           }
 
           return (
-            <UserMessage 
-              key={message.id} 
-              message={message} 
+            <UserMessage
+              key={message.id}
+              message={message}
               onImageClick={onImageClick}
               promptNumber={userPromptNumberById.get(message.id)}
+              onElementChange={registerPromptElement}
             />
           );
         })}
