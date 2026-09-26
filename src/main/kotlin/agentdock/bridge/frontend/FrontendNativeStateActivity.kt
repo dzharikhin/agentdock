@@ -2,6 +2,7 @@
 
 package agentdock.bridge.frontend
 
+import agentdock.acp.AcpAudioPlayer
 import agentdock.rpc.AgentDockRpcApi
 import agentdock.rpc.LocalBridgeHost
 import agentdock.rpc.NativeState
@@ -25,6 +26,8 @@ class FrontendNativeStateService(
     private val project: Project,
     private val scope: CoroutineScope,
 ) {
+    private val audio = AcpAudioPlayer(scope)
+
     init {
         scope.launch(Dispatchers.IO) { collectState() }
     }
@@ -42,7 +45,7 @@ class FrontendNativeStateService(
                     ?: AgentDockRpcApi.getInstance().nativeState(project.projectId())
                 states.collect { state ->
                     FrontendSettings.apply(state.settings)
-                    QuotaSnapshot.apply(state.quotas)
+                    if (QuotaSnapshot.apply(state.quotas)) audio.playQuotaWarningSound()
 
                     if (previousWidgetEnabled != state.settings.quotaWidgetEnabled) {
                         previousWidgetEnabled = state.settings.quotaWidgetEnabled

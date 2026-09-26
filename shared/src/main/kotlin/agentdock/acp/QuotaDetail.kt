@@ -13,5 +13,6 @@ data class QuotaDetail(
     val adapterId: String,
     val adapterName: String,
     val mainPercentage: Int,
-    val details: List<String> = emptyList()
+    val details: List<String> = emptyList(),
+    val percentages: Map<String, Int> = emptyMap()
 )

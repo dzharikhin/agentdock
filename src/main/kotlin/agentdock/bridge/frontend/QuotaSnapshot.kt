@@ -15,7 +15,17 @@ object QuotaSnapshot {
     private val _quotas = MutableStateFlow<Map<String, QuotaDetail>>(emptyMap())
     val quotas = _quotas.asStateFlow()
 
-    fun apply(quotas: List<QuotaDetail>) {
-        _quotas.value = quotas.associateBy { it.adapterId }
+    @Synchronized
+    fun apply(quotas: List<QuotaDetail>): Boolean {
+        val previous = _quotas.value
+        val updated = quotas.associateBy { it.adapterId }
+        val crossedThreshold = updated.any { (adapterId, quota) ->
+            quota.percentages.any { (key, percent) ->
+                val oldPercent = previous[adapterId]?.percentages?.get(key)
+                oldPercent != null && oldPercent <= 90 && percent > 90
+            }
+        }
+        _quotas.value = updated
+        return crossedThreshold
     }
 }

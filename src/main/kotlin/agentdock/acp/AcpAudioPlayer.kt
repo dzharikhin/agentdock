@@ -26,6 +26,10 @@ internal class AcpAudioPlayer(private val scope: CoroutineScope) {
         playSound("/sounds/typing.wav")
     }
 
+    fun playQuotaWarningSound() {
+        playSound("/sounds/warning.wav")
+    }
+
     private fun playSound(resourcePath: String) {
         scope.launch(Dispatchers.IO) {
             if (!FrontendSettings.current.audioNotificationsEnabled) {

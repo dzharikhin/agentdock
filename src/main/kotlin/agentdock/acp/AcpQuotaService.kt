@@ -141,6 +141,7 @@ class AcpQuotaService : Disposable {
             val root = jsonParser.parseToJsonElement(rawJson) as? JsonObject
                 ?: return null
             val details = mutableListOf<String>()
+            val percentages = mutableMapOf<String, Int>()
             var mainPercent = 0
 
             when (adapter.id) {
@@ -157,8 +158,14 @@ class AcpQuotaService : Disposable {
                         roundPercent((sevenDay?.get("utilization") as? JsonPrimitive)?.doubleOrNull)
                     } else null
 
-                    fiveHourPct?.let { details.add("5h: $it%") }
-                    sevenDayPct?.let { details.add("7d: $it%") }
+                    fiveHourPct?.let {
+                        details.add("5h: $it%")
+                        percentages["five_hour"] = it
+                    }
+                    sevenDayPct?.let {
+                        details.add("7d: $it%")
+                        percentages["seven_day"] = it
+                    }
 
                     if (details.isNotEmpty()) {
                         mainPercent = when {
@@ -186,6 +193,7 @@ class AcpQuotaService : Disposable {
                     primaryPct?.let {
                         val label = if ((primarySecs ?: 0.0) >= 24.0 * 60 * 60) "7d" else "5h"
                         details.add("$label: $it%")
+                        percentages["primary_window"] = it
                     }
                     secondaryPct?.let {
                         val label = if ((secondarySecs ?: 0.0) >= 24.0 * 60 * 60) "7d" else "5h"
@@ -193,6 +201,7 @@ class AcpQuotaService : Disposable {
                             if (label == "5h") "7d" else "5h"
                         } else label
                         details.add("$finalLabel: $it%")
+                        percentages["secondary_window"] = it
                     }
 
                     if (details.isEmpty() && authType != null) {
@@ -213,7 +222,7 @@ class AcpQuotaService : Disposable {
                         val groupName = group["name"]?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotBlank() }
                             ?: return@groupLoop
                         val buckets = group["buckets"] as? JsonArray ?: return@groupLoop
-                        buckets.forEach bucketLoop@{ bucketElement ->
+                        buckets.forEachIndexed bucketLoop@{ bucketIndex, bucketElement ->
                             val bucket = bucketElement as? JsonObject ?: return@bucketLoop
                             val resetAt = bucket["reset_time"]?.jsonPrimitive?.contentOrNull
                             if (!resetAt.isNullOrBlank() && !hasDisplayableQuotaReset(resetAt)) return@bucketLoop
@@ -225,6 +234,7 @@ class AcpQuotaService : Disposable {
                                 ?.replace(Regex("""\s+Remaining$""", RegexOption.IGNORE_CASE), "")
                                 ?.takeIf { it.isNotBlank() }
                             details.add(if (bucketName == null) "$groupName: $usedPct%" else "$groupName · $bucketName: $usedPct%")
+                            percentages["$groupName/${bucketName ?: bucketIndex}"] = usedPct
                             mainPercent = maxOf(mainPercent, usedPct)
                         }
                     }
@@ -238,8 +248,14 @@ class AcpQuotaService : Disposable {
                         if (showPercents && plan != null) {
                             val cursorModelsPct = roundPercent((plan["autoPercentUsed"] as? JsonPrimitive)?.doubleOrNull)
                             val otherModelsPct = roundPercent((plan["apiPercentUsed"] as? JsonPrimitive)?.doubleOrNull)
-                            cursorModelsPct?.let { details.add("Cursor Models: $it%") }
-                            otherModelsPct?.let { details.add("Other Models: $it%") }
+                            cursorModelsPct?.let {
+                                details.add("Cursor Models: $it%")
+                                percentages["auto"] = it
+                            }
+                            otherModelsPct?.let {
+                                details.add("Other Models: $it%")
+                                percentages["api"] = it
+                            }
                             mainPercent = listOfNotNull(cursorModelsPct, otherModelsPct).maxOrNull() ?: 0
                         }
                     }
@@ -258,13 +274,14 @@ class AcpQuotaService : Disposable {
                     } else {
                         usedPct?.let {
                             details.add("Plan: $it%")
+                            percentages["plan"] = it
                             mainPercent = it
                         }
                     }
                 }
             }
             if (details.isEmpty()) null
-            else QuotaDetail(adapter.id, adapter.name, mainPercent, details)
+            else QuotaDetail(adapter.id, adapter.name, mainPercent, details, percentages)
         } catch (e: Exception) {
             log.warn("Failed to parse usage payload for ${adapter.id}", e)
             null

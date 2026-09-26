@@ -380,7 +380,7 @@ export function SettingsView() {
           <SettingsSection title='General'>
             <SettingsCheckbox
               title='Audio Notifications'
-              description='Play sounds for new assistant messages and permission requests'
+              description='Play sounds for new assistant messages and quota limit warnings'
               checked={globalSettings.settings.audioNotificationsEnabled}
               onToggle={() =>
                 updateGlobalSettings({ audioNotificationsEnabled: !globalSettings.settings.audioNotificationsEnabled })
