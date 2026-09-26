@@ -122,11 +122,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
         >
           <div
             className={cx(
-              'max-w-[calc(100vw-16px)] border border-[var(--ide-Button-startBorderColor)] ' +
+              'border border-[var(--ide-Button-startBorderColor)] ' +
               'bg-background-secondary text-foreground rounded-md',
               variant === 'minimal'
-                ? 'overflow-hidden px-2 py-1 text-xs whitespace-nowrap text-ellipsis'
-                : 'max-w-[300px] p-3 pt-2 text-ide-small whitespace-normal break-words',
+                ? 'max-w-[min(1000px,calc(100vw-16px))] overflow-hidden px-2 py-1 text-xs whitespace-nowrap text-ellipsis'
+                : 'max-w-[calc(100vw-16px)] max-w-[300px] p-3 pt-2 text-ide-small whitespace-normal break-words',
               contentClassName
             )}
           >

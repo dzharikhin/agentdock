@@ -149,8 +149,7 @@ export function RecentChats({
                       title
                     )}
                     onClose={() => setRenamingId(null)}
-                    className="-ml-1 rounded-[3px] bg-background px-1 text-foreground
-                      focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
+                    className="-ml-1 rounded-[3px] bg-background px-1 text-foreground"
                   />
                 </div>
               ) : (

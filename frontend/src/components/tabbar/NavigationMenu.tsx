@@ -345,8 +345,7 @@ export function TabNavigationContent({
                               initialTitle={tab.title}
                               onCommit={(title) => onRenameTab(tab.id, title)}
                               onClose={() => setRenamingTabId(null)}
-                              className="-ml-1 rounded-[3px] bg-background px-1 text-foreground
-                                focus-visible:rounded-[4px] focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
+                              className="-ml-1 rounded-[3px] bg-background px-1 text-foreground"
                             />
                           </div>
                         ) : (

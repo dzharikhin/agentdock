@@ -128,6 +128,9 @@ export function useAppController() {
     const conversationId = conversationKeyOf(tab);
     const projectPath = historyConversationIndex.get(conversationId);
     if (projectPath) {
+      setTabs((prev) => prev.map((item) => (
+        item.id === tabId ? { ...item, title } : item
+      )));
       ACPBridge.renameHistoryConversation(projectPath, conversationId, title);
       return;
     }

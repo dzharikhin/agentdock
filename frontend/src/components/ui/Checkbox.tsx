@@ -30,7 +30,7 @@ export function Checkbox({
         checked
           ? 'border-transparent bg-primary text-[var(--ide-Button-default-foreground)]'
           : 'border-[var(--ide-Button-startBorderColor)] text-transparent',
-        'focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-2',
+        'focus:outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-2',
         className
       )}
       onClick={(event) => {

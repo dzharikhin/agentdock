@@ -324,10 +324,10 @@ export function SettingsView() {
             </div>
 
             <SettingsCheckbox
-              title='Show prompt navigation markers only on hover'
+              title='Show prompt navigation on the left side of the chat only on hover'
               checked={globalSettings.settings.promptNavigationHoverOnly}
               onToggle={() => updateGlobalSettings({ promptNavigationHoverOnly: !globalSettings.settings.promptNavigationHoverOnly })}
-              ariaLabel='Show prompt navigation on hover'
+              ariaLabel='Show prompt navigation on the left side of the chat only on hover'
             />
 
             <SettingsField

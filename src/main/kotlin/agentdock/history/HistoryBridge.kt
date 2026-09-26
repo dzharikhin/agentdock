@@ -132,16 +132,24 @@ class HistoryBridge(
             if (payload.isBlank()) return@register
 
             scope.launch(Dispatchers.Default) {
+                var failedRequest: RenameHistoryPayload? = null
                 try {
                     val request = permissiveJson.decodeFromString<RenameHistoryPayload>(payload)
+                    failedRequest = request
                     val success = AgentDockHistoryService.renameConversation(request.projectPath, request.conversationId, request.newTitle)
+                    val history = AgentDockHistoryService.getHistoryList(request.projectPath)
+                    pushHistoryList(permissiveJson.encodeToString(history))
                     if (success) {
-                        val history = AgentDockHistoryService.getHistoryList(request.projectPath)
-                        pushHistoryList(permissiveJson.encodeToString(history))
-                    } else {
-                        sendJsError("Failed to rename conversation")
+                        return@launch
                     }
+                    sendJsError("Failed to rename conversation")
                 } catch (e: Exception) {
+                    failedRequest?.let { request ->
+                        runCatching {
+                            val history = AgentDockHistoryService.getHistoryList(request.projectPath)
+                            pushHistoryList(permissiveJson.encodeToString(history))
+                        }
+                    }
                     sendJsError("Error during rename: ${e.message}")
                 }
             }
