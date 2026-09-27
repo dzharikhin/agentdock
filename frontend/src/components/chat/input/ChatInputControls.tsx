@@ -199,21 +199,21 @@ export function ChatInputControls({
         )}
 
         {fastModeOption && fastModeOnValue && fastModeOffValue && (
-          <button
-            type="button"
-            disabled={!hasSelectedAgent}
-            aria-label="Fast mode"
-            aria-pressed={fastModeEnabled}
-            onClick={() => onConfigOptionChange(fastModeOption.id, fastModeEnabled ? fastModeOffValue : fastModeOnValue)}
-            className={`ml-0.5 flex shrink-0 items-center rounded border-0 bg-background-secondary px-1.5 outline-none chat-max-400:hidden
-              focus-visible:relative focus-visible:z-10
-              hover:bg-hover focus-visible:bg-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-[var(--ide-Button-default-focusColor)]
-              disabled:cursor-not-allowed ${fastModeEnabled ? 'text-primary' : 'text-foreground'}`}
-          >
-            <Tooltip variant="minimal" content={`Fast mode: ${fastModeEnabled ? 'On' : 'Off'}${fastModeDescription ? `, ${fastModeDescription}` : ''}`}>
+          <Tooltip variant="minimal" className="ml-0.5 flex chat-max-400:hidden" content={`Fast mode: ${fastModeEnabled ? 'On' : 'Off'}${fastModeDescription ? `, ${fastModeDescription}` : ''}`}>
+            <button
+              type="button"
+              disabled={!hasSelectedAgent}
+              aria-label="Fast mode"
+              aria-pressed={fastModeEnabled}
+              onClick={() => onConfigOptionChange(fastModeOption.id, fastModeEnabled ? fastModeOffValue : fastModeOnValue)}
+              className={`flex shrink-0 items-center rounded border-0 bg-background-secondary px-1.5 outline-none
+                focus-visible:relative focus-visible:z-10
+                hover:bg-hover focus-visible:bg-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-[var(--ide-Button-default-focusColor)]
+                disabled:cursor-not-allowed ${fastModeEnabled ? 'text-primary' : 'text-foreground'}`}
+            >
               <Zap size={15} fill={fastModeEnabled ? 'currentColor' : 'none'} aria-hidden="true" />
-            </Tooltip>
-          </button>
+            </button>
+          </Tooltip>
         )}
         <ChatDropdown
           containerRef={containerRef}
@@ -281,14 +281,13 @@ export function ChatInputControls({
             }),
           ]}
           placeholder="Options"
+          triggerTooltip="Options"
           disabled={false}
           customTrigger={
-            <Tooltip variant="minimal" content="Options">
-              <div className="flex items-center">
-                <Ellipsis size={16} aria-hidden="true" />
-                <span className="sr-only">Options</span>
-              </div>
-            </Tooltip>
+            <div className="flex items-center">
+              <Ellipsis size={16} aria-hidden="true" />
+              <span className="sr-only">Options</span>
+            </div>
           }
           onChange={() => {}}
           onSubChange={(parentId, subId) => {
@@ -337,18 +336,18 @@ export function ChatInputControls({
               </button>
             </Tooltip>
           )}
-          <button key="stop-button" type="button" onClick={onStop} aria-label="Cancel"
-            className="flex items-center h-full px-1.5 rounded appearance-none border-0 bg-background-secondary
-                outline-none text-ide-small text-error hover:bg-hover focus-visible:bg-hover
-                focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-          >
-            <Tooltip variant="minimal" content="Cancel">
+          <Tooltip variant="minimal" content="Cancel" className="h-full">
+            <button key="stop-button" type="button" onClick={onStop} aria-label="Cancel"
+              className="flex items-center h-full px-1.5 rounded appearance-none border-0 bg-background-secondary
+                  outline-none text-ide-small text-error hover:bg-hover focus-visible:bg-hover
+                  focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+            >
               <div className="flex items-center">
                 <Square size={16} aria-hidden="true" />
                 <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
               </div>
-            </Tooltip>
-          </button>
+            </button>
+          </Tooltip>
           </>
         ) : (
           <Tooltip variant="minimal" content={hasInput ? 'Send' : null} className="h-full">

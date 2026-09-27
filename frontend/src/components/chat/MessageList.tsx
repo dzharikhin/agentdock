@@ -537,7 +537,7 @@ function MessageList({
         className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto scroll-auto [overflow-anchor:none] px-4 opacity-100 transition-opacity duration-300"
       >
       <div ref={contentRef} className="mx-auto min-h-full w-full max-w-app-content flex flex-col">
-        <div className="flex flex-1 flex-col pb-6 pt-[calc(1.5rem+var(--content-top-inset,0px))]">
+        <div className="flex flex-1 flex-col pb-12 pt-[calc(1.5rem+var(--content-top-inset,0px))]">
         
         {hiddenCount > 0 && !isHistoryReplaying && (
           <div className="flex justify-center mb-12">

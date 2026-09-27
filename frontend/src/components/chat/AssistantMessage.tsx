@@ -28,7 +28,7 @@ function formatPromptTime(timestamp?: number): string | null {
   const day = String(date.getDate()).padStart(2, '0');
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${day}/${month}/${year} ${hours}:${minutes}`;
+  return `${day}.${month}.${year} ${hours}:${minutes}`;
 }
 
 function formatContextUsage(used?: number, size?: number): string | null {

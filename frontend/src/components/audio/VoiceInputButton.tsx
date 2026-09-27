@@ -21,20 +21,20 @@ function ActiveVoiceInputButton({ conversationId, insertText }: VoiceInputButton
 
   if (isTranscribing) {
     return (
-      <button type="button" onClick={onCancel}
-        aria-label="Cancel transcription"
-        className="flex items-center h-full px-1.5 rounded appearance-none
-          border-0 bg-background-secondary outline-none text-ide-small text-foreground-secondary
-          hover:bg-hover hover:text-foreground
-          focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-      >
-        <Tooltip variant="minimal" content="Cancel transcription">
+      <Tooltip variant="minimal" content="Cancel transcription" className="h-full">
+        <button type="button" onClick={onCancel}
+          aria-label="Cancel transcription"
+          className="flex items-center h-full px-1.5 rounded appearance-none
+            border-0 bg-background-secondary outline-none text-ide-small text-foreground-secondary
+            hover:bg-hover hover:text-foreground
+            focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+        >
           <div className="flex items-center">
             <LoaderCircle size={16} className="animate-spin" />
             <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
           </div>
-        </Tooltip>
-      </button>
+        </button>
+      </Tooltip>
     );
   }
 
@@ -43,17 +43,17 @@ function ActiveVoiceInputButton({ conversationId, insertText }: VoiceInputButton
     : 'bg-background-secondary text-foreground hover:text-foreground hover:bg-hover focus-visible:bg-hover focus-visible:text-foreground';
 
   return (
-    <button type="button" onClick={onRecord}
-      className={`flex items-center h-full px-1.5 rounded appearance-none border-0 outline-none text-ide-small
-        focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]
-        ${recordClassName}`}
-    >
-      <Tooltip variant="minimal" content={isRecording ? 'Stop recording' : 'Voice input'}>
+    <Tooltip variant="minimal" content={isRecording ? 'Stop recording' : 'Voice input'} className="h-full">
+      <button type="button" onClick={onRecord}
+        className={`flex items-center h-full px-1.5 rounded appearance-none border-0 outline-none text-ide-small
+          focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]
+          ${recordClassName}`}
+      >
         <div className="flex items-center">
           <Mic size={15} className="block" />
           <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
         </div>
-      </Tooltip>
-    </button>
+      </button>
+    </Tooltip>
   );
 }
