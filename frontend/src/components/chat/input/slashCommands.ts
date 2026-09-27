@@ -1,11 +1,7 @@
-import {
-  $createParagraphNode,
-  $createTextNode,
-  $getRoot,
-  LexicalEditor,
-} from 'lexical';
-import { AvailableCommand } from '../../../types/chat';
+import { LexicalEditor } from 'lexical';
+import { AvailableCommand, ChatAttachment } from '../../../types/chat';
 import { PromptLibraryItem } from '../../../types/promptLibrary';
+import { restoreComposerContent } from './composerContent';
 
 export interface SlashCommandItem {
   id: string;
@@ -13,6 +9,7 @@ export interface SlashCommandItem {
   description: string;
   insertText: string;
   displayPrefix: string;
+  attachments?: ChatAttachment[];
 }
 
 export function buildAgentSlashItems(commands: AvailableCommand[]): SlashCommandItem[] {
@@ -27,13 +24,14 @@ export function buildAgentSlashItems(commands: AvailableCommand[]): SlashCommand
 
 export function buildPromptLibrarySlashItems(prompts: PromptLibraryItem[]): SlashCommandItem[] {
   return prompts
-    .filter((prompt) => prompt.name.trim() && prompt.prompt.trim())
+    .filter((prompt) => prompt.name.trim() && (prompt.prompt.trim() || prompt.attachments?.length))
     .map((prompt) => ({
       id: prompt.id,
       name: prompt.name.trim(),
-      description: prompt.prompt.trim(),
+      description: prompt.prompt.trim().replace(/\[image-[a-z0-9-]+]/g, '[image]').replace(/\[code-ref-[a-z0-9-]+]/g, '[file]') || prompt.attachments?.[0]?.name || '',
       insertText: prompt.prompt,
       displayPrefix: '',
+      attachments: prompt.attachments ?? [],
     }));
 }
 
@@ -104,21 +102,19 @@ export function computeViewportTopInset(rootElement: HTMLDivElement): number {
 export function applySlashCommandToEditor(
   editor: LexicalEditor | null,
   command: SlashCommandItem,
-  onInputChange: (value: string) => void
+  onInputChange: (value: string) => void,
+  onAttachmentsChange: (attachments: ChatAttachment[]) => void
 ): string {
   const nextValue = command.insertText;
   onInputChange(nextValue);
 
   if (editor) {
-    editor.update(() => {
-      const root = $getRoot();
-      root.clear();
-      const paragraph = $createParagraphNode();
-      paragraph.append($createTextNode(nextValue));
-      root.append(paragraph);
-      paragraph.selectEnd();
+    restoreComposerContent(editor, nextValue, command.attachments ?? [], () => {
+      if (command.attachments) onAttachmentsChange(command.attachments);
     });
     editor.focus();
+  } else if (command.attachments) {
+    onAttachmentsChange(command.attachments);
   }
 
   return nextValue;

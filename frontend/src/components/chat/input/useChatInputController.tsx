@@ -10,7 +10,7 @@ import {openFile} from '../../../utils/openFile';
 import {useSlashCommands} from '../../../hooks/useSlashCommands';
 import {applySlashCommandToEditor, buildAgentSlashItems, buildPromptLibrarySlashItems,} from './slashCommands';
 import {useFileMentions} from '../../../hooks/useFileMentions';
-import {$createImageNode, ImageNode} from './ImageNode';
+import {ImageNode} from './ImageNode';
 import {CodeReferenceNode} from './CodeReferenceNode';
 import {ChatInputProps} from './chatInputState';
 
@@ -21,7 +21,6 @@ export function useChatInputController({
   onInputChange,
   selectedAgentId,
   availableCommands,
-  attachments,
   onAttachmentsChange,
   customHeight = 180,
   autoFocus = false,
@@ -74,16 +73,6 @@ export function useChatInputController({
     return (localStorage.getItem('chat-send-mode') as 'enter' | 'ctrl-enter') || 'enter';
   });
 
-  const initialConfig = useMemo(() => ({
-    namespace: `ChatInput-${conversationId}`,
-    nodes: [ImageNode, CodeReferenceNode],
-    theme: {
-      paragraph: 'm-0',
-      text: { base: 'text-foreground' },
-    },
-    onError: (error: Error) => console.error(error),
-  }), [conversationId, composerRevision]);
-
   const agentSlashItems = useMemo(
     () => buildAgentSlashItems(availableCommands),
     [availableCommands]
@@ -133,25 +122,6 @@ export function useChatInputController({
     return options;
   }, [agentSlashItems, promptLibrarySlashItems]);
 
-  const handleImagePaste = useCallback((file: File, editor: LexicalEditor) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = (event.target?.result as string).split(',')[1];
-      const id = Math.random().toString(36).substring(2, 9);
-      const newAtt = { id, name: file.name || 'pasted-image.png', data: base64, mimeType: file.type, isInline: true };
-      onAttachmentsChange([...attachments, newAtt]);
-
-      editor.update(() => {
-        const selection = $getSelection();
-        if ($isRangeSelection(selection)) {
-          const imageNode = $createImageNode(id);
-          selection.insertNodes([imageNode]);
-        }
-      });
-    };
-    reader.readAsDataURL(file);
-  }, [attachments, onAttachmentsChange]);
-
   useEffect(() => {
     if (!autoFocus) return;
     const focusEditor = () => {
@@ -180,6 +150,7 @@ export function useChatInputController({
     menuRef: slashMenuRef,
     lexicalEditorRef,
     onInputChange,
+    onAttachmentsChange,
   });
 
   const {
@@ -240,9 +211,10 @@ export function useChatInputController({
     applySlashCommandToEditor(
       lexicalEditorRef.current,
       item,
-      onInputChange
+      onInputChange,
+      onAttachmentsChange
     );
-  }, [lexicalEditorRef, onInputChange]);
+  }, [lexicalEditorRef, onInputChange, onAttachmentsChange]);
 
   return {
     editorContainerRef,
@@ -250,7 +222,6 @@ export function useChatInputController({
     slashMenuRef,
     fileMenuRef,
     composerRevision,
-    initialConfig,
     sendMode,
     setSendMode,
     plusMenuOptions,
@@ -272,7 +243,6 @@ export function useChatInputController({
     agentSlashItems,
     promptLibrarySlashItems,
     handleOpenFile,
-    handleImagePaste,
     combinedHandleKeyDownCapture,
     handleInsertSlashItem,
     setLexicalEditor: (editor: LexicalEditor) => {

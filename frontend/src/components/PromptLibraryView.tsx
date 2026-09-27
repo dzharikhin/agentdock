@@ -2,19 +2,23 @@ import { useEffect, useState } from 'react';
 import { Bookmark, Pencil, Plus, Trash2 } from 'lucide-react';
 import { ACPBridge } from '../utils/bridge';
 import { PromptLibraryItem } from '../types/promptLibrary';
+import type { ChatAttachment } from '../types/chat';
 import { Button } from './ui/Button';
 import { Tooltip } from './chat/shared/Tooltip';
 import { SectionTitle } from './ui/SectionTitle';
 import ConfirmationModal from './ConfirmationModal';
 import { FormDialog } from './ui/FormDialog';
+import { PromptLibraryEditor } from './PromptLibraryEditor';
+import { ImageOverlayModal } from './chat/shared/ImageOverlayModal';
 
 interface FormState {
   name: string;
   prompt: string;
+  attachments: ChatAttachment[];
 }
 
 function emptyForm(): FormState {
-  return { name: '', prompt: '' };
+  return { name: '', prompt: '', attachments: [] };
 }
 
 function nextId(): string {
@@ -26,6 +30,7 @@ function formToPrompt(form: FormState, id: string): PromptLibraryItem {
     id,
     name: form.name.trim(),
     prompt: form.prompt.trim(),
+    attachments: form.attachments,
   };
 }
 
@@ -33,7 +38,12 @@ function promptToForm(prompt: PromptLibraryItem): FormState {
   return {
     name: prompt.name,
     prompt: prompt.prompt,
+    attachments: prompt.attachments ?? [],
   };
+}
+
+function hasPromptContent(form: FormState): boolean {
+  return Boolean(form.prompt.trim() || form.attachments.length);
 }
 
 export function PromptLibraryView() {
@@ -41,6 +51,7 @@ export function PromptLibraryView() {
   const [form, setForm] = useState<FormState | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<PromptLibraryItem | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   useEffect(() => {
     const cleanup = ACPBridge.onPromptLibrary((e) => setPrompts(e.detail.items));
@@ -66,11 +77,12 @@ export function PromptLibraryView() {
   const cancelForm = () => {
     setForm(null);
     setEditingId(null);
+    setPreviewImage(null);
   };
 
   const submitForm = () => {
     if (!form) return;
-    if (!form.name.trim() || !form.prompt.trim()) return;
+    if (!form.name.trim() || !hasPromptContent(form)) return;
 
     if (editingId) {
       save(prompts.map((prompt) => (
@@ -128,7 +140,7 @@ export function PromptLibraryView() {
             <div className="flex-1 min-w-0">
               <div className="truncate text-foreground">{prompt.name}</div>
               <div className="mt-1 text-xs text-foreground-secondary truncate">
-                {prompt.prompt}
+                {prompt.prompt.replace(/\[image-[a-z0-9-]+]/g, '[image]').replace(/\[code-ref-[a-z0-9-]+]/g, '[file]') || prompt.attachments?.[0]?.name}
               </div>
             </div>
 
@@ -168,7 +180,7 @@ export function PromptLibraryView() {
           <>
             <Button
               onClick={submitForm}
-              disabled={!form?.name.trim() || !form?.prompt.trim()}
+              disabled={!form || !form.name.trim() || !hasPromptContent(form)}
               variant="primary"
             >
               Save
@@ -193,18 +205,19 @@ export function PromptLibraryView() {
 
             <div className="flex flex-col gap-1">
               <span className="text-foreground-secondary">Prompt <span className="text-error" aria-hidden="true">*</span></span>
-              <textarea
+              <PromptLibraryEditor
                 value={form.prompt}
-                onChange={(event) => setForm({ ...form, prompt: event.target.value })}
-                rows={8}
-                className="w-full min-h-[120px] h-auto resize-none rounded-[4px] px-2 py-1"
-                required
-                aria-required="true"
+                attachments={form.attachments}
+                onChange={(value) => setForm((current) => current ? { ...current, prompt: value } : current)}
+                onAttachmentsChange={(attachments) => setForm((current) => current ? { ...current, attachments } : current)}
+                onImageClick={setPreviewImage}
               />
             </div>
           </div>
         ) : null}
       </FormDialog>
+
+      <ImageOverlayModal src={previewImage} onClose={() => setPreviewImage(null)} />
 
       <ConfirmationModal
         isOpen={deleteTarget !== null}

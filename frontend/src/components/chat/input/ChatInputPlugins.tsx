@@ -3,7 +3,6 @@ import type { RefObject } from 'react';
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext';
 import {
   $createLineBreakNode,
-  $createParagraphNode,
   $createTextNode,
   $getRoot,
   $getSelection,
@@ -24,6 +23,7 @@ import { $createImageNode, ImageNode } from './ImageNode';
 import { CodeReferenceNode, $createCodeReferenceNode, $isCodeReferenceNode } from './CodeReferenceNode';
 import { ChatAttachment, RichContentBlock } from '../../../types/chat';
 import { pastedPrompt, PROMPT_MIME } from '../../../utils/promptClipboard';
+import { restoreComposerContent } from './composerContent';
 
 export function AttachmentsSyncPlugin({ attachments, onAttachmentsChange }: {
   attachments: ChatAttachment[],
@@ -114,12 +114,13 @@ function insertPrompt(editor: LexicalEditor, blocks: RichContentBlock[], attachm
   }
 }
 
-export function PasteLogPlugin({ onImagePaste, attachments, onAttachmentsChange }: {
-  onImagePaste: (file: File, editor: LexicalEditor) => void;
+export function PasteLogPlugin({ attachments, onAttachmentsChange }: {
   attachments: ChatAttachment[];
   onAttachmentsChange: (items: ChatAttachment[]) => void;
 }) {
   const [editor] = useLexicalComposerContext();
+  const attachmentsRef = useRef(attachments);
+  attachmentsRef.current = attachments;
 
   const handlePaste = useCallback((e: ClipboardEvent) => {
     const items = e.clipboardData?.items;
@@ -129,11 +130,23 @@ export function PasteLogPlugin({ onImagePaste, attachments, onAttachmentsChange 
       if (items[i].type.indexOf('image') !== -1) {
         const file = items[i].getAsFile();
         if (file) {
-          onImagePaste(file, editor);
+          const reader = new FileReader();
+          reader.onload = () => {
+            if (!editor.getRootElement() || typeof reader.result !== 'string') return;
+            const id = crypto.randomUUID();
+            const attachment = { id, name: file.name || 'pasted-image.png', data: reader.result.split(',')[1], mimeType: file.type, isInline: true };
+            attachmentsRef.current = [...attachmentsRef.current, attachment];
+            onAttachmentsChange(attachmentsRef.current);
+            editor.update(() => {
+              if (!$isRangeSelection($getSelection())) $getRoot().selectEnd();
+              $getSelection()?.insertNodes([$createImageNode(id)]);
+            });
+          };
+          reader.readAsDataURL(file);
         }
       }
     }
-  }, [onImagePaste, editor]);
+  }, [onAttachmentsChange, editor]);
 
   useEffect(() => {
     const rootElement = editor.getRootElement();
@@ -196,7 +209,7 @@ export function KeyboardPlugin({
   sendMode,
   disabled = false,
 }: {
-  onSend: () => void,
+  onSend?: () => void,
   sendMode: 'enter' | 'ctrl-enter',
   disabled?: boolean,
 }) {
@@ -207,7 +220,14 @@ export function KeyboardPlugin({
       KEY_ENTER_COMMAND,
       (event: KeyboardEvent) => {
         if (disabled) return false;
-        if (sendMode === 'enter') {
+        if (!onSend) {
+          if (event.isComposing) return false;
+          const selection = $getSelection();
+          if (!$isRangeSelection(selection)) return false;
+          event.preventDefault();
+          selection.insertNodes([$createLineBreakNode()]);
+          return true;
+        } else if (sendMode === 'enter') {
           if (!event.shiftKey && !event.ctrlKey && !event.metaKey) {
             event.preventDefault();
             onSend();
@@ -522,50 +542,8 @@ export function LoadComposerDraftPlugin({
 
   useEffect(() => {
     if (revision === 0) return;
-
     const draft = draftRef.current;
-    const attachmentsById = new Map(draft.attachments.map((attachment) => [attachment.id, attachment]));
-
-    editor.update(() => {
-      const root = $getRoot();
-      const paragraph = $createParagraphNode();
-      const placeholderRegex = /\[(image|code-ref)-([a-z0-9-]+)]/g;
-      let lastIndex = 0;
-      let match: RegExpExecArray | null;
-
-      const appendText = (value: string) => {
-        value.split('\n').forEach((part, index) => {
-          if (index > 0) paragraph.append($createLineBreakNode());
-          if (part) paragraph.append($createTextNode(part));
-        });
-      };
-
-      while ((match = placeholderRegex.exec(draft.inputValue)) !== null) {
-        appendText(draft.inputValue.slice(lastIndex, match.index));
-        const attachment = attachmentsById.get(match[2]);
-
-        if (match[1] === 'image' && attachment?.mimeType.startsWith('image/')) {
-          paragraph.append($createImageNode(attachment.id));
-        } else if (match[1] === 'code-ref' && attachment?.path) {
-          paragraph.append($createCodeReferenceNode(
-            attachment.id,
-            attachment.path,
-            attachment.name,
-            attachment.startLine,
-            attachment.endLine
-          ));
-        } else {
-          appendText(match[0]);
-        }
-
-        lastIndex = placeholderRegex.lastIndex;
-      }
-
-      appendText(draft.inputValue.slice(lastIndex));
-      root.clear();
-      root.append(paragraph);
-      paragraph.selectEnd();
-    });
+    restoreComposerContent(editor, draft.inputValue, draft.attachments);
   }, [editor, revision]);
 
   return null;

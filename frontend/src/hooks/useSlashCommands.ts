@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { LexicalEditor } from 'lexical';
+import type { ChatAttachment } from '../types/chat';
 import {
   applySlashCommandToEditor,
   SlashCommandItem,
@@ -19,6 +20,7 @@ interface UseSlashCommandsOptions {
   menuRef: React.RefObject<HTMLDivElement>;
   lexicalEditorRef: React.RefObject<LexicalEditor | null>;
   onInputChange: (value: string) => void;
+  onAttachmentsChange: (attachments: ChatAttachment[]) => void;
 }
 
 export function useSlashCommands({
@@ -29,6 +31,7 @@ export function useSlashCommands({
   menuRef,
   lexicalEditorRef,
   onInputChange,
+  onAttachmentsChange,
 }: UseSlashCommandsOptions) {
   const [layout, setLayout] = useState<SlashMenuLayout | null>(null);
   const [highlightedIndex, setHighlightedIndex] = useState(0);
@@ -51,11 +54,12 @@ export function useSlashCommands({
     const nextValue = applySlashCommandToEditor(
       lexicalEditorRef.current,
       command,
-      onInputChange
+      onInputChange,
+      onAttachmentsChange
     );
     setDismissedSlashValue(nextValue);
     setLayout(null);
-  }, [lexicalEditorRef, onInputChange]);
+  }, [lexicalEditorRef, onInputChange, onAttachmentsChange]);
 
   const updateLayout = useCallback(() => {
     if (!isOpen) {

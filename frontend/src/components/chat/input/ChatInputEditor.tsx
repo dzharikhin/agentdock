@@ -1,4 +1,4 @@
-import { ComponentProps, KeyboardEvent, RefObject } from 'react';
+import { KeyboardEvent, RefObject, useMemo } from 'react';
 import { LexicalComposer } from '@lexical/react/LexicalComposer';
 import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin';
 import { ContentEditable } from '@lexical/react/LexicalContentEditable';
@@ -8,6 +8,8 @@ import { LexicalErrorBoundary } from '@lexical/react/LexicalErrorBoundary';
 import { $getRoot, LexicalEditor } from 'lexical';
 import { ChatAttachment } from '../../../types/chat';
 import { ChatInputActionsContext } from './ChatInputActionsContext';
+import { ImageNode } from './ImageNode';
+import { CodeReferenceNode } from './CodeReferenceNode';
 import {
   AttachmentsSyncPlugin,
   AutoHeightPlugin,
@@ -25,7 +27,6 @@ import {
 interface ChatInputEditorProps {
   conversationId: string;
   composerRevision: number;
-  initialConfig: ComponentProps<typeof LexicalComposer>['initialConfig'];
   editorContainerRef: RefObject<HTMLDivElement>;
   inputValue: string;
   composerLoadRevision: number;
@@ -39,16 +40,15 @@ interface ChatInputEditorProps {
   onImageClick: (src: string) => void;
   onOpenFile: (filePath: string, line?: number) => void;
   onHeightChange?: (contentHeight: number) => void;
-  onImagePaste: (file: File, editor: LexicalEditor) => void;
-  onSend: () => void;
-  onKeyDownCapture: (event: KeyboardEvent<HTMLDivElement>) => void;
-  onEditorReady: (editor: LexicalEditor) => void;
+  onSend?: () => void;
+  onKeyDownCapture?: (event: KeyboardEvent<HTMLDivElement>) => void;
+  onEditorReady?: (editor: LexicalEditor) => void;
+  placeholder?: string;
 }
 
 export function ChatInputEditor({
   conversationId,
   composerRevision,
-  initialConfig,
   editorContainerRef,
   inputValue,
   composerLoadRevision,
@@ -62,11 +62,18 @@ export function ChatInputEditor({
   onImageClick,
   onOpenFile,
   onHeightChange,
-  onImagePaste,
   onSend,
   onKeyDownCapture,
   onEditorReady,
+  placeholder = 'Type your task here, @ to add files, / for commands',
 }: ChatInputEditorProps) {
+  const initialConfig = useMemo(() => ({
+    namespace: `ChatInput-${conversationId}`,
+    nodes: [ImageNode, CodeReferenceNode],
+    theme: { paragraph: 'm-0', text: { base: 'text-foreground' } },
+    onError: (error: Error) => console.error(error),
+  }), [conversationId, composerRevision]);
+
   return (
     <div ref={editorContainerRef} onKeyDownCapture={onKeyDownCapture}
       className={`relative flex min-h-0 flex-1 cursor-text flex-col overflow-y-auto rounded-t-ide transition-colors
@@ -79,13 +86,13 @@ export function ChatInputEditor({
             }
             placeholder={
               <div className="absolute top-3 left-3 text-foreground-secondary pointer-events-none">
-                Type your task here, @ to add files, / for commands
+                {placeholder}
               </div>
             }
             ErrorBoundary={LexicalErrorBoundary}
           />
           <HistoryPlugin />
-          <RegisterEditorPlugin onReady={onEditorReady} />
+          {onEditorReady && <RegisterEditorPlugin onReady={onEditorReady} />}
           <OnChangePlugin onChange={(editorState) => {
             editorState.read(() => {
               const text = $getRoot().getTextContent();
@@ -99,7 +106,7 @@ export function ChatInputEditor({
             inputValue={inputValue}
             attachments={attachments}
           />
-          <PasteLogPlugin onImagePaste={onImagePaste} attachments={attachments} onAttachmentsChange={onAttachmentsChange} />
+          <PasteLogPlugin attachments={attachments} onAttachmentsChange={onAttachmentsChange} />
           <KeyboardPlugin onSend={onSend} sendMode={sendMode} disabled={isSlashMenuOpen} />
           <PlainTextFormattingGuardPlugin />
           <InlineAttachmentBackspacePlugin />

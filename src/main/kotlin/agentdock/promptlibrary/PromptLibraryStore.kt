@@ -11,7 +11,21 @@ import java.io.File
 data class PromptLibraryItem(
     val id: String,
     val name: String,
-    val prompt: String
+    val prompt: String,
+    val attachments: List<PromptAttachment> = emptyList()
+)
+
+@Serializable
+data class PromptAttachment(
+    val id: String,
+    val name: String,
+    val mimeType: String,
+    val data: String? = null,
+    val path: String? = null,
+    val isInline: Boolean? = null,
+    val attachmentType: String? = null,
+    val startLine: Int? = null,
+    val endLine: Int? = null
 )
 
 private val json = Json {

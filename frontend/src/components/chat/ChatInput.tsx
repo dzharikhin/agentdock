@@ -57,7 +57,6 @@ export default function ChatInput(props: ChatInputProps) {
     slashMenuRef,
     fileMenuRef,
     composerRevision,
-    initialConfig,
     sendMode,
     setSendMode,
     plusMenuOptions,
@@ -79,7 +78,6 @@ export default function ChatInput(props: ChatInputProps) {
     agentSlashItems,
     promptLibrarySlashItems,
     handleOpenFile,
-    handleImagePaste,
     combinedHandleKeyDownCapture,
     handleInsertSlashItem,
     setLexicalEditor,
@@ -117,7 +115,6 @@ export default function ChatInput(props: ChatInputProps) {
           <ChatInputEditor
             conversationId={conversationId}
             composerRevision={composerRevision}
-            initialConfig={initialConfig}
             editorContainerRef={editorContainerRef}
             inputValue={inputValue}
             composerLoadRevision={composerLoadRevision}
@@ -131,7 +128,6 @@ export default function ChatInput(props: ChatInputProps) {
             onImageClick={onImageClick}
             onOpenFile={handleOpenFile}
             onHeightChange={onHeightChange}
-            onImagePaste={handleImagePaste}
             onSend={onSend}
             onKeyDownCapture={combinedHandleKeyDownCapture}
             onEditorReady={setLexicalEditor}
