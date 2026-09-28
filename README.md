@@ -39,7 +39,7 @@ Any other ACP-compatible agent can be added through the custom configuration opt
 - Fork chats from any point.
 - Configure MCP servers for additional tools and resources.
 - Save and insert reusable prompts.
-- Queue prompts while an agent is working.
+- Queue prompts while an agent is working and schedule them to be sent at a chosen time.
 - Manage system instructions for agent sessions.
 - Generate Git commit messages from current changes.
 
