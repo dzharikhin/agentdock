@@ -4,6 +4,7 @@ import agentdock.bridge.BridgeHost
 import com.intellij.openapi.project.Project
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
@@ -46,6 +47,21 @@ class HistoryBridge(
 
     fun install() {
         val defaultProjectPath = project.basePath ?: System.getProperty("user.dir")
+        val canonicalProjectPath = canonicalHistoryProjectPath(defaultProjectPath)
+
+        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            HistorySyncService.backgroundSyncCompletions.collect { projectPath ->
+                if (projectPath != canonicalProjectPath) return@collect
+                try {
+                    val history = AgentDockHistoryService.getHistoryList(projectPath)
+                    pushHistoryList(permissiveJson.encodeToString(history))
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    sendJsError("Failed to list history after background sync: ${e.message}")
+                }
+            }
+        }
 
         host.register("requestHistoryList") { payload ->
             val projectPath = payload.trim().takeUnless { it.isEmpty() || it == "undefined" } ?: defaultProjectPath

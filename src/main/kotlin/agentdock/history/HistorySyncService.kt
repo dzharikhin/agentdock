@@ -17,6 +17,8 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -29,6 +31,8 @@ internal object HistorySyncService {
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val ephemeralDeletionJobs = ConcurrentHashMap<String, Boolean>()
     private val projectSyncMutexes = ConcurrentHashMap<String, Mutex>()
+    private val backgroundSyncCompleted = MutableSharedFlow<String>()
+    val backgroundSyncCompletions = backgroundSyncCompleted.asSharedFlow()
 
     fun startBackgroundHistorySync(projectPath: String?) {
         val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
@@ -36,6 +40,7 @@ internal object HistorySyncService {
         backgroundScope.launch {
             try {
                 syncProjectIndex(cleanProjectPath)
+                backgroundSyncCompleted.emit(cleanProjectPath)
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {

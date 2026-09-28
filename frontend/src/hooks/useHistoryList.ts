@@ -11,6 +11,10 @@ export function useHistoryList(enabled: boolean) {
     setHistoryLoaded(true);
   }), []);
 
+  useEffect(() => ACPBridge.onAdapterDeleted(() => {
+    ACPBridge.requestHistoryList();
+  }), []);
+
   useEffect(() => {
     if (!enabled) {
       return;

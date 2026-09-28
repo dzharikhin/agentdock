@@ -534,7 +534,7 @@ function MessageList({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onKeyDown={handleKeyDown}
-        className="flex-1 min-h-0 overflow-x-hidden overflow-y-auto scroll-auto [overflow-anchor:none] px-4 opacity-100 transition-opacity duration-300"
+        className="relative flex-1 min-h-0 overflow-x-hidden overflow-y-auto scroll-auto [overflow-anchor:none] px-4 opacity-100 transition-opacity duration-300"
       >
       <div ref={contentRef} className="mx-auto min-h-full w-full max-w-app-content flex flex-col">
         <div className="flex flex-1 flex-col pb-12 pt-[calc(1.5rem+var(--content-top-inset,0px))]">
@@ -581,7 +581,7 @@ function MessageList({
         })}
 
         {visibleMessages.length === 0 && !isSending && !isHistoryReplaying && agentIconPath && (
-          <div className="flex items-center justify-center min-h-[45vh]">
+          <div className="pointer-events-none absolute inset-x-0 top-[35%] flex -translate-y-1/2 justify-center">
             <img src={agentIconPath}
               className="w-14 h-14 opacity-60 select-none pointer-events-none"
             />

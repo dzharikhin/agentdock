@@ -171,7 +171,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
   );
 
   return (
-    <div className={`animate-in fade-in slide-in-from-bottom-2 duration-300 ${hasFollowingMessage ? 'mb-8' : ''}`}>
+    <div className={`animate-in fade-in slide-in-from-bottom-2 duration-300 ${hasFollowingMessage ? 'mb-4' : ''}`}>
       <div className="break-words text-foreground" onClick={handleReplyImageClick}>
         {renderContent()}
       </div>
