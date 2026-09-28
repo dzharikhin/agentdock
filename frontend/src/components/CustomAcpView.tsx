@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
-import { Bot, Pencil, Plus, Trash2 } from 'lucide-react';
-import { CustomAcpConfig } from '../types/customAcp';
+import { useEffect, useRef, useState } from 'react';
+import { Bot, Loader2, Pencil, PlugZap, Plus, Trash2 } from 'lucide-react';
+import { CustomAcpConfig, CustomAcpStatusUpdate } from '../types/customAcp';
+import { AgentOption } from '../types/chat';
 import { ACPBridge } from '../utils/bridge';
 import ConfirmationModal from './ConfirmationModal';
 import { Tooltip } from './chat/shared/Tooltip';
 import { Button } from './ui/Button';
+import { Checkbox } from './ui/Checkbox';
 import { FormDialog } from './ui/FormDialog';
 import { SectionTitle } from './ui/SectionTitle';
 
@@ -50,6 +52,7 @@ function formToConfig(form: FormState, id: string): CustomAcpConfig {
   const cliResumeArg = form.cliResumeArg.trim();
   return {
     id,
+    enabled: true,
     name: form.name.trim(),
     command: form.command.trim(),
     args: parseLines(form.args),
@@ -66,20 +69,41 @@ function nextId(): string {
 
 export function CustomAcpView() {
   const [configs, setConfigs] = useState<CustomAcpConfig[]>([]);
+  const configsRef = useRef<CustomAcpConfig[]>([]);
+  const [statuses, setStatuses] = useState<Record<string, CustomAcpStatusUpdate>>({});
+  const [availableAgents, setAvailableAgents] = useState<AgentOption[]>([]);
   const [form, setForm] = useState<FormState | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CustomAcpConfig | null>(null);
 
+  const updateConfigs = (next: CustomAcpConfig[]) => {
+    const previous = configsRef.current;
+    const unchanged = new Set(next.filter(config =>
+      JSON.stringify(previous.find(item => item.id === config.id)) === JSON.stringify(config)
+    ).map(config => config.id));
+    setStatuses(current => Object.fromEntries(Object.entries(current).filter(([id]) => unchanged.has(id))));
+    configsRef.current = next;
+    setConfigs(next);
+  };
+
   useEffect(() => {
     const cleanup = ACPBridge.onCustomAcpConfigs(event => {
-      setConfigs(Array.isArray(event.detail.configs) ? event.detail.configs : []);
+      updateConfigs(Array.isArray(event.detail.configs) ? event.detail.configs : []);
     });
+    const cleanupStatus = ACPBridge.onCustomAcpStatus(event => {
+      const update = event.detail.update;
+      setStatuses(current => current[update.id]?.requestId === update.requestId
+        ? { ...current, [update.id]: update }
+        : current);
+    });
+    const cleanupAdapters = ACPBridge.onAdapters(event => setAvailableAgents(event.detail.adapters));
     ACPBridge.loadCustomAcpConfigs();
-    return cleanup;
+    ACPBridge.requestAdapters();
+    return () => { cleanup(); cleanupStatus(); cleanupAdapters(); };
   }, []);
 
   const save = (next: CustomAcpConfig[]) => {
-    setConfigs(next);
+    updateConfigs(next);
     ACPBridge.saveCustomAcpConfigs(next);
   };
 
@@ -91,7 +115,7 @@ export function CustomAcpView() {
   const submitForm = () => {
     if (!form?.name.trim() || !form.command.trim()) return;
     if (editingId) {
-      save(configs.map(config => config.id === editingId ? formToConfig(form, editingId) : config));
+      save(configs.map(config => config.id === editingId ? { ...formToConfig(form, editingId), enabled: config.enabled } : config));
     } else {
       save([...configs, formToConfig(form, nextId())]);
     }
@@ -125,20 +149,57 @@ export function CustomAcpView() {
             </div>
           ) : null}
 
-          {configs.map(config => (
+          {configs.map(config => {
+            const test = statuses[config.id];
+            const adapter = config.enabled ? availableAgents.find(agent => agent.id === config.id) : undefined;
+            const status = test?.status ?? (adapter?.initializing ? 'loading'
+              : adapter?.initializationError ? 'error' : adapter?.ready ? 'connected' : undefined);
+            const label = status === 'loading' ? (test ? 'Checking…' : 'Initializing…')
+              : status === 'connected' ? (test ? 'Reachable' : 'Ready') : status === 'error' ? 'Error' : undefined;
+            const message = test ? test.message : adapter?.initializationError;
+            return (
             <div key={config.id} className="flex items-start gap-3 border-b border-border px-4 py-2.5 last:border-b-0">
+              <Checkbox
+                checked={config.enabled}
+                onCheckedChange={() => save(configs.map(item => item.id === config.id ? { ...item, enabled: !item.enabled } : item))}
+                aria-label={`${config.enabled ? 'Disable' : 'Enable'} ${config.name}`}
+                className="mt-[11px]"
+              />
               <div className="min-w-0 flex-1">
                 <div className="truncate">{config.name}</div>
-                <div className="mt-1 truncate font-mono text-xs text-foreground-secondary" title={config.command}>
-                  {config.command}
+                <div className="mt-1 flex items-center gap-1.5 text-xs text-foreground-secondary">
+                  {label && <span
+                    role="img"
+                    aria-label={label}
+                    className={`inline-block h-2 w-2 mt-[-2px] shrink-0 rounded-full ${status === 'loading' ? 'bg-warning animate-pulse' : status === 'error' ? 'bg-error' : 'bg-success'}`}
+                  />}
+                  <span className="truncate">{config.command}{label ? ` · ${label}` : ''}</span>
                 </div>
+                {message && <div className={`mt-1 max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words text-xs ${status === 'error' ? 'text-error' : 'text-foreground-secondary'}`}>
+                  {message}
+                </div>}
               </div>
-              <div className="mt-1 flex shrink-0 items-center gap-2">
+              <div className="mt-[8px] flex shrink-0 items-center gap-2">
+                <Tooltip variant="minimal" content="Test connection">
+                  <button
+                    type="button"
+                    disabled={test?.status === 'loading'}
+                    onClick={() => {
+                      const requestId = crypto.randomUUID();
+                      setStatuses(current => ({ ...current, [config.id]: { id: config.id, requestId, status: 'loading' } }));
+                      ACPBridge.testCustomAcpConnection(config.id, requestId);
+                    }}
+                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground disabled:opacity-50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-border"
+                    aria-label={`Test connection for ${config.name}`}
+                  >
+                    {test?.status === 'loading' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
+                  </button>
+                </Tooltip>
                 <Tooltip variant="minimal" content="Edit">
                   <button
                     type="button"
                     onClick={() => { setEditingId(config.id); setForm(configToForm(config)); }}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-border"
                     aria-label={`Edit ${config.name}`}
                   >
                     <Pencil size={13} />
@@ -148,7 +209,7 @@ export function CustomAcpView() {
                   <button
                     type="button"
                     onClick={() => setDeleteTarget(config)}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-error focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-error focus-visible:outline focus-visible:outline-1 focus-visible:outline-border"
                     aria-label={`Delete ${config.name}`}
                   >
                     <Trash2 size={13} />
@@ -156,7 +217,8 @@ export function CustomAcpView() {
                 </Tooltip>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

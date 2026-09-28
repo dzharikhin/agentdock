@@ -14,7 +14,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.sync.withLock
@@ -25,7 +27,7 @@ import kotlinx.serialization.json.buildJsonObject
 
 // Includes process launch, ACP initialize, and config-options discovery.
 private const val ADAPTER_INITIALIZATION_TIMEOUT_MS = 300_000L
-private const val ACP_INITIALIZE_ATTEMPT_TIMEOUT_MS = 60_000L
+private const val ACP_INITIALIZE_ATTEMPT_TIMEOUT_MS = 90_000L
 private const val ACP_INITIALIZE_MAX_ATTEMPTS = 2
 private const val ACP_INITIALIZE_RETRY_DELAY_MS = 5_000L
 private const val CONFIG_OPTIONS_FETCH_TIMEOUT_MS = 120_000L
@@ -115,15 +117,20 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
     adapterInfo: AcpAdapterConfig.AdapterInfo,
     adapterRoot: String,
     command: List<String>,
-    attempt: Int
+    attempt: Int,
+    diagnostics: StringBuffer? = null
 ) {
     sharedProcess.stop()
-    try {
-        updateAdapterInitializationState(
+    var stderrThread: Thread? = null
+    fun reportProgress(detail: String) {
+        if (diagnostics == null) updateAdapterInitializationState(
             adapterInfo.id,
             AcpClientService.AdapterInitializationStatus.Initializing,
-            detail = "Starting adapter process... (attempt $attempt/$ACP_INITIALIZE_MAX_ATTEMPTS)"
+            detail = detail
         )
+    }
+    try {
+        reportProgress("Starting adapter process... (attempt $attempt/$ACP_INITIALIZE_MAX_ATTEMPTS)")
 
         var commandLine = com.intellij.execution.configurations.GeneralCommandLine(command)
             .withWorkDirectory(resolveAdapterProcessWorkingDirectory(File(adapterRoot)))
@@ -133,31 +140,42 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
             commandLine = AcpNodeRuntimeResolver.applyTo(commandLine, runtime)
         }
 
-        val process = withContext(Dispatchers.IO) { commandLine.createProcess() }
-        sharedProcess.process = process
+        val process = withContext(Dispatchers.IO) {
+            commandLine.createProcess().also { sharedProcess.process = it }
+        }
         AcpProcessRegistry.registerProcess(adapterInfo.id, adapterRoot, adapterInfo.isCustom, process)
-        updateAdapterInitializationState(
-            adapterInfo.id,
-            AcpClientService.AdapterInitializationStatus.Initializing,
-            detail = "Opening ACP stdio transport... (attempt $attempt/$ACP_INITIALIZE_MAX_ATTEMPTS)"
-        )
+        reportProgress("Opening ACP stdio transport... (attempt $attempt/$ACP_INITIALIZE_MAX_ATTEMPTS)")
 
-        Thread {
-            if (BuildConfig.IS_DEV) {
-                process.errorStream.bufferedReader().useLines { lines ->
-                    lines.filter(String::isNotBlank).forEach { line ->
-                        onLogEntry(
-                            AcpLogEntry(
-                                adapterInfo.id,
-                                AcpLogEntry.Direction.RECEIVED,
-                                line,
-                                AcpLogEntry.Category.STDERR
-                            )
-                        )
+        stderrThread = Thread {
+            runCatching {
+                if (diagnostics != null) {
+                    process.errorStream.bufferedReader().use { reader ->
+                        val buffer = CharArray(2048)
+                        while (true) {
+                            val count = reader.read(buffer)
+                            if (count < 0) break
+                            synchronized(diagnostics) {
+                                diagnostics.append(buffer, 0, count)
+                                if (diagnostics.length > 16_384) diagnostics.delete(0, diagnostics.length - 16_384)
+                            }
+                        }
                     }
+                } else if (BuildConfig.IS_DEV) {
+                    process.errorStream.bufferedReader().useLines { lines ->
+                        lines.filter(String::isNotBlank).forEach { line ->
+                            onLogEntry(
+                                AcpLogEntry(
+                                    adapterInfo.id,
+                                    AcpLogEntry.Direction.RECEIVED,
+                                    line,
+                                    AcpLogEntry.Category.STDERR
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    process.errorStream.use { it.copyTo(OutputStream.nullOutputStream()) }
                 }
-            } else {
-                process.errorStream.use { it.copyTo(OutputStream.nullOutputStream()) }
             }
         }.apply {
             isDaemon = true
@@ -199,11 +217,7 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
             throw IllegalStateException("Agent process exited immediately with code $exitCode")
         }
 
-        updateAdapterInitializationState(
-            adapterInfo.id,
-            AcpClientService.AdapterInitializationStatus.Initializing,
-            detail = "Waiting for ACP initialize... (attempt $attempt/$ACP_INITIALIZE_MAX_ATTEMPTS)"
-        )
+        reportProgress("Waiting for ACP initialize... (attempt $attempt/$ACP_INITIALIZE_MAX_ATTEMPTS)")
         val result = withTimeoutOrNull(ACP_INITIALIZE_ATTEMPT_TIMEOUT_MS) {
             client.initialize(
                 ClientInfo(
@@ -233,7 +247,32 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
         }
         sharedProcess.stop()
         throw error
+    } finally {
+        if (diagnostics != null) {
+            sharedProcess.stop()
+            stderrThread?.join(1000)
+        }
     }
+}
+
+internal suspend fun AcpClientService.testCustomAcpConnection(config: CustomAcpConfig): Pair<Boolean, String> {
+    val diagnostics = StringBuffer()
+    val sharedProcess = createSharedProcess(config.id)
+    var errorMessage: String? = null
+    try {
+        val adapterInfo = CustomAcpConfigStore.toAdapterInfo(config)
+        val target = AcpAdapterPaths.getExecutionTarget()
+        val root = resolveDownloadPath(adapterInfo, target)
+        val command = AcpAdapterPaths.buildLaunchCommand(root, adapterInfo, project.basePath, target)
+        initializeFreshProcessAttempt(sharedProcess, adapterInfo, root, command, 1, diagnostics)
+    } catch (error: Exception) {
+        currentCoroutineContext().ensureActive()
+        errorMessage = formatAcpError(error)
+    } finally {
+        sharedProcess.stop()
+    }
+    return (errorMessage == null) to listOfNotNull(errorMessage, diagnostics.toString().trim().takeIf { it.isNotEmpty() })
+        .joinToString("\n\n")
 }
 
 private suspend fun AcpClientService.fetchAndStoreRuntimeMetadata(

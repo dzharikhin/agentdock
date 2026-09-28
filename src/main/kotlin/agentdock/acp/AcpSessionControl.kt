@@ -152,7 +152,7 @@ internal fun AcpClientService.stopSharedProcess(adapterName: String) {
     updateAdapterInitializationState(adapterName, AcpClientService.AdapterInitializationStatus.NotStarted)
     adapterRuntimeMetadataMap.remove(adapterName)
     availableCommandsByAdapter.remove(adapterName)
-    sessions.values.filter { it.sharedProcess == shared }.forEach { it.stop() }
+    if (shared != null) sessions.values.filter { it.sharedProcess == shared }.forEach { it.stop() }
 }
 
 internal fun AcpClientService.replaceSharedProcess(adapterName: String): AcpClientService.SharedProcess {

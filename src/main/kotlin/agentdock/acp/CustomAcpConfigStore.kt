@@ -17,6 +17,7 @@ data class CustomAcpConfig(
     val id: String,
     val name: String,
     val command: String,
+    val enabled: Boolean = true,
     val args: List<String> = emptyList(),
     val env: List<CustomAcpEnvironmentVariable> = emptyList(),
     val cliCommand: String? = null,
@@ -44,10 +45,10 @@ object CustomAcpConfigStore {
     }
 
     fun getAdapter(id: String): AcpAdapterConfig.AdapterInfo? =
-        load().firstOrNull { it.id == id }?.toAdapterInfo()
+        load().firstOrNull { it.id == id && it.enabled }?.let(::toAdapterInfo)
 
     fun loadAdapters(): Map<String, AcpAdapterConfig.AdapterInfo> =
-        load().associate { it.id to it.toAdapterInfo() }
+        load().filter { it.enabled }.associate { it.id to toAdapterInfo(it) }
 
     fun save(configs: List<CustomAcpConfig>): List<CustomAcpConfig> = synchronized(lock) {
         saveLocked(normalize(configs))
@@ -87,7 +88,7 @@ object CustomAcpConfigStore {
         }
     }
 
-    private fun CustomAcpConfig.toAdapterInfo(): AcpAdapterConfig.AdapterInfo {
+    internal fun toAdapterInfo(config: CustomAcpConfig): AcpAdapterConfig.AdapterInfo = with(config) {
         val cliConfig = cliCommand?.let { executable ->
             AcpAdapterConfig.CliConfig(
                 executable = AcpAdapterConfig.PlatformBinary(win = executable, unix = executable),
@@ -100,7 +101,7 @@ object CustomAcpConfigStore {
             args.joinToString("\u0000"),
             env.joinToString("\u0000") { "${it.name}=${it.value}" }
         ).joinToString("\u0001").hashCode().toUInt().toString(16)
-        return AcpAdapterConfig.AdapterInfo(
+        AcpAdapterConfig.AdapterInfo(
             id = id,
             name = name,
             supportsSessionList = true,

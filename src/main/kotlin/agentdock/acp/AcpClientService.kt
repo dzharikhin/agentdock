@@ -83,6 +83,10 @@ class AcpClientService private constructor(val project: Project) {
                 created
             }
 
+        internal fun stopCustomAdapterInAllProjects(adapterId: String) {
+            instances.values.forEach { it.stopSharedProcess(adapterId) }
+        }
+
         /**
          * Project disposal runs on the EDT, and stopping agent processes must never hold the IDE
          * window open. The work is handed to a plain thread that JVM shutdown waits for, so the

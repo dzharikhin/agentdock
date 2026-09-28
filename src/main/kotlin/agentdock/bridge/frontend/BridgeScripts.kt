@@ -112,6 +112,7 @@ internal object BridgeScripts {
 
             window.__loadCustomAcpConfigs = function() { invoke('loadCustomAcpConfigs', ''); };
             window.__saveCustomAcpConfigs = function(json) { invoke('saveCustomAcpConfigs', json); };
+            window.__testCustomAcpConnection = function(json) { invoke('testCustomAcpConnection', json); };
 
             window.__loadPromptLibrary = function() { invoke('loadPromptLibrary', ''); };
             window.__savePromptLibrary = function(json) { invoke('savePromptLibrary', json); };

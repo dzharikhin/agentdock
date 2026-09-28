@@ -615,6 +615,7 @@ declare global {
     __onMcpServers?: (servers: unknown) => void;
     __onMcpStatus?: (update: unknown) => void;
     __onCustomAcpConfigs?: (configs: unknown) => void;
+    __onCustomAcpStatus?: (update: import('./customAcp').CustomAcpStatusUpdate) => void;
     __onFilesResult?: (filesJson: unknown) => void;
     __searchFiles?: (query: string) => void;
     __requestFileIcon?: (path: string) => void;
@@ -627,6 +628,7 @@ declare global {
     __checkMcpStatus?: () => void;
     __loadCustomAcpConfigs?: () => void;
     __saveCustomAcpConfigs?: (json: string) => void;
+    __testCustomAcpConnection?: (json: string) => void;
     __onPromptLibrary?: (items: unknown) => void;
     __loadPromptLibrary?: () => void;
     __savePromptLibrary?: (json: string) => void;

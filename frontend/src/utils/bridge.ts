@@ -40,6 +40,7 @@ import {
   McpServersEvent,
   McpStatusEvent,
   CustomAcpConfigsEvent,
+  CustomAcpStatusEvent,
   ModeEvent,
   PermissionRequestEvent,
   PromptLibraryEvent,
@@ -294,6 +295,10 @@ export const ACPBridge = {
 
     window.__onCustomAcpConfigs = (configs) => {
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.CUSTOM_ACP_CONFIGS, { detail: { configs } }));
+    };
+
+    window.__onCustomAcpStatus = (update) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.CUSTOM_ACP_STATUS, { detail: { update } }));
     };
 
     window.__onMcpStatus = (update) => {
@@ -656,6 +661,13 @@ export const ACPBridge = {
 
   onCustomAcpConfigs: (callback: (e: CustomEvent<CustomAcpConfigsEvent>) => void) =>
     onBridgeEvent(EVENT_NAMES.CUSTOM_ACP_CONFIGS, callback),
+
+  testCustomAcpConnection: (id: string, requestId: string) => {
+    window.__testCustomAcpConnection?.(JSON.stringify({ id, requestId }));
+  },
+
+  onCustomAcpStatus: (callback: (e: CustomEvent<CustomAcpStatusEvent>) => void) =>
+    onBridgeEvent(EVENT_NAMES.CUSTOM_ACP_STATUS, callback),
 
   checkMcpStatus: () => {
     window.__checkMcpStatus?.();
