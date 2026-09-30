@@ -66,7 +66,6 @@ data class GitCommitGenerationSettings(
 @Serializable
 data class GlobalSettings(
     val audioNotificationsEnabled: Boolean = true,
-    val uiFontSizeOffsetPx: Int = 0,
     val uiZoomPercent: Int = 100,
     val userMessageBackgroundStyle: String = "default",
     val userMessageCustomColor: String = "#193d70",

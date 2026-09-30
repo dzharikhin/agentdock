@@ -515,7 +515,6 @@ export const DEFAULT_SIDEBAR_EXPANDED_SECTIONS: SidebarSectionId[] = [
 
 export interface GlobalSettings {
   audioNotificationsEnabled: boolean;
-  uiFontSizeOffsetPx: number;
   uiZoomPercent: number;
   userMessageBackgroundStyle: 'default' | 'blue-highlight' | 'blue' | 'background-secondary' | 'accent' | 'custom';
   userMessageCustomColor: string;

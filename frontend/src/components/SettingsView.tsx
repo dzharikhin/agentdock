@@ -57,13 +57,9 @@ function readUiZoom() {
 }
 
 function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undefined): GlobalSettingsPayload {
-  const uiFontSizeOffsetPx = Number.isFinite(payload?.settings?.uiFontSizeOffsetPx)
-    ? Math.max(-3, Math.min(3, Math.round(payload!.settings!.uiFontSizeOffsetPx)))
-    : 0;
   return {
     settings: {
       audioNotificationsEnabled: payload?.settings?.audioNotificationsEnabled ?? true,
-      uiFontSizeOffsetPx,
       uiZoomPercent: normalizeUiZoomPercent(payload?.settings?.uiZoomPercent),
       userMessageBackgroundStyle: payload?.settings?.userMessageBackgroundStyle === 'custom' || userMessageBackgroundOptions.some(
         (option) => option.id === payload?.settings?.userMessageBackgroundStyle
@@ -89,15 +85,6 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
         : [...DEFAULT_SIDEBAR_EXPANDED_SECTIONS]
     }
   };
-}
-
-function readIdeFontSizePx(): number {
-  if (typeof window === 'undefined') {
-    return 14;
-  }
-  const value = window.getComputedStyle(document.documentElement).getPropertyValue('--ide-font-size').trim();
-  const px = Number.parseFloat(value);
-  return Number.isFinite(px) ? Math.round(px) : 14;
 }
 
 const userMessageBackgroundOptions: Array<{
@@ -140,25 +127,8 @@ export function SettingsView() {
     normalizeGlobalSettings(ACPBridge.getGlobalSettingsSnapshot())
   );
   const [installedAgents, setInstalledAgents] = useState<AgentOption[]>([]);
-  const [uiFontSizeBasePx, setUiFontSizeBasePx] = useState(() => readIdeFontSizePx());
   const liveZoomRef = useRef<number | null>(null);
   const persistLiveZoomRef = useRef(false);
-  const uiFontSizeSelectOptions: DropdownOption[] = Array.from({ length: 7 }, (_, index) => {
-    const offset = index - 3;
-    const px = uiFontSizeBasePx + offset;
-    return { value: String(offset), label: `${px}px` };
-  });
-
-  useEffect(() => {
-    document.documentElement.style.setProperty(
-      '--ui-font-size-offset',
-      `${globalSettings.settings.uiFontSizeOffsetPx}px`
-    );
-  }, [globalSettings.settings.uiFontSizeOffsetPx]);
-
-  useEffect(() => {
-    setUiFontSizeBasePx(readIdeFontSizePx());
-  }, [globalSettings]);
 
   useEffect(() => {
     applyUserMessageTheme(globalSettings.settings.userMessageBackgroundStyle, globalSettings.settings.userMessageCustomColor);
@@ -298,14 +268,6 @@ export function SettingsView() {
                 })}
                 options={SIDEBAR_POSITION_OPTIONS}
                 disabled={!globalSettings.settings.sidebarEnabled}
-                className='max-w-full'
-              />
-
-              <span className='text-foreground'>Base Font Size:</span>
-              <DropdownSelect
-                value={String(globalSettings.settings.uiFontSizeOffsetPx)}
-                onChange={(value) => updateGlobalSettings({ uiFontSizeOffsetPx: Number(value) })}
-                options={uiFontSizeSelectOptions}
                 className='max-w-full'
               />
 

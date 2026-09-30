@@ -83,8 +83,7 @@ class AgentDockUiHost(
             if (previous.uiZoomPercent != settings.uiZoomPercent) {
                 applyUiZoom(settings.uiZoomPercent)
             }
-            if (previous.uiFontSizeOffsetPx != settings.uiFontSizeOffsetPx ||
-                previous.userMessageBackgroundStyle != settings.userMessageBackgroundStyle ||
+            if (previous.userMessageBackgroundStyle != settings.userMessageBackgroundStyle ||
                 previous.userMessageCustomColor != settings.userMessageCustomColor
             ) {
                 bridge?.eval(IdeTheme.generateCssUpdateScript())

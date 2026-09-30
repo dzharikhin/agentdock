@@ -83,8 +83,6 @@ function App() {
       if (!nextSidebarEnabled) setSidebarHidden(false);
       setSidebarPosition(payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left');
       setSidebarExpandedSections(normalizeSidebarExpandedSections(payload?.settings?.sidebarExpandedSections));
-      const offset = payload?.settings?.uiFontSizeOffsetPx ?? 0;
-      document.documentElement.style.setProperty('--ui-font-size-offset', `${offset}px`);
 
       const styleId = payload?.settings?.userMessageBackgroundStyle ?? 'default';
       const customColor = payload?.settings?.userMessageCustomColor ?? '#193d70';

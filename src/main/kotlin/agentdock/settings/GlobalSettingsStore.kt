@@ -48,7 +48,6 @@ object GlobalSettingsStore {
     private fun saveLocked(settings: GlobalSettings): GlobalSettings {
         val normalized = settings.copy(
             audioNotificationsEnabled = settings.audioNotificationsEnabled,
-            uiFontSizeOffsetPx = normalizeUiFontSizeOffsetPx(settings.uiFontSizeOffsetPx),
             userMessageBackgroundStyle = normalizeUserMessageBackgroundStyle(settings.userMessageBackgroundStyle),
             userMessageCustomColor = settings.userMessageCustomColor.takeIf { Regex("#[0-9a-fA-F]{6}").matches(it) } ?: "#193d70",
             sidebarPosition = normalizeSidebarPosition(settings.sidebarPosition),
@@ -74,8 +73,6 @@ object GlobalSettingsStore {
     fun isSystemInstructionsEnabled(): Boolean = systemInstructionsEnabled ?: load().systemInstructionsEnabled
 
     fun areAudioNotificationsEnabled(): Boolean = load().audioNotificationsEnabled
-
-    fun uiFontSizeOffsetPx(): Int = normalizeUiFontSizeOffsetPx(load().uiFontSizeOffsetPx)
 
     fun userMessageBackgroundStyle(): String = normalizeUserMessageBackgroundStyle(load().userMessageBackgroundStyle)
 
@@ -138,10 +135,6 @@ object GlobalSettingsStore {
                 loaded
             }
         }.getOrDefault(GlobalSettings())
-    }
-
-    private fun normalizeUiFontSizeOffsetPx(offset: Int?): Int {
-        return (offset ?: 0).coerceIn(-3, 3)
     }
 
     private fun normalizeUserMessageBackgroundStyle(style: String?): String {

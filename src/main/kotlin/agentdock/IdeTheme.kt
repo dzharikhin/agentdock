@@ -82,7 +82,6 @@ object IdeTheme {
         val baseFont = com.intellij.util.ui.JBFont.regular()
         sb.append("  --ide-font-family: '${baseFont.family}', sans-serif;\n")
         sb.append("  --ide-font-size: ${baseFont.size2D + 1}px;\n")
-        sb.append("  --ui-font-size-offset: ${FrontendSettings.current.uiFontSizeOffsetPx}px;\n")
 
         sb.append("  --ide-code-font-family: '${scheme.editorFontName}', monospace;\n")
         sb.append("  --ide-code-font-size: ${scheme.editorFontSize + 1}px;\n")

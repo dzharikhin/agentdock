@@ -14,15 +14,13 @@
   html, body {
     background-color: var(--ide-Panel-background);
     color: var(--ide-Panel-foreground);
-    font-size: calc(var(--ide-font-size) + var(--ui-font-size-offset, 0px));
+    font-size: var(--ide-font-size);
     font-family: var(--ide-font-family);
     letter-spacing: -0.1px;
   }
 
   :root {
-    --user-message-bg: var(--ide-user-message-default-bg, #25324d);
-    --ui-font-size-offset: 0px;
-  }
+    --user-message-bg: var(--ide-user-message-default-bg, #25324d);  }
 
   h1 {
     font-size: 1.75rem;
