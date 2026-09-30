@@ -1,6 +1,6 @@
 import { RefObject, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { ChevronDown, ChevronRight, Pencil, Plus, Terminal, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Clock, Pencil, Plus, Terminal, Trash2, X } from 'lucide-react';
 import {
   AgentOption,
   ChatTab,
@@ -320,9 +320,11 @@ export function TabNavigationContent({
                       </span>
                     ) : hasQueued ? (
                       <Tooltip variant="minimal" placement={tooltipPlacement} content="Queued prompts"
-                        className="relative z-10 ml-1 mr-3 shrink-0 self-center cursor-default">
+                        className="relative z-10 ml-1 mr-2 shrink-0 self-center cursor-default">
                         <span data-open-chat-status role="img" aria-label="Queued prompts"
-                          className="block h-2 w-2 rounded-full border border-current text-foreground-secondary" />
+                          className="flex text-foreground-secondary">
+                          <Clock size={14} aria-hidden="true" />
+                        </span>
                       </Tooltip>
                     ) : hasUnread ? (
                       <span className="relative z-10 ml-1 mr-3 h-2 w-2 shrink-0 self-center rounded-full bg-sky-500" />

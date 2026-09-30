@@ -124,6 +124,9 @@ function App() {
     historyList,
     historyLoaded,
     pendingAgentSwitch,
+    pendingCloseTabIds,
+    handleConfirmCloseTabs,
+    handleCancelCloseTabs,
     pendingAgentName,
     pendingHandoffsByTab,
     handleSelectTab,
@@ -323,6 +326,18 @@ function App() {
           />
         )}
       </div>
+
+      <ConfirmationModal
+        isOpen={pendingCloseTabIds !== null}
+        title={pendingCloseTabIds && pendingCloseTabIds.length > 1 ? 'Close Chats' : 'Close Chat'}
+        message={pendingCloseTabIds && pendingCloseTabIds.length > 1
+          ? 'Some chats have unfinished prompts. Closing these chats will stop active prompts and discard all queued prompts.'
+          : 'This chat has unfinished prompts. Closing it will stop any active prompt and discard all queued prompts.'}
+        confirmLabel={pendingCloseTabIds && pendingCloseTabIds.length > 1 ? 'Close Chats' : 'Close Chat'}
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmCloseTabs}
+        onCancel={handleCancelCloseTabs}
+      />
 
       <ConfirmationModal
         isOpen={pendingAgentSwitch !== null}

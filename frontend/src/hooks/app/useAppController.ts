@@ -69,6 +69,7 @@ export function useAppController() {
   const { historyList, historyLoaded } = useHistoryList(agentAvailabilityResolved);
   const [tabSessionState, setTabSessionState] = useState<Record<string, TabSessionState>>({});
   const [pendingAgentSwitch, setPendingAgentSwitch] = useState<PendingAgentSwitch | null>(null);
+  const [pendingCloseTabIds, setPendingCloseTabIds] = useState<string[] | null>(null);
   const [pendingHandoffsByTab, setPendingHandoffsByTab] = useState<Record<string, PendingHandoffContext>>({});
   const pendingConversationContinuationsRef = useRef<Record<string, PendingConversationContinuation>>({});
 
@@ -434,35 +435,48 @@ export function useAppController() {
     }
   }, [activateChat]);
 
-  const handleCloseTab = useCallback((id: string) => {
-    const closingTab = tabs.find(t => t.id === id);
-    if (closingTab && typeof window.__stopAgent === 'function') {
+  const closeTabs = useCallback((ids: string[]) => {
+    const closingIds = new Set(ids);
+    const currentTabs = tabsRef.current;
+    currentTabs.filter((tab) => closingIds.has(tab.id)).forEach((tab) => {
       try {
-        window.__stopAgent(closingTab.conversationId);
+        window.__stopAgent?.(tab.conversationId);
       } catch (e) {
         console.warn('[App] Failed to stop agent:', e);
       }
-    }
-
-    const newTabs = tabs.filter((t) => t.id !== id);
-    cleanupTabUi(id);
-
+      cleanupTabUi(tab.id);
+    });
+    const newTabs = currentTabs.filter((tab) => !closingIds.has(tab.id));
     setTabs(newTabs);
-    if (lastActiveChatIdRef.current === id) {
+    if (closingIds.has(lastActiveChatIdRef.current)) {
       lastActiveChatIdRef.current = newTabs[newTabs.length - 1]?.id ?? '';
     }
 
-    if (activeTabId === id) {
-      const currentIndex = tabs.findIndex(t => t.id === id);
-      if (currentIndex > 0) {
-        activateChat(tabs[currentIndex - 1].id);
-      } else if (tabs.length > 1) {
-        activateChat(tabs[currentIndex + 1].id);
+    if (closingIds.has(activeTabIdRef.current)) {
+      const currentIndex = currentTabs.findIndex((tab) => tab.id === activeTabIdRef.current);
+      const fallbackTab = newTabs[Math.max(0, currentIndex - 1)] ?? newTabs[0];
+      if (fallbackTab) {
+        activateChat(fallbackTab.id);
       } else {
         setActiveTabId('');
       }
     }
-  }, [activateChat, activeTabId, cleanupTabUi, tabs]);
+  }, [activateChat, cleanupTabUi]);
+
+  const requestCloseTabs = useCallback((ids: string[]) => {
+    if (ids.some((id) => tabUi[id]?.processing || tabUi[id]?.queued)) {
+      setPendingCloseTabIds(ids);
+    } else {
+      closeTabs(ids);
+    }
+  }, [closeTabs, tabUi]);
+
+  const handleCloseTab = useCallback((id: string) => requestCloseTabs([id]), [requestCloseTabs]);
+
+  const handleConfirmCloseTabs = () => {
+    if (pendingCloseTabIds) closeTabs(pendingCloseTabIds);
+    setPendingCloseTabIds(null);
+  };
 
   const tabUsesAdapter = (tab: ChatTab, adapterId: string) =>
     (tabSessionState[tab.id]?.adapterName || tab.agentId) === adapterId;
@@ -508,14 +522,8 @@ export function useAppController() {
   }, []);
 
   const handleCloseAllChats = useCallback(() => {
-    tabs.forEach((tab) => {
-      try { window.__stopAgent?.(tab.conversationId); } catch (_) {}
-      cleanupTabUi(tab.id);
-    });
-    setTabs([]);
-    lastActiveChatIdRef.current = '';
-    setActiveTabId('');
-  }, [cleanupTabUi, tabs]);
+    requestCloseTabs(tabsRef.current.map((tab) => tab.id));
+  }, [requestCloseTabs]);
 
   const handleOpenHistory = useCallback((item: HistorySessionMeta, placeFirst = false) => {
     const conversationKey = item.conversationId;
@@ -566,6 +574,9 @@ export function useAppController() {
     historyList,
     historyLoaded,
     pendingAgentSwitch,
+    pendingCloseTabIds,
+    handleConfirmCloseTabs,
+    handleCancelCloseTabs: () => setPendingCloseTabIds(null),
     pendingAgentName,
     pendingHandoffsByTab,
     handleSelectTab,
