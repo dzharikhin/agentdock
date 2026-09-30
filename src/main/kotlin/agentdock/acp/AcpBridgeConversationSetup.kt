@@ -196,8 +196,8 @@ internal fun AcpBridge.installConversationQueries() {
                             )
                         }
                     }
-                    // Prompt dispatch is the final configuration barrier: anything shown as
-                    // selected in the UI must be applied before the agent receives the prompt.
+                    // Prompt dispatch is the final configuration barrier: the configuration
+                    // captured at submission must be applied before the agent receives the prompt.
                     // Bounded like every other start, so a stuck agent fails the prompt
                     // instead of leaving the user waiting on a prompt that never runs.
                     val started = withTimeoutOrNull(AcpBridge.START_AGENT_TIMEOUT_MS) {

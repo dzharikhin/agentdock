@@ -121,9 +121,10 @@ export function useAgentRuntimeOptions({
     .filter((option) => option.id !== modelOption?.id)
     .map((option) => ({ ...option, currentValue: configValues[option.id] ?? option.currentValue ?? '' }));
 
-  const handleSessionConfigOptions = useCallback((payload: SessionConfigOptionsPayload) => {
+  const handleSessionConfigOptions = useCallback((payload: SessionConfigOptionsPayload, preserveSelection = false) => {
     if (!sessionAgentId) return;
     setSessionConfigOptions(payload);
+    if (preserveSelection) return;
     setSelectedByAgent((current) => {
       const values = { ...initialValues, ...current[sessionAgentId] };
       if (payload.applyCurrentValues) {
@@ -163,6 +164,11 @@ export function useAgentRuntimeOptions({
   const selectConfigValue = (configId: string, value: string, targetAgentId = selectedAgentId) =>
     updateConfigValue(configId, value, targetAgentId, true);
 
+  const restoreConfigValues = useCallback((values: Record<string, string>) => {
+    if (!selectedAgentId) return;
+    setSelectedByAgent((current) => ({ ...current, [selectedAgentId]: { ...values } }));
+  }, [selectedAgentId]);
+
   const handleModelChange = (modelId: string, targetAgentId?: string) => {
     const agentId = targetAgentId || selectedAgentId;
     const agent = availableAgents.find((item) => item.id === agentId)
@@ -184,6 +190,7 @@ export function useAgentRuntimeOptions({
     additionalConfigOptions,
     configValues,
     selectedConfigOptions,
+    restoreConfigValues,
     selectedModelId,
     selectedModeId,
     selectedReasoningEffortId,
