@@ -5,7 +5,7 @@ import { ACPBridge } from '../utils/bridge';
 import { Button } from './ui/Button';
 import { Checkbox } from './ui/Checkbox';
 import { Tooltip } from './chat/shared/Tooltip';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionPage } from './ui/SectionPage';
 import ConfirmationModal from './ConfirmationModal';
 import { DropdownSelect } from './ui/DropdownSelect';
 import { FormDialog } from './ui/FormDialog';
@@ -185,9 +185,7 @@ export function McpServersView() {
 
   return (
     <div className="h-full overflow-hidden bg-background text-foreground text-ide-small">
-      <div className="h-full w-full overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-      <SectionTitle actions={(
+      <SectionPage actions={(
         <>
           <Button
             onClick={() => ACPBridge.checkMcpStatus()}
@@ -206,9 +204,7 @@ export function McpServersView() {
             Add
           </Button>
         </>
-      )}>
-        MCP Servers
-      </SectionTitle>
+      )} title="MCP Servers">
 
         {servers.length === 0 && !form && (
           <div className="flex-1 flex flex-col mt-12 items-center gap-2 text-foreground-secondary">
@@ -280,9 +276,7 @@ export function McpServersView() {
             </div>
           );
         })}
-
-        </div>
-      </div>
+      </SectionPage>
 
       <FormDialog
         isOpen={form !== null}

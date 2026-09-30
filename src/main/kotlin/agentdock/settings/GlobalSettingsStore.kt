@@ -48,6 +48,7 @@ object GlobalSettingsStore {
     private fun saveLocked(settings: GlobalSettings): GlobalSettings {
         val normalized = settings.copy(
             audioNotificationsEnabled = settings.audioNotificationsEnabled,
+            contentMaxWidthPx = settings.contentMaxWidthPx.takeIf { it == 0 || it >= 400 } ?: 760,
             userMessageBackgroundStyle = normalizeUserMessageBackgroundStyle(settings.userMessageBackgroundStyle),
             userMessageCustomColor = settings.userMessageCustomColor.takeIf { Regex("#[0-9a-fA-F]{6}").matches(it) } ?: "#193d70",
             sidebarPosition = normalizeSidebarPosition(settings.sidebarPosition),

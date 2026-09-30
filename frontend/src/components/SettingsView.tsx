@@ -13,7 +13,7 @@ import { normalizeAudioTranscriptionProvider } from './audio/audioTranscription'
 import { GitCommitGenerationSettings } from './settings/GitCommitGenerationSettings';
 import { SettingsCheckbox, SettingsField, SettingsSection } from './settings/SettingsLayout';
 import { Tooltip } from './chat/shared/Tooltip';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionPage } from './ui/SectionPage';
 import { DropdownOption, DropdownSelect } from './ui/DropdownSelect';
 
 function normalizeGitCommitGenerationSettings(
@@ -29,6 +29,7 @@ function normalizeGitCommitGenerationSettings(
 }
 
 const UI_ZOOM_PRESETS = [50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200];
+const CONTENT_MAX_WIDTH_PRESETS = [500, 600, 680, 720, 740, 760, 780, 800, 840, 900, 0];
 const SIDEBAR_POSITION_OPTIONS: DropdownOption[] = [
   { value: 'right', label: 'Right' },
   { value: 'left', label: 'Left' },
@@ -50,6 +51,16 @@ function zoomSelectOptions(currentPercent: number): DropdownOption[] {
   }));
 }
 
+function contentMaxWidthOptions(currentPx: number): DropdownOption[] {
+  const widths = CONTENT_MAX_WIDTH_PRESETS.includes(currentPx)
+    ? CONTENT_MAX_WIDTH_PRESETS
+    : [currentPx, ...CONTENT_MAX_WIDTH_PRESETS];
+  return widths.map((width) => ({
+    value: String(width),
+    label: width ? `${width}px` : 'Unlimited'
+  }));
+}
+
 function readUiZoom() {
   (
     window as Window & { __agentDockInvoke?: (name: string, payload?: string) => void }
@@ -61,6 +72,7 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
     settings: {
       audioNotificationsEnabled: payload?.settings?.audioNotificationsEnabled ?? true,
       uiZoomPercent: normalizeUiZoomPercent(payload?.settings?.uiZoomPercent),
+      contentMaxWidthPx: payload?.settings?.contentMaxWidthPx ?? 760,
       userMessageBackgroundStyle: payload?.settings?.userMessageBackgroundStyle === 'custom' || userMessageBackgroundOptions.some(
         (option) => option.id === payload?.settings?.userMessageBackgroundStyle
       )
@@ -238,9 +250,7 @@ export function SettingsView() {
 
   return (
     <div className='flex h-full flex-col overflow-hidden'>
-      <div className='w-full flex-1 overflow-y-auto'>
-        <div className='mx-auto flex min-h-full w-full max-w-app-content flex-col'>
-          <SectionTitle>Settings</SectionTitle>
+      <SectionPage title='Settings'>
           <div className='flex flex-col gap-8 px-4 pb-8 text-ide-small'>
           <SettingsSection title='Appearance' compact>
             <SettingsCheckbox
@@ -259,7 +269,14 @@ export function SettingsView() {
               ariaLabel='Use sidebar layout'
             />
 
-            <div className='grid grid-cols-[max-content_max-content] items-center gap-x-2 gap-y-3'>
+            <SettingsCheckbox
+              title='Hide prompt navigation on the left side of the chat until hover'
+              checked={globalSettings.settings.promptNavigationHoverOnly}
+              onToggle={() => updateGlobalSettings({ promptNavigationHoverOnly: !globalSettings.settings.promptNavigationHoverOnly })}
+              ariaLabel='Hide prompt navigation on the left side of the chat until hover'
+            />
+
+            <div className='my-1 grid grid-cols-[max-content_max-content] items-center gap-x-2 gap-y-3'>
               <span className='text-foreground'>Sidebar Position:</span>
               <DropdownSelect
                 value={globalSettings.settings.sidebarPosition}
@@ -283,14 +300,15 @@ export function SettingsView() {
                 options={zoomSelectOptions(globalSettings.settings.uiZoomPercent)}
                 className='max-w-full'
               />
-            </div>
 
-            <SettingsCheckbox
-              title='Hide prompt navigation on the left side of the chat until hover'
-              checked={globalSettings.settings.promptNavigationHoverOnly}
-              onToggle={() => updateGlobalSettings({ promptNavigationHoverOnly: !globalSettings.settings.promptNavigationHoverOnly })}
-              ariaLabel='Hide prompt navigation on the left side of the chat until hover'
-            />
+              <span className='text-foreground'>Content Max Width:</span>
+              <DropdownSelect
+                value={String(globalSettings.settings.contentMaxWidthPx)}
+                onChange={(value) => updateGlobalSettings({ contentMaxWidthPx: Number(value) })}
+                options={contentMaxWidthOptions(globalSettings.settings.contentMaxWidthPx)}
+                className='max-w-full'
+              />
+            </div>
 
             <SettingsField
               label='User Message Background'
@@ -379,8 +397,7 @@ export function SettingsView() {
             onSettingsSave={saveAudioSettings}
           />
           </div>
-        </div>
-      </div>
+      </SectionPage>
     </div>
   );
 }

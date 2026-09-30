@@ -5,7 +5,7 @@ import { PromptLibraryItem } from '../types/promptLibrary';
 import type { ChatAttachment } from '../types/chat';
 import { Button } from './ui/Button';
 import { Tooltip } from './chat/shared/Tooltip';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionPage } from './ui/SectionPage';
 import ConfirmationModal from './ConfirmationModal';
 import { FormDialog } from './ui/FormDialog';
 import { PromptLibraryEditor } from './PromptLibraryEditor';
@@ -106,9 +106,7 @@ export function PromptLibraryView() {
 
   return (
     <div className="h-full overflow-hidden bg-background text-foreground text-ide-small">
-      <div className="h-full w-full overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-      <SectionTitle actions={(
+      <SectionPage actions={(
         <Button
           onClick={openAdd}
           variant="primary"
@@ -117,9 +115,7 @@ export function PromptLibraryView() {
         >
           <span>Add</span>
         </Button>
-      )}>
-        Prompt Library
-      </SectionTitle>
+      )} title="Prompt Library">
 
         {prompts.length === 0 && !form && (
           <div className="flex-1 flex flex-col mt-12 items-center gap-2 text-foreground-secondary">
@@ -168,9 +164,7 @@ export function PromptLibraryView() {
             </div>
           </div>
         ))}
-
-        </div>
-      </div>
+      </SectionPage>
 
       <FormDialog
         isOpen={form !== null}

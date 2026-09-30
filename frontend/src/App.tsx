@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 import TabBar, { TabBarProps } from './components/TabBar';
 import { Sidebar } from './components/Sidebar';
@@ -17,6 +17,8 @@ import {
 } from './types/chat';
 
 const SIDEBAR_ANIMATION_MS = 200;
+/** From this content width `app-wide:` widens side padding and the chat prompt navigation. */
+const WIDE_CONTENT_MIN_WIDTH_PX = 720;
 
 function normalizeSidebarExpandedSections(value: unknown): SidebarSectionId[] {
   if (!Array.isArray(value)) return [...DEFAULT_SIDEBAR_EXPANDED_SECTIONS];
@@ -64,6 +66,16 @@ function App() {
 
   useEffect(() => () => window.clearTimeout(sidebarAnimationTimerRef.current), []);
 
+  const appContentRef = useRef<HTMLDivElement>(null);
+  const [contentWide, setContentWide] = useState(false);
+  useLayoutEffect(() => {
+    const el = appContentRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setContentWide(el.clientWidth >= WIDE_CONTENT_MIN_WIDTH_PX));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   useEffect(() => {
     const userMessageBgMap: Record<string, string> = {
       'default': 'var(--ide-user-message-default-bg)',
@@ -83,6 +95,8 @@ function App() {
       if (!nextSidebarEnabled) setSidebarHidden(false);
       setSidebarPosition(payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left');
       setSidebarExpandedSections(normalizeSidebarExpandedSections(payload?.settings?.sidebarExpandedSections));
+      const contentMaxWidthPx = payload?.settings?.contentMaxWidthPx ?? 760;
+      document.documentElement.style.setProperty('--app-content-max-width', contentMaxWidthPx ? `${contentMaxWidthPx}px` : 'none');
 
       const styleId = payload?.settings?.userMessageBackgroundStyle ?? 'default';
       const customColor = payload?.settings?.userMessageCustomColor ?? '#193d70';
@@ -272,7 +286,7 @@ function App() {
         />
       ) : null}
 
-      <div id="app-content" className="flex-1 relative min-h-0 min-w-0">
+      <div id="app-content" ref={appContentRef} data-wide={contentWide || undefined} className="flex-1 relative min-h-0 min-w-0">
         {/* Chat tabs stay mounted so their sessions and UI state are preserved. */}
         {tabs.map((tab) => {
           const isTabActive = tab.id === activeTabId;
@@ -283,7 +297,7 @@ function App() {
               tab={tab}
               isActive={isTabActive}
               runnableAgents={runnableAgents}
-              promptNavigationHoverOnly={promptNavigationHoverOnly}
+              promptNavigationHoverOnly={promptNavigationHoverOnly || !contentWide}
               pendingHandoff={pendingHandoffsByTab[tab.id]}
               onUserMessageSent={() => handleUserMessageSent(tab.id)}
               onAssistantActivity={() => handleAssistantActivity(tab.id)}

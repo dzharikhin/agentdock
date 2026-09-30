@@ -15,7 +15,7 @@ import { MenuButton } from './ui/MenuButton';
 import { SplitButton } from './ui/SplitButton';
 import { Tooltip } from './chat/shared/Tooltip';
 import { AdapterUsageLifecycleProvider } from '../hooks/useAdapterUsage';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionPage } from './ui/SectionPage';
 
 function mergeAgentSnapshot(previous: AgentOption | undefined, next: AgentOption): AgentOption {
   if (!previous) return next;
@@ -244,9 +244,7 @@ export function AgentManagementView({
   return (
     <AdapterUsageLifecycleProvider value={{ mode: 'provider', enabled: isActive }}>
       <div className="flex flex-col h-full bg-background text-foreground overflow-hidden">
-      <div className="h-full w-full overflow-y-auto pb-16">
-        <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-      <SectionTitle actions={(
+      <SectionPage className="pb-16" actions={(
         <Tooltip variant="minimal" content="Refresh status">
           <button
             onClick={handleRefresh}
@@ -257,9 +255,7 @@ export function AgentManagementView({
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
         </Tooltip>
-      )}>
-        Service Providers
-      </SectionTitle>
+      )} title="Service Providers">
           {agents.map((agent, index) => {
             const isDownloadedKnown = agent.downloadedKnown === true;
             const isDownloaded = agent.downloaded === true;
@@ -538,8 +534,7 @@ export function AgentManagementView({
               </div>
             );
           })}
-        </div>
-      </div>
+      </SectionPage>
 
       <ConfirmationModal
         isOpen={confirmDeleteId !== null}

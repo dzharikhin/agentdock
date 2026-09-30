@@ -10,7 +10,6 @@ import { Button } from '../ui/Button';
 const BOTTOM_PIN_THRESHOLD_PX = 10;
 const READ_ACK_THRESHOLD_PX = 48;
 const EARLIER_PROMPTS_BATCH_SIZE = 20;
-
 function promptPreview(message: Message): string {
   const blocks = message.blocks?.length ? message.blocks : message.contentBlocks;
   let text = message.content.slice(0, 161);
@@ -120,7 +119,6 @@ function MessageList({
   const touchStartYRef = useRef<number | null>(null);
 
   const [revealedPromptCount, setRevealedPromptCount] = useState(0);
-  const [hasNavigationRoom, setHasNavigationRoom] = useState(false);
   const [navigationEdges, setNavigationEdges] = useState({ atTop: true, atBottom: true });
 
   useEffect(() => {
@@ -252,24 +250,7 @@ function MessageList({
   }, [messages]);
   const previousPromptCountRef = useRef(prompts.length);
 
-  useLayoutEffect(() => {
-    const el = containerRef.current;
-    const content = contentRef.current;
-    if (!el || !content) return;
-    const updateNavigationRoom = () => {
-      const maxWidth = Number.parseFloat(getComputedStyle(content).maxWidth);
-      const contentRect = content.getBoundingClientRect();
-      const leftGutter = contentRect.left - el.getBoundingClientRect().left;
-      setHasNavigationRoom(Number.isFinite(maxWidth) && contentRect.width >= maxWidth - 1 && leftGutter >= 28);
-    };
-    const observer = new ResizeObserver(updateNavigationRoom);
-    observer.observe(el);
-    updateNavigationRoom();
-    return () => observer.disconnect();
-  }, []);
-
   const showNavigation = prompts.length > 1 && !isHistoryReplaying;
-  const navigationHiddenUntilHover = !hasNavigationRoom || promptNavigationHoverOnly;
 
   const updateNavigationEdges = useCallback(() => {
     const el = navigationRef.current;
@@ -502,7 +483,10 @@ function MessageList({
               markNavigationScrollIntent();
             }
           }}
-          className={`absolute top-[45px] bottom-[45px] z-30 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${hasNavigationRoom ? 'left-[4px] w-[20px]' : 'left-0 w-[12px]'} ${navigationHiddenUntilHover ? 'opacity-0 transition-opacity duration-75 hover:duration-200 hover:opacity-100 hover:delay-200 focus-within:opacity-100 focus-within:delay-0' : ''} ${navigationFade}`}
+          className={`absolute top-[45px] bottom-[45px] z-30 overflow-y-auto overscroll-contain [scrollbar-width:none] 
+            [&::-webkit-scrollbar]:hidden left-0 w-[12px] app-wide:left-[4px] app-wide:w-[20px] 
+            ${promptNavigationHoverOnly ? 'opacity-0 transition-opacity duration-75 hover:duration-200 hover:opacity-100 ' +
+            'hover:delay-200 focus-within:opacity-100 focus-within:delay-0' : ''} ${navigationFade}`}
         >
           <div className="flex min-h-full flex-col items-center justify-center">
             {prompts.map((message, index) => (
@@ -516,7 +500,8 @@ function MessageList({
                   type="button"
                   aria-label={`Go to prompt ${index + 1}`}
                   onClick={() => handlePromptClick(message, index + 1)}
-                  className={`group flex h-[8px] shrink-0 cursor-pointer items-center justify-center rounded-sm border border-transparent focus-visible:border-[var(--ide-Button-default-focusColor)] ${hasNavigationRoom ? 'w-[20px]' : 'w-[12px]'}`}
+                  className="group flex h-[8px] shrink-0 cursor-pointer items-center justify-center rounded-sm border
+                    border-transparent focus-visible:border-[var(--ide-Button-default-focusColor)] w-[12px]"
                 >
                   <span className="h-[2px] w-[6px] bg-foreground-secondary opacity-60 group-hover:opacity-100" />
                 </button>
@@ -534,7 +519,8 @@ function MessageList({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onKeyDown={handleKeyDown}
-        className="relative flex-1 min-h-0 overflow-x-hidden overflow-y-auto scroll-auto [overflow-anchor:none] px-4 opacity-100 transition-opacity duration-300"
+        className="relative flex-1 min-h-0 overflow-x-hidden overflow-y-auto scroll-auto [overflow-anchor:none]
+          px-4 app-wide:px-6 opacity-100 transition-opacity duration-300"
       >
       <div ref={contentRef} className="mx-auto min-h-full w-full max-w-app-content flex flex-col">
         <div className="flex flex-1 flex-col pb-12 pt-[calc(1.5rem+var(--content-top-inset,0px))]">
@@ -596,7 +582,8 @@ function MessageList({
         </div>
         {footer && (
           <div ref={footerRef} className="sticky bottom-0 z-20 flex shrink-0 flex-col pt-2">
-            <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 w-screen -translate-x-1/2 bg-background shadow-[0_4px_0_0_var(--ide-Panel-background)]">
+            <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 w-screen -translate-x-1/2
+              bg-background shadow-[0_4px_0_0_var(--ide-Panel-background)]">
               <div className="absolute inset-x-0 bottom-full h-8 bg-gradient-to-b from-transparent to-background" />
             </div>
             <div className="relative flex flex-col">

@@ -8,7 +8,7 @@ import { Tooltip } from './chat/shared/Tooltip';
 import { Button } from './ui/Button';
 import { Checkbox } from './ui/Checkbox';
 import { FormDialog } from './ui/FormDialog';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionPage } from './ui/SectionPage';
 
 interface FormState {
   name: string;
@@ -124,9 +124,7 @@ export function CustomAcpView() {
 
   return (
     <div className="h-full overflow-hidden bg-background text-foreground text-ide-small">
-      <div className="h-full w-full overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-          <SectionTitle actions={(
+      <SectionPage actions={(
             <Button
               onClick={() => { setEditingId(null); setForm(emptyForm()); }}
               variant="primary"
@@ -135,9 +133,7 @@ export function CustomAcpView() {
             >
               Add
             </Button>
-          )}>
-            Custom ACP agents
-          </SectionTitle>
+          )} title="Custom ACP agents">
 
           {configs.length === 0 && !form ? (
             <div className="mt-12 flex flex-1 flex-col items-center gap-2 text-foreground-secondary">
@@ -219,8 +215,7 @@ export function CustomAcpView() {
             </div>
             );
           })}
-        </div>
-      </div>
+      </SectionPage>
 
       <FormDialog
         isOpen={form !== null}

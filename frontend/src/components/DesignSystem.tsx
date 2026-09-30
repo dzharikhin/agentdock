@@ -5,7 +5,7 @@ import { Checkbox } from './ui/Checkbox';
 import { DropdownSelect } from './ui/DropdownSelect';
 import { MenuButton } from './ui/MenuButton';
 import { SplitButton } from './ui/SplitButton';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionPage } from './ui/SectionPage';
 
 export function DesignSystemView() {
     const [reloadInBrowser, setReloadInBrowser] = useState('on-save');
@@ -19,9 +19,7 @@ export function DesignSystemView() {
     ];
 
     return (
-        <div className="h-full overflow-y-auto bg-background text-foreground">
-            <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-            <SectionTitle>Design System</SectionTitle>
+        <SectionPage className="bg-background text-foreground" title="Design System">
             <div className="space-y-8 p-6">
             {/* Colors */}
             <section className="space-y-4">
@@ -168,8 +166,7 @@ export function DesignSystemView() {
                 </div>
             </section>
             </div>
-            </div>
-        </div>
+        </SectionPage>
     );
 }
 

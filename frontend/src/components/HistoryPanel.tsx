@@ -7,7 +7,7 @@ import { LoadingSpinner } from './ui/LoadingSpinner';
 import { Tooltip } from './chat/shared/Tooltip';
 import { HistoryListItem } from './history/HistoryListItem';
 import { useHistoryPanelController } from './history/useHistoryPanelController';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionPage } from './ui/SectionPage';
 
 interface HistoryPanelProps {
   availableAgents: AgentOption[];
@@ -76,9 +76,7 @@ export default function HistoryPanel({
 
   return (
     <div className="h-full bg-background text-foreground z-10 w-full overflow-hidden relative">
-      <div className="h-full w-full overflow-y-auto pb-4">
-        <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-      <SectionTitle>History</SectionTitle>
+      <SectionPage className="pb-4" title="History">
       <div className="sticky top-0 flex items-center justify-between min-h-12 px-3 py-1 border-b border-border shrink-0 z-20 bg-background">
         <div className="flex min-w-0 items-center gap-2">
           <Tooltip variant="minimal" content="Synchronize history">
@@ -254,8 +252,7 @@ export default function HistoryPanel({
           })
         )}
       </div>
-        </div>
-      </div>
+      </SectionPage>
 
       <ConfirmationModal
         isOpen={pendingDeleteIds.length > 0}

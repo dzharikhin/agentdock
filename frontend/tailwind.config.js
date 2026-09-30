@@ -80,7 +80,7 @@ export default {
         'ide': '6px',
       },
       maxWidth: {
-        'app-content': '800px',
+        'app-content': 'var(--app-content-max-width, 760px)',
       },
       spacing: {
         'ide-paragraph': 'var(--ide-paragraph-spacing)',
@@ -95,6 +95,7 @@ export default {
     function({ addUtilities, addVariant }) {
       addVariant('chat-max-400', '@container chat-input (max-width: 400px)');
       addVariant('chat-max-600', '@container chat-input (max-width: 600px)');
+      addVariant('app-wide', '#app-content[data-wide] &');
       addUtilities({
         '.bg-hover': {
           'filter': 'var(--ide-surface-hover-filter)',

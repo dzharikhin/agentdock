@@ -67,6 +67,7 @@ data class GitCommitGenerationSettings(
 data class GlobalSettings(
     val audioNotificationsEnabled: Boolean = true,
     val uiZoomPercent: Int = 100,
+    val contentMaxWidthPx: Int = 760,
     val userMessageBackgroundStyle: String = "default",
     val userMessageCustomColor: String = "#193d70",
     val audioTranscription: AudioTranscriptionSettings = AudioTranscriptionSettings(),

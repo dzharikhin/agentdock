@@ -43,7 +43,7 @@ export function EmptyStateView({
           </div>
         </div>
       ) : (
-        <div className="mx-auto flex min-h-full w-full max-w-app-content justify-center px-4 py-8 sm:px-6">
+        <div className="mx-auto flex min-h-full w-full max-w-app-content justify-center px-4 py-8 app-wide:px-6">
           <div className="flex flex-col items-center text-center relative pt-[10vh]">
             {runnableAgents.length > 0 ? (
               <>

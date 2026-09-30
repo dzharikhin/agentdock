@@ -5,7 +5,7 @@ import { SystemInstruction } from '../types/systemInstructions';
 import { Button } from './ui/Button';
 import { Checkbox } from './ui/Checkbox';
 import { Tooltip } from './chat/shared/Tooltip';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionPage } from './ui/SectionPage';
 import ConfirmationModal from './ConfirmationModal';
 import { FormDialog } from './ui/FormDialog';
 
@@ -106,9 +106,7 @@ export function SystemInstructionsView() {
 
   return (
     <div className="h-full overflow-hidden text-ide-small">
-      <div className="h-full w-full overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-      <SectionTitle actions={(
+      <SectionPage actions={(
         <Button
           onClick={openAdd}
           variant="primary"
@@ -117,9 +115,7 @@ export function SystemInstructionsView() {
         >
           <span>Add</span>
         </Button>
-      )}>
-        System Instructions
-      </SectionTitle>
+      )} title="System Instructions">
 
         {instructions.length === 0 && !form && (
           <div className="flex-1 flex flex-col mt-12 items-center gap-2 text-foreground-secondary">
@@ -180,9 +176,7 @@ export function SystemInstructionsView() {
             </div>
           </div>
         ))}
-
-        </div>
-      </div>
+      </SectionPage>
 
       <FormDialog
         isOpen={form !== null}
