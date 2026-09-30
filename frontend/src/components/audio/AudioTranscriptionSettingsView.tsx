@@ -145,7 +145,7 @@ export function AudioTranscriptionSettingsView({
                     autoComplete='off'
                     spellCheck={false}
                     aria-label={apiKeyLabel}
-                    className='w-60 max-w-full rounded-[3px] px-2 py-1'
+                    className='w-60 max-w-full rounded-[3px]'
                   />
                 </SettingsField>
               )}

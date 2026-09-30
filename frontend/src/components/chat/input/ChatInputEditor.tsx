@@ -82,7 +82,7 @@ export function ChatInputEditor({
       <ChatInputActionsContext.Provider value={{ onImageClick, onOpenFile, attachments }}>
         <LexicalComposer key={`chat-input-${conversationId}-${composerRevision}`} initialConfig={initialConfig}>
           <RichTextPlugin contentEditable={
-              <ContentEditable className="outline-none p-3 text-foreground placeholder:text-foreground" spellCheck={false}/>
+              <ContentEditable className="outline-none p-3 text-foreground" spellCheck={false}/>
             }
             placeholder={
               <div className="absolute top-3 left-3 text-foreground-secondary pointer-events-none">

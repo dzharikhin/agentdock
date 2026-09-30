@@ -59,7 +59,7 @@ export function MenuButton({ label, items, disabled = false, variant = 'outline'
         <div
           role="menu"
           className="absolute right-0 top-[calc(100%+0.35em)] z-20 w-max min-w-full rounded-[4px]
-            border border-[var(--ide-Button-startBorderColor)] bg-background p-1"
+            border border-border bg-background p-1"
         >
           {items.map((item, index) => (
             <button

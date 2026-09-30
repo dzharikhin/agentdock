@@ -57,7 +57,7 @@ export function SplitButton({
 
   return (
     <div ref={rootRef} className="relative inline-flex flex-col items-start">
-      <div className="inline-flex overflow-hidden rounded-[4px] border border-[var(--ide-Button-startBorderColor)] bg-primary
+      <div className="inline-flex overflow-hidden rounded-[4px] border border-border bg-primary
         focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_0_1px_var(--ide-Button-default-focusColor)]">
         <button
           type="button"
@@ -87,7 +87,7 @@ export function SplitButton({
 
       {hasMenu && menuOpen ? (
         <div className="absolute left-0 top-[calc(100%+0.5em)] bg-background z-20 min-w-full rounded-[6px]
-          border border-[var(--ide-Button-startBorderColor)] p-1.5">
+          border border-border p-1.5">
           {menuItems.map((item, index) => (
             <button
               key={index}

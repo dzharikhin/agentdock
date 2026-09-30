@@ -77,15 +77,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const userMessageBgMap: Record<string, string> = {
-      'default': 'var(--ide-user-message-default-bg)',
-      'blue-highlight': 'var(--ide-user-message-blue-highlight-bg)',
-      'blue': 'var(--ide-user-message-blue-bg)',
-      'background-secondary': 'var(--ide-background-secondary)',
-      'accent': 'var(--ide-List-selectionBackground)',
-      'custom': 'var(--ide-user-message-custom-bg)',
-    };
-
     const applyGlobalSettings = (payload: { settings?: Partial<GlobalSettings> } | undefined) => {
       setOpenInEditor(payload?.settings?.openInEditor ?? true);
       setSystemInstructionsEnabled(payload?.settings?.systemInstructionsEnabled ?? false);
@@ -97,14 +88,6 @@ function App() {
       setSidebarExpandedSections(normalizeSidebarExpandedSections(payload?.settings?.sidebarExpandedSections));
       const contentMaxWidthPx = payload?.settings?.contentMaxWidthPx ?? 760;
       document.documentElement.style.setProperty('--app-content-max-width', contentMaxWidthPx ? `${contentMaxWidthPx}px` : 'none');
-
-      const styleId = payload?.settings?.userMessageBackgroundStyle ?? 'default';
-      const customColor = payload?.settings?.userMessageCustomColor ?? '#193d70';
-      document.documentElement.style.setProperty(
-        '--ide-user-message-custom-bg', /^#[0-9a-fA-F]{6}$/.test(customColor) ? customColor : '#193d70'
-      );
-      const bg = userMessageBgMap[styleId] ?? userMessageBgMap['default'];
-      document.documentElement.style.setProperty('--user-message-bg', bg);
     };
 
     const cleanup = ACPBridge.onGlobalSettings((e) => {

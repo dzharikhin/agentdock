@@ -101,38 +101,14 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
 
 const userMessageBackgroundOptions: Array<{
   id: GlobalSettingsPayload['settings']['userMessageBackgroundStyle'];
-  background: string;
   toneClass: string;
 }> = [
-  {
-    id: 'default',
-    background: 'var(--ide-user-message-default-bg)',
-    toneClass: 'bg-user-message-default'
-  },
-  {
-    id: 'blue-highlight',
-    background: 'var(--ide-user-message-blue-highlight-bg)',
-    toneClass: 'bg-user-message-blue-highlight'
-  },
-  {
-    id: 'blue',
-    background: 'var(--ide-user-message-blue-bg)',
-    toneClass: 'bg-user-message-blue'
-  },
-  { id: 'accent', background: 'var(--ide-List-selectionBackground)', toneClass: 'bg-accent' },
-  {
-    id: 'background-secondary',
-    background: 'var(--ide-background-secondary)',
-    toneClass: 'bg-background-secondary'
-  },
+  { id: 'default', toneClass: 'bg-user-message-default' },
+  { id: 'blue-highlight', toneClass: 'bg-user-message-blue-highlight' },
+  { id: 'blue', toneClass: 'bg-user-message-blue' },
+  { id: 'accent', toneClass: 'bg-accent' },
+  { id: 'background-secondary', toneClass: 'bg-background-secondary' },
 ];
-
-function applyUserMessageTheme(styleId: GlobalSettingsPayload['settings']['userMessageBackgroundStyle'], customColor: string) {
-  const selected =
-    userMessageBackgroundOptions.find((option) => option.id === styleId) ?? userMessageBackgroundOptions[0];
-  document.documentElement.style.setProperty('--ide-user-message-custom-bg', customColor);
-  document.documentElement.style.setProperty('--user-message-bg', styleId === 'custom' ? 'var(--ide-user-message-custom-bg)' : selected.background);
-}
 
 export function SettingsView() {
   const [globalSettings, setGlobalSettings] = useState<GlobalSettingsPayload>(() =>
@@ -141,10 +117,6 @@ export function SettingsView() {
   const [installedAgents, setInstalledAgents] = useState<AgentOption[]>([]);
   const liveZoomRef = useRef<number | null>(null);
   const persistLiveZoomRef = useRef(false);
-
-  useEffect(() => {
-    applyUserMessageTheme(globalSettings.settings.userMessageBackgroundStyle, globalSettings.settings.userMessageCustomColor);
-  }, [globalSettings.settings.userMessageBackgroundStyle, globalSettings.settings.userMessageCustomColor]);
 
   useEffect(() => {
     const requestSettings = () => {

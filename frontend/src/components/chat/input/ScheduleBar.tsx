@@ -112,7 +112,7 @@ export function ScheduleBar({ scheduledAt, onScheduledAtChange, onClose }: Sched
                     focusSegment(index + 1);
                   }
                 }}
-                className={`${segment.width} h-5 min-w-0 appearance-none rounded-none border-0 bg-transparent p-0 text-center tabular-nums text-foreground placeholder:text-foreground-secondary outline-none focus:bg-accent focus:text-accent-foreground focus:shadow-none`}
+                className={`${segment.width} h-5 min-w-0 appearance-none rounded-none border-0 bg-transparent p-0 text-center tabular-nums text-foreground outline-none focus:bg-accent focus:text-accent-foreground focus:shadow-none`}
               />
             </span>
           ))}

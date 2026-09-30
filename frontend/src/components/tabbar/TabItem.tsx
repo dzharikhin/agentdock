@@ -49,7 +49,7 @@ export function TabItem({
 }: TabItemProps) {
   const activeClassName = isActive
     ? isIslandsTheme
-      ? 'text-foreground before:absolute before:inset-[3px_3px] before:rounded-[6px] before:bg-background before:[filter:var(--ide-surface-active-filter)] before:shadow-[inset_0_0_0_1px_var(--ide-Button-startBorderColor)]'
+      ? 'text-foreground before:absolute before:inset-[3px_3px] before:rounded-[6px] before:bg-background before:[filter:var(--ide-surface-active-filter)] before:shadow-[inset_0_0_0_1px_var(--ide-Borders-color)]'
       : 'text-foreground before:absolute before:inset-0 before:bg-background before:[filter:var(--ide-surface-active-filter)] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-[var(--ide-Button-default-focusColor)]'
     : '';
   const tabRadiusClassName = isIslandsTheme ? 'rounded-[6px]' : 'rounded-[4px]';

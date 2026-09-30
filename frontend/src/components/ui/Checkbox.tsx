@@ -29,7 +29,7 @@ export function Checkbox({
         'bg-background inline-flex h-[16px] w-[16px] relative -top-px shrink-0 items-center justify-center rounded-[3px] border',
         checked
           ? 'border-transparent bg-primary text-[var(--ide-Button-default-foreground)]'
-          : 'border-[var(--ide-Button-startBorderColor)] text-transparent',
+          : 'border-border text-transparent',
         'focus:outline-none focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-2',
         className
       )}

@@ -84,9 +84,9 @@ export function DropdownSelect({
           setOpen((current) => !current);
         }}
         className={cx(
-          'bg-[var(--ide-List-hoverBackground)] inline-flex w-full items-center justify-between gap-2',
-          'rounded-[3px] border border-[var(--ide-Button-startBorderColor)]',
-          'px-2 py-0.5 text-left leading-none text-[var(--ide-Button-foreground)]',
+          'bg-background-secondary inline-flex w-full items-center justify-between gap-2',
+          'rounded-[3px] border border-border',
+          'px-2 py-[calc(0.425rem-2px)] text-left leading-none text-[var(--ide-TextField-foreground)]',
           'focus:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]',
           'disabled:cursor-default disabled:text-[var(--ide-Button-disabledText)]',
           'focus:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]',
@@ -105,7 +105,7 @@ export function DropdownSelect({
           role="listbox"
           className={cx(
             'absolute left-0 top-[calc(100%+0.35em)] z-20 min-w-full w-max overflow-hidden rounded-[3px] ' +
-            'border border-[var(--ide-Button-startBorderColor)] bg-background px-1.5 py-0.5',
+            'border border-border bg-background px-1.5 py-0.5',
             menuClassName
           )}
         >

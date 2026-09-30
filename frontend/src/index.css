@@ -19,9 +19,6 @@
     letter-spacing: -0.1px;
   }
 
-  :root {
-    --user-message-bg: var(--ide-user-message-default-bg, #25324d);  }
-
   h1 {
     font-size: 1.75rem;
     font-weight: 700;
@@ -52,10 +49,10 @@
 
   input, select, textarea {
     color: var(--ide-TextField-foreground);
-    border: 1px solid var(--ide-Button-startBorderColor);
+    border: 1px solid var(--ide-Borders-color);
     border-radius: 4px;
     box-sizing: border-box;
-    padding: 0.3rem 0.5rem;
+    padding: calc(0.3rem - 2px) 0.5rem;
   }
 
   input:focus, select:focus, textarea:focus {
@@ -63,16 +60,12 @@
     outline: none;
   }
 
-  input, select {
-    background: var(--ide-TextField-background);
+  input, select, textarea {
+    background: var(--ide-background-secondary);
   }
 
-  textarea {
-    background: var(--ide-editor-bg);
-  }
-
-  textarea::placeholder {
-    opacity: 0.5;
+  input::placeholder, textarea::placeholder {
+    color: theme('colors.foreground.secondary');
   }
 
   input::selection, textarea::selection {
@@ -80,7 +73,7 @@
     color: var(--ide-TextField-selectionForeground);
   }
   table td, table th {
-    border: 1px solid var(--ide-Table-gridColor);
+    border: 1px solid var(--ide-Borders-color);
     padding: 0.5rem;
   }
 

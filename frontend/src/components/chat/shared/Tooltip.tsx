@@ -108,7 +108,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
       {visible && content && createPortal(
         <div 
           ref={tooltipRef}
-          className="fixed z-[9999] pointer-events-none"
+          className="fixed z-[9999] w-max pointer-events-none"
           style={{ 
             left: coords.x, 
             top: coords.y,
@@ -122,7 +122,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
         >
           <div
             className={cx(
-              'border border-[var(--ide-Button-startBorderColor)] ' +
+              'border border-border ' +
               'bg-background-secondary text-foreground rounded-md',
               variant === 'minimal'
                 ? 'max-w-[min(1000px,calc(100vw-16px))] overflow-hidden px-2 py-1 text-xs whitespace-nowrap text-ellipsis'

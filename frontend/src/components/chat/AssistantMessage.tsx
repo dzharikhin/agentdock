@@ -162,10 +162,10 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
   const hasMetaTooltip = tooltipRows.length > 0;
 
   const agentBadge = agentIconPath ? (
-    <img src={agentIconPath} alt={message.agentName || 'Agent'} className="w-4 h-4 opacity-60"/>
+    <img src={agentIconPath} alt={message.agentName || 'Agent'} className="w-4 h-4 opacity-60 hover:opacity-80"/>
   ) : (
     <div className="w-4 h-4 rounded bg-background-secondary border border-border flex items-center justify-center
-      text-[9px] font-semibold uppercase opacity-80">
+      text-[9px] font-semibold uppercase opacity-60 hover:opacity-80">
       {(message.agentName || '?').slice(0, 1)}
     </div>
   );

@@ -11,10 +11,6 @@ export default {
           DEFAULT: 'var(--ide-Panel-background)',
           secondary: 'var(--ide-background-secondary)'
         },
-        surface: {
-          hover: 'var(--ide-surface-hover)',
-          active: 'var(--ide-surface-active)'
-        },
         foreground: {
           DEFAULT: 'var(--ide-Label-foreground)',
           secondary: 'color-mix(in srgb, var(--ide-Label-foreground), transparent 40%)'
@@ -24,17 +20,13 @@ export default {
           foreground: 'var(--ide-Button-default-foreground)',
           border: 'var(--ide-Button-default-borderColor)',
         },
-        secondary: {
-          DEFAULT: 'var(--ide-Button-startBackground)',
-          foreground: 'var(--ide-Button-foreground)',
-          border: 'var(--ide-Button-borderColor)',
-        },
+        secondary: 'var(--ide-Button-startBackground)',
         accent: {
           DEFAULT: 'var(--ide-List-selectionBackground)',
           foreground: 'var(--ide-List-selectionForeground)',
         },
         border: 'var(--ide-Borders-color)',
-        input: 'var(--ide-TextField-background)',
+        input: 'var(--ide-background-secondary)',
         editor: {
           bg: 'var(--ide-editor-bg)',
           fg: 'var(--ide-editor-fg)',

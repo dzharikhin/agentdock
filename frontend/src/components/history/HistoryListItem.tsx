@@ -125,7 +125,7 @@ export function HistoryListItem({
                 />
                 <button
                   onClick={(e) => { e.stopPropagation(); onSubmitRename(item.projectPath, conversationId); }}
-                  className="rounded border border-[var(--ide-Button-startBorderColor)] bg-background p-1
+                  className="rounded border border-border bg-background p-1
                     text-foreground-secondary transition-colors hover:text-primary
                     focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
                 >
@@ -133,7 +133,7 @@ export function HistoryListItem({
                 </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}
-                  className="rounded border border-[var(--ide-Button-startBorderColor)] bg-background p-1
+                  className="rounded border border-border bg-background p-1
                     text-foreground-secondary transition-colors hover:text-error
                     focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
                 >

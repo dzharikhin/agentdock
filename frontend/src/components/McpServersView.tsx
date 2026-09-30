@@ -290,7 +290,7 @@ export function McpServersView() {
         )}
       >
         {form ? (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-3">
             <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2">
               <span className="text-foreground-secondary">Name <span className="text-error" aria-hidden="true">*</span></span>
               <input

@@ -484,7 +484,7 @@ function MessageList({
             }
           }}
           className={`absolute top-[45px] bottom-[45px] z-30 overflow-y-auto overscroll-contain [scrollbar-width:none] 
-            [&::-webkit-scrollbar]:hidden left-0 w-[12px] app-wide:left-[4px] app-wide:w-[20px] 
+            [&::-webkit-scrollbar]:hidden left-0 w-[12px] app-wide:left-[4px] 
             ${promptNavigationHoverOnly ? 'opacity-0 transition-opacity duration-75 hover:duration-200 hover:opacity-100 ' +
             'hover:delay-200 focus-within:opacity-100 focus-within:delay-0' : ''} ${navigationFade}`}
         >
@@ -527,7 +527,7 @@ function MessageList({
         
         {hiddenCount > 0 && !isHistoryReplaying && (
           <div className="flex justify-center mb-12">
-            <Button onClick={handleExpand} variant="secondary">
+            <Button onClick={handleExpand} variant="outline">
               Show {Math.min(hiddenPromptCount, EARLIER_PROMPTS_BATCH_SIZE)} earlier message{Math.min(hiddenPromptCount, EARLIER_PROMPTS_BATCH_SIZE) > 1 ? 's' : ''}
             </Button>
           </div>

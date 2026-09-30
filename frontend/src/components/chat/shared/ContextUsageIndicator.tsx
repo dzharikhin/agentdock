@@ -64,7 +64,7 @@ export function ContextUsageIndicator({ used, size }: ContextUsageIndicatorProps
                 strokeLinecap="round"
               />
             </svg>
-            <span className="relative top-px ml-1 min-w-0 truncate chat-max-600:hidden">{percentUsed}%</span>
+            <span className="ml-1 min-w-0 truncate chat-max-600:hidden">{percentUsed}%</span>
             <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
           </div>
         </button>

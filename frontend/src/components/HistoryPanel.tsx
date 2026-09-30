@@ -171,8 +171,8 @@ export default function HistoryPanel({
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search…"
               aria-label="Search chats by title"
-              className="w-full min-w-0 rounded-[4px] border border-border bg-input pl-2 pr-6 py-0.5 text-ide-small
-                text-foreground placeholder:text-foreground-secondary focus:outline-none"
+              className="w-full min-w-0 rounded-[4px] border border-border bg-input pl-2 pr-6 text-ide-small
+                text-foreground focus:outline-none"
             />
             {searchQuery && (
               <button

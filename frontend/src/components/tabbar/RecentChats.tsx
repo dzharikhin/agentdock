@@ -104,8 +104,8 @@ export function RecentChats({
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="Search…"
                 aria-label="Search recent chats by title"
-                className="h-8 w-full rounded-[4px] border border-border bg-input py-0 pl-2 pr-6 text-ide-small text-foreground
-                  placeholder:text-foreground-secondary focus:shadow-none focus:outline-none
+                className="w-full rounded-[4px] border border-border bg-input pl-2 pr-6 text-ide-small leading-[1.5rem] text-foreground
+                  focus:shadow-none focus:outline-none
                   focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]"
               />
               {searchQuery ? (
