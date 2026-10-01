@@ -421,6 +421,12 @@ function handleToolCallUpdate(blocks: RichContentBlock[], chunk: ContentChunk) {
           e.result = merged.text;
         }
         const newEntries = [...exp.entries];
+        if (!isExploringChunk({ ...chunk, toolKind: e.kind, toolTitle: e.title })) {
+          newEntries.splice(idx, 1);
+          const remaining = newEntries.length > 0 ? [{ ...exp, isStreaming: false, entries: newEntries }] : [];
+          blocks.splice(i, 1, ...remaining, ...createToolCallBlocks(e, chunk.isReplay));
+          return;
+        }
         newEntries[idx] = e;
         blocks[i] = { ...exp, entries: newEntries };
         return;

@@ -290,7 +290,7 @@ export default function ChatDropdown({
 
       {open && !disabled && (
         <div ref={popupRef} className={`absolute mb-[4px] z-[100] w-max rounded-md border border-border bg-background-secondary px-1 py-0.5 
-          animate-in fade-in duration-75 ${direction === 'up' ? 'bottom-full mb-2 left-0' : 'top-full mt-2 left-0'}`}
+          ${direction === 'up' ? 'bottom-full mb-2 left-0' : 'top-full mt-2 left-0'}`}
         >
           <div className="flex flex-col overflow-y-auto" style={{ maxHeight: dynamicMaxHeight }} onScroll={() => {
               if (hoveredOptionId && popupRef.current) {
@@ -384,7 +384,7 @@ export default function ChatDropdown({
 
           {hoveredOption?.subOptions && (
             <div className={`absolute mb-[4px] left-full z-[101] ml-1 w-max rounded-md border border-border
-              bg-background-secondary px-1 py-0.5 animate-in fade-in slide-in-from-left-1 duration-75
+              bg-background-secondary px-1 py-0.5
               chat-max-600:left-0 chat-max-600:ml-0 chat-max-600:mb-0 ${hoveredOption.className ?? ''}`}
               style={{[subMenuPosition.prop]: subMenuPosition.offset, minWidth: subMenuPosition.minWidth, maxWidth: subMenuPosition.maxWidth}}
             >

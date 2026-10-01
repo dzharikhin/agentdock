@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useState, type MouseEvent } from 'react';
-import type { ExploringBlock, Message, RichContentBlock, TextBlock } from '../../types/chat';
+import type { ExploringBlock, Message, RichContentBlock, TextBlock, ToolCallBlock } from '../../types/chat';
 import { MarkdownMessage } from './MarkdownMessage';
 import { ContentBlockRenderer } from './blocks/ContentBlockRenderer';
+import { EditGroup } from './blocks/EditGroup';
 import { Tooltip } from './shared/Tooltip';
 import { Check, Copy, GitFork } from 'lucide-react';
 
@@ -49,12 +50,23 @@ function isTextBlock(block: RichContentBlock): block is TextBlock {
   return block.type === 'text';
 }
 
+function isEditBlock(block: RichContentBlock | undefined): block is ToolCallBlock {
+  return block?.type === 'tool_call' && block.entry.kind === 'edit';
+}
+
 function groupAssistantBlocks(blocks: RichContentBlock[]) {
-  const groups: Array<{ key: string; blocks: RichContentBlock[] }> = [];
+  const groups: Array<{ key: string; blocks: RichContentBlock[]; edits?: ToolCallBlock[] }> = [];
 
   for (let i = 0; i < blocks.length; i++) {
     const current = blocks[i];
     const next = blocks[i + 1];
+
+    if (isEditBlock(current)) {
+      const edits = [current];
+      while (isEditBlock(blocks[i + 1])) edits.push(blocks[++i] as ToolCallBlock);
+      groups.push({ key: `edits-${i - edits.length + 1}`, blocks: edits, edits });
+      continue;
+    }
 
     if (isThoughtExploringBlock(current) && next && isTextBlock(next)) {
       groups.push({ key: `thought-${i}`, blocks: [current, next] });
@@ -94,8 +106,10 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
     if (message.contentBlocks && message.contentBlocks.length > 0) {
       const groupedBlocks = groupAssistantBlocks(message.contentBlocks);
       return (
-        <div className="flex flex-col gap-2 [&>.markdown-body]:my-0">
-          {groupedBlocks.map((group) => (
+        <div className="flex flex-col gap-3 [&>.markdown-body]:my-0">
+          {groupedBlocks.map((group, groupIdx) => group.edits ? (
+            <EditGroup key={group.key} blocks={group.edits} isOpen={isActivePrompt && groupIdx === groupedBlocks.length - 1} />
+          ) : (
             <div key={group.key} className={`flex flex-col [&>.markdown-body]:my-0 ${group.blocks.length > 1 ? 'gap-1' : ''}`}>
               {group.blocks.map((block, idx) => (
                 <ContentBlockRenderer key={`${group.key}-${idx}`} block={block} isActivePrompt={isActivePrompt} onImageClick={onImageClick} />
@@ -171,13 +185,13 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
   );
 
   return (
-    <div className={`animate-in fade-in slide-in-from-bottom-2 duration-300 ${hasFollowingMessage ? 'mb-4' : ''}`}>
+    <div className={hasFollowingMessage ? 'mb-8' : ''}>
       <div className="break-words text-foreground" onClick={handleReplyImageClick}>
         {renderContent()}
       </div>
 
       {showMeta && (
-        <div className="ml-0.5 mt-2 flex items-center gap-2 text-foreground-secondary">
+        <div className="ml-0.5 mt-4 flex items-center gap-2 text-foreground-secondary">
           <Tooltip
             content={hasMetaTooltip ? (
                 <div className="min-w-[190px] space-y-1.5">

@@ -44,7 +44,7 @@ export function FormDialog({
 
   return (
     <div
-      className="absolute inset-0 z-[100] flex items-start justify-center bg-black/50 px-3 pb-3 pt-24 animate-in fade-in duration-150"
+      className="absolute inset-0 z-[100] flex items-start justify-center bg-black/50 px-3 pb-3 pt-24"
     >
       <div
         ref={dialogRef}
@@ -53,7 +53,7 @@ export function FormDialog({
         aria-labelledby={titleId}
         tabIndex={-1}
         className={`relative flex w-full max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border
-         mx-4 bg-background text-foreground animate-in zoom-in-95 duration-150`}
+         mx-4 bg-background text-foreground`}
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {

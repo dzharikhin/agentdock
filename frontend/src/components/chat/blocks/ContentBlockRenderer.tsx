@@ -4,7 +4,6 @@ import { ExploringBlock } from './ExploringBlock';
 import { ExecuteBlock } from './ExecuteBlock';
 import { SubAgentBlock } from './SubAgentBlock';
 import { SimpleActivityBlock } from './SimpleActivityBlock';
-import { EditBlock } from './EditBlock';
 import { OtherToolBlock } from './OtherToolBlock';
 import { PlanBlockComponent } from './PlanBlock';
 import { MarkdownMessage } from '../MarkdownMessage';
@@ -30,9 +29,6 @@ export const ContentBlockRenderer: React.FC<Props> = ({ block, isActivePrompt = 
       }
       if (block.entry.kind === 'delete' || block.entry.kind === 'move') {
         return <SimpleActivityBlock block={block} />;
-      }
-      if (block.entry.kind === 'edit') {
-        return <EditBlock block={block} />;
       }
       return <OtherToolBlock block={block} onImageClick={onImageClick} />;
     case 'plan':

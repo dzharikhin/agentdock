@@ -10,7 +10,6 @@ const TerminalIcon = () => (<SquareTerminal size={16} className="text-foreground
 
 interface Props {
   block: ToolCallBlock;
-  type?: string
   isActivePrompt?: boolean;
 }
 
@@ -29,7 +28,7 @@ function pickLastString(value: unknown): string | null {
   return null;
 }
 
-export const ExecuteBlock: React.FC<Props> = ({ block, isActivePrompt = false, type = null }) => {
+export const ExecuteBlock: React.FC<Props> = ({ block, isActivePrompt = false }) => {
   const { isPending, isError, isFinished } = parseToolStatus(block.entry.status);
   const showPending = isPending && isActivePrompt;
   const showFinished = isFinished || !showPending;
@@ -63,8 +62,7 @@ export const ExecuteBlock: React.FC<Props> = ({ block, isActivePrompt = false, t
   }, [block.entry.rawJson, block.entry.title, block.entry.kind]);
 
   return (
-    <div className={`border border-border rounded-[6px] overflow-hidden 
-      ${type === 'single-exploring' ? '-mt-2' : type === 'exploring' ? '' : 'mb-2'}`}>
+    <div className="border border-border rounded-[6px] overflow-hidden">
       <button onClick={toggle} className={`flex items-center gap-2 w-full px-3 h-9 bg-background-secondary ${chatInsetFocusClassName}`}>
         <div className="flex-shrink-0 grayscale"><TerminalIcon /></div>
         <div className="flex-1 text-left font-mono truncate pr-2 text-foreground">{command}</div>

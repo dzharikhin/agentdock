@@ -90,10 +90,10 @@ export const ExploringBlock: React.FC<Props> = ({ block, isActivePrompt = false 
   const label = buildLabel(entries, block.isStreaming);
 
   const renderEntries = () => (
-    <div className="flex flex-col gap-1 px-[1px] py-1 w-full min-w-0">
+    <div className="flex flex-col gap-1 px-[1px] w-full min-w-0">
       {block.entries.map((entry, i) => {
         if (entry.kind === 'thinking') {
-          return <ThinkingActivity key={entry.toolCallId || i} entry={entry} isExploring={label.startsWith('Explor')} />;
+          return <ThinkingActivity key={entry.toolCallId || i} entry={entry} />;
         }
         if (entry.kind === 'read') {
           return <ReadActivity key={entry.toolCallId || i} entry={entry} onOpenFile={handleOpenFile} isActivePrompt={isActivePrompt} />;
@@ -123,7 +123,7 @@ export const ExploringBlock: React.FC<Props> = ({ block, isActivePrompt = false 
   return (
     <div className="w-full min-w-0 max-w-full text-foreground-secondary">
       <button onClick={() => setIsExpanded(v => !v)}
-        className={`flex items-center gap-1.5 max-w-full mb-2 ${chatFocusClassName}`}
+        className={`flex items-center gap-1.5 max-w-full ${chatFocusClassName}`}
       >
         <span className="truncate">{label}</span>
         <span className={`transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}>
@@ -136,7 +136,9 @@ export const ExploringBlock: React.FC<Props> = ({ block, isActivePrompt = false 
         style={{ gridTemplateRows: isExpanded ? '1fr' : '0fr' }}
       >
         <div className="font-normal w-full min-w-0 min-h-0">
-          {renderEntries()}
+          <div className="pt-2">
+            {renderEntries()}
+          </div>
         </div>
       </div>
     </div>

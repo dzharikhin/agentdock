@@ -200,7 +200,7 @@ export const EditBlock: React.FC<Props> = ({ block }) => {
   };
 
   return (
-    <div className="border border-border rounded-[6px] overflow-hidden mb-2">
+    <div className="border border-border rounded-[6px] overflow-hidden">
       <button
         onClick={showInline ? toggle : undefined}
         className={`flex items-center gap-2 w-full px-3 h-9 bg-background-secondary ${chatInsetFocusClassName}`}
