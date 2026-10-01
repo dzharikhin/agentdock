@@ -666,11 +666,19 @@ export const ACPBridge = {
     window.__testCustomAcpConnection?.(JSON.stringify({ id, requestId }));
   },
 
+  cancelCustomAcpConnectionTest: (id: string) => {
+    window.__cancelCustomAcpConnectionTest?.(id);
+  },
+
   onCustomAcpStatus: (callback: (e: CustomEvent<CustomAcpStatusEvent>) => void) =>
     onBridgeEvent(EVENT_NAMES.CUSTOM_ACP_STATUS, callback),
 
-  checkMcpStatus: () => {
-    window.__checkMcpStatus?.();
+  checkMcpStatus: (id: string) => {
+    window.__checkMcpStatus?.(id);
+  },
+
+  cancelMcpStatus: (id: string) => {
+    window.__cancelMcpStatus?.(id);
   },
 
   onMcpStatus: (callback: (e: CustomEvent<McpStatusEvent>) => void) => onBridgeEvent(EVENT_NAMES.MCP_STATUS, callback),

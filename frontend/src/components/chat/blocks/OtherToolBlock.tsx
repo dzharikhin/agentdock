@@ -49,11 +49,11 @@ function ToolOutputImage({ image, onImageClick }: { image: ToolCallImageRef; onI
 
   if (!src) return null;
   return (
-    <div className="rounded-lg overflow-hidden border border-border max-w-sm w-full">
+    <div className="rounded-lg overflow-hidden max-w-full">
       <img
         src={src}
         alt=""
-        className={`w-full h-auto`}
+        className={`block max-w-full h-auto ${onImageClick ? 'cursor-zoom-in' : ''}`}
         onClick={onImageClick ? () => onImageClick(src) : undefined}
       />
     </div>

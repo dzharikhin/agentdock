@@ -4,7 +4,7 @@ import agentdock.bridge.BridgeHost
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -20,7 +20,7 @@ class McpBridge(
     private val scope: CoroutineScope
 ) {
     private val statusJobMutex = Mutex()
-    private var statusJob: Job? = null
+    private val statusJobs = mutableMapOf<String, Job>()
     private var nextStatusRunId = 0L
 
     fun install() {
@@ -44,45 +44,29 @@ class McpBridge(
             }
         }
 
-        host.register("checkMcpStatus") {
-            requestStatusCheck()
-        }
-    }
-
-    private fun requestStatusCheck(serversSnapshot: List<McpServerConfig>? = null) {
-        scope.launch(Dispatchers.IO) {
-            statusJobMutex.withLock {
-                val servers = serversSnapshot ?: McpConfigStore.load()
-                val runId = nextStatusRunId++
-                pushInitialStatus(servers, runId)
-                statusJob?.cancelAndJoin()
-                statusJob = scope.launch(Dispatchers.IO) {
-                    runStatusCheck(servers, runId)
+        host.register("checkMcpStatus") { id ->
+            scope.launch(Dispatchers.IO) {
+                statusJobMutex.withLock {
+                    val server = McpConfigStore.load().firstOrNull { it.id == id } ?: return@withLock
+                    val runId = nextStatusRunId++
+                    pushStatus(McpStatusUpdate(server.id, McpStatus.LOADING, "Checking…", runId))
+                    statusJobs.remove(id)?.cancel()
+                    statusJobs[id] = scope.launch(Dispatchers.IO) {
+                        val result = McpStatusChecker.check(server).copy(runId = runId)
+                        statusJobMutex.withLock {
+                            if (statusJobs[id] != coroutineContext.job) return@withLock
+                            statusJobs.remove(id)
+                            pushStatus(result)
+                        }
+                    }
                 }
             }
         }
-    }
 
-    private suspend fun runStatusCheck(servers: List<McpServerConfig>, runId: Long) {
-        if (servers.isEmpty()) return
-
-        // Probe each server sequentially so we never spawn many processes / sockets at once.
-        servers.forEach { server ->
-            val result = McpStatusChecker.check(server).copy(runId = runId)
-            pushStatus(result)
-        }
-    }
-
-    private fun pushInitialStatus(servers: List<McpServerConfig>, runId: Long) {
-        // Announce a loading state for enabled servers and disabled for the rest, so the UI can
-        // show the yellow indicator immediately before each probe completes.
-        servers.forEach { server ->
-            val initial = if (server.enabled) {
-                McpStatusUpdate(server.id, McpStatus.LOADING, "Checking…", runId)
-            } else {
-                McpStatusUpdate(server.id, McpStatus.DISABLED, "Disabled", runId)
+        host.register("cancelMcpStatus") { id ->
+            scope.launch(Dispatchers.IO) {
+                statusJobMutex.withLock { statusJobs.remove(id)?.cancel() }
             }
-            pushStatus(initial)
         }
     }
 

@@ -1,6 +1,7 @@
 package agentdock.mcp
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -58,10 +59,6 @@ object McpStatusChecker {
     }.toString()
 
     suspend fun check(server: McpServerConfig): McpStatusUpdate {
-        if (!server.enabled) {
-            return status(server, McpStatus.DISABLED, "Disabled")
-        }
-
         return when (server.transport.lowercase()) {
             "stdio" -> checkStdio(server)
             "http", "sse" -> checkReachable(server)
@@ -134,7 +131,8 @@ object McpStatusChecker {
             }
 
             val response = try {
-                responseFuture.get(STDIO_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+                // Interruptible so cancelling the check stops waiting and the finally block kills the process.
+                runInterruptible { responseFuture.get(STDIO_TIMEOUT_MS, TimeUnit.MILLISECONDS) }
             } catch (_: TimeoutException) {
                 return@withContext status(
                     server,

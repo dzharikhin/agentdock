@@ -625,10 +625,12 @@ declare global {
     __onThemeChanged?: () => void;
     __loadMcpServers?: () => void;
     __saveMcpServers?: (json: string) => void;
-    __checkMcpStatus?: () => void;
+    __checkMcpStatus?: (id: string) => void;
+    __cancelMcpStatus?: (id: string) => void;
     __loadCustomAcpConfigs?: () => void;
     __saveCustomAcpConfigs?: (json: string) => void;
     __testCustomAcpConnection?: (json: string) => void;
+    __cancelCustomAcpConnectionTest?: (id: string) => void;
     __onPromptLibrary?: (items: unknown) => void;
     __loadPromptLibrary?: () => void;
     __savePromptLibrary?: (json: string) => void;

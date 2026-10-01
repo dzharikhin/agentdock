@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
 import TabBar, { TabBarProps } from './components/TabBar';
 import { Sidebar } from './components/Sidebar';
 import { AppTabContent } from './components/AppTabContent';
@@ -223,8 +222,7 @@ function App() {
 
   return (
     <div
-      style={{ '--content-top-inset': sidebarEnabled && isWide ? '1rem' : '0px' } as CSSProperties}
-      className={`relative h-full min-w-[300px] bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'}`}
+      className={`relative h-full min-w-[300px] bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'} ${!sidebarEnabled || isWide ? '[--content-top-inset:1rem]' : ''}`}
     >
       {sidebarEnabled ? (
         <Sidebar

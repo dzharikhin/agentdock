@@ -14,8 +14,7 @@ import kotlinx.serialization.Serializable
 enum class McpStatus {
     @SerialName("loading") LOADING,
     @SerialName("connected") CONNECTED,
-    @SerialName("error") ERROR,
-    @SerialName("disabled") DISABLED
+    @SerialName("error") ERROR
 }
 
 @Serializable

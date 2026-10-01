@@ -99,7 +99,7 @@
     }
 
     & img {
-        @apply max-w-full cursor-zoom-in;
+        @apply block mx-auto max-w-full rounded-lg cursor-zoom-in;
     }
 
     & h1 {

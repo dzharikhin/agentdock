@@ -108,11 +108,13 @@ internal object BridgeScripts {
 
             window.__loadMcpServers = function() { invoke('loadMcpServers', ''); };
             window.__saveMcpServers = function(json) { invoke('saveMcpServers', json); };
-            window.__checkMcpStatus = function() { invoke('checkMcpStatus', ''); };
+            window.__checkMcpStatus = function(id) { invoke('checkMcpStatus', id); };
+            window.__cancelMcpStatus = function(id) { invoke('cancelMcpStatus', id); };
 
             window.__loadCustomAcpConfigs = function() { invoke('loadCustomAcpConfigs', ''); };
             window.__saveCustomAcpConfigs = function(json) { invoke('saveCustomAcpConfigs', json); };
             window.__testCustomAcpConnection = function(json) { invoke('testCustomAcpConnection', json); };
+            window.__cancelCustomAcpConnectionTest = function(id) { invoke('cancelCustomAcpConnectionTest', id); };
 
             window.__loadPromptLibrary = function() { invoke('loadPromptLibrary', ''); };
             window.__savePromptLibrary = function(json) { invoke('savePromptLibrary', json); };

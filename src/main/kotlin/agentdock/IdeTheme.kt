@@ -119,8 +119,6 @@ object IdeTheme {
         val isIslands = isIslandsTheme()
         sb.append("  --ide-theme-is-dark: ${if (isDark) "1" else "0"};\n")
         sb.append("  --ide-theme-is-islands: ${if (isIslands) "1" else "0"};\n")
-        val shimmerHighlightColor = if (isDark) Color(255, 255, 255) else Color(0, 0, 0)
-        sb.append("  --ide-shimmer-highlight-color: ${toCssColor(shimmerHighlightColor)};\n")
         val blueHighlightUserMessageBackground =
             if (isDark) Color(0x19, 0x3d, 0x70) else Color(0xe0, 0xf0, 0xff)
         val blueUserMessageBackground = if (isDark) Color(0x25, 0x32, 0x4d) else Color(225, 235, 253, 220)

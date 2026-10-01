@@ -21,6 +21,10 @@ function emptyForm(): FormState {
   return { name: '', prompt: '', attachments: [] };
 }
 
+function truncatePreview(text: string): string {
+  return text.length > 100 ? `${text.slice(0, 100).trimEnd()}…` : text;
+}
+
 function nextId(): string {
   return `saved-prompt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -136,7 +140,7 @@ export function PromptLibraryView() {
             <div className="flex-1 min-w-0">
               <div className="truncate text-foreground">{prompt.name}</div>
               <div className="mt-1 text-xs text-foreground-secondary truncate">
-                {prompt.prompt.replace(/\[image-[a-z0-9-]+]/g, '[image]').replace(/\[code-ref-[a-z0-9-]+]/g, '[file]') || prompt.attachments?.[0]?.name}
+                {truncatePreview(prompt.prompt.replace(/\[image-[a-z0-9-]+]/g, '[image]').replace(/\[code-ref-[a-z0-9-]+]/g, '[file]')) || prompt.attachments?.[0]?.name}
               </div>
             </div>
 

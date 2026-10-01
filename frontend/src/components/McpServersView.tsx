@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Network, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Loader2, Network, Pencil, PlugZap, Plus, Trash2 } from 'lucide-react';
 import { McpServerConfig, McpStatus, McpStatusUpdate, McpTransport } from '../types/mcp';
 import { ACPBridge } from '../utils/bridge';
 import { Button } from './ui/Button';
@@ -96,7 +96,6 @@ const STATUS_VISUALS: Record<McpStatus, StatusVisual | null> = {
   connected: { dotClass: 'bg-success', pulse: false, label: 'Reachable' },
   loading: { dotClass: 'bg-warning', pulse: true, label: 'Checking…' },
   error: { dotClass: 'bg-error', pulse: false, label: 'Error' },
-  disabled: null,
   unknown: null,
 };
 
@@ -122,7 +121,6 @@ export function McpServersView() {
   const [servers, setServers] = useState<McpServerConfig[]>([]);
   const [statusMap, setStatusMap] = useState<Record<string, McpStatusUpdate>>({});
   const statusSignaturesRef = useRef<Record<string, string>>({});
-  const latestStatusRunRef = useRef(0);
   const [form, setForm] = useState<FormState | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<McpServerConfig | null>(null);
@@ -137,10 +135,14 @@ export function McpServersView() {
     });
     const cleanupStatus = ACPBridge.onMcpStatus(e => {
       const update = e.detail.update;
-      const runId = update.runId ?? 0;
-      if (runId < latestStatusRunRef.current) return;
-      latestStatusRunRef.current = runId;
-      setStatusMap(prev => ({ ...prev, [update.id]: update }));
+      setStatusMap(prev => {
+        const current = prev[update.id];
+        const runId = update.runId ?? 0;
+        const currentRunId = current?.runId ?? 0;
+        // A run's result is accepted only while that run is still loading (not finished or cancelled).
+        if (current && (runId < currentRunId || (runId === currentRunId && current.status !== 'loading'))) return prev;
+        return { ...prev, [update.id]: update };
+      });
     });
     ACPBridge.loadMcpServers();
     return () => { cleanupServers(); cleanupStatus(); };
@@ -186,24 +188,14 @@ export function McpServersView() {
   return (
     <div className="h-full overflow-hidden bg-background text-foreground text-ide-small">
       <SectionPage actions={(
-        <>
-          <Button
-            onClick={() => ACPBridge.checkMcpStatus()}
-            variant="secondary"
-            leftIcon={<RefreshCw size={14} />}
-            className="max-h-8"
-          >
-            Check Status
-          </Button>
-          <Button
-            onClick={openAdd}
-            variant="primary"
-            leftIcon={<Plus size={14} />}
-            className="max-h-8"
-          >
-            Add
-          </Button>
-        </>
+        <Button
+          onClick={openAdd}
+          variant="primary"
+          leftIcon={<Plus size={14} />}
+          className="max-h-8"
+        >
+          Add
+        </Button>
       )} title="MCP Servers">
 
         {servers.length === 0 && !form && (
@@ -220,8 +212,6 @@ export function McpServersView() {
             const statusUpdate = statusMap[s.id];
             const status: McpStatus = statusUpdate?.status ?? 'unknown';
             const statusMessage = statusUpdate?.message;
-            const displayStatus: McpStatus = s.enabled ? status : 'disabled';
-            const displayStatusMessage = s.enabled ? statusMessage : undefined;
             return (
             <div
               key={s.id}
@@ -239,12 +229,12 @@ export function McpServersView() {
                 <div className="truncate">
                   {s.name}
                 </div>
-                <McpStatusLine transport={s.transport} status={displayStatus} />
-                {displayStatus === 'error' && displayStatusMessage && (
+                <McpStatusLine transport={s.transport} status={status} />
+                {status === 'error' && statusMessage && (
                   // Errors are shown in full: wrapped over as many lines as needed,
                   // with scrolling only as a guard against unusually long output.
                   <div className='mt-1 max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-error'>
-                    {displayStatusMessage}
+                    {statusMessage}
                   </div>
                 )}
               </div>
@@ -252,6 +242,23 @@ export function McpServersView() {
               {/* Same fixed offset as the checkbox, so both edges sit on the
                   centre line of the name + status lines. */}
               <div className='mt-[8px] flex flex-shrink-0 items-center gap-2'>
+                <Tooltip variant="minimal" content={status === 'loading' ? 'Cancel check' : 'Test connection'}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (status !== 'loading') {
+                        ACPBridge.checkMcpStatus(s.id);
+                        return;
+                      }
+                      setStatusMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], status: 'unknown', message: undefined } }));
+                      ACPBridge.cancelMcpStatus(s.id);
+                    }}
+                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                    aria-label={status === 'loading' ? `Cancel check for ${s.name}` : `Test connection for ${s.name}`}
+                  >
+                    {status === 'loading' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
+                  </button>
+                </Tooltip>
                 <Tooltip variant="minimal" content="Edit">
                   <button
                     type="button"

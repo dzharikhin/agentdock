@@ -115,7 +115,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
               return (
                 <div key={idx}>
                   <img src={src} alt=""
-                    className="max-w-full rounded-md shadow-sm cursor-zoom-in hover:opacity-90 transition-opacity"
+                    className="block mx-auto max-w-full rounded-lg cursor-zoom-in hover:opacity-90 transition-opacity"
                     style={{ maxHeight: '300px' }}
                     onClick={() => onImageClick(src)}
                   />

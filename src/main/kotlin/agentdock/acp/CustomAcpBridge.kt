@@ -101,6 +101,12 @@ class CustomAcpBridge(
                 }
             }
         }
+
+        host.register("cancelCustomAcpConnectionTest") { id ->
+            scope.launch(Dispatchers.IO) {
+                mutex.withLock { testJobs.remove(id)?.cancel() }
+            }
+        }
     }
 
     private fun pushStatus(update: CustomAcpStatusUpdate) {

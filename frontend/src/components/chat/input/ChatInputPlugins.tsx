@@ -122,40 +122,6 @@ export function PasteLogPlugin({ attachments, onAttachmentsChange }: {
   const attachmentsRef = useRef(attachments);
   attachmentsRef.current = attachments;
 
-  const handlePaste = useCallback((e: ClipboardEvent) => {
-    const items = e.clipboardData?.items;
-    if (!items) return;
-
-    for (let i = 0; i < items.length; i++) {
-      if (items[i].type.indexOf('image') !== -1) {
-        const file = items[i].getAsFile();
-        if (file) {
-          const reader = new FileReader();
-          reader.onload = () => {
-            if (!editor.getRootElement() || typeof reader.result !== 'string') return;
-            const id = crypto.randomUUID();
-            const attachment = { id, name: file.name || 'pasted-image.png', data: reader.result.split(',')[1], mimeType: file.type, isInline: true };
-            attachmentsRef.current = [...attachmentsRef.current, attachment];
-            onAttachmentsChange(attachmentsRef.current);
-            editor.update(() => {
-              if (!$isRangeSelection($getSelection())) $getRoot().selectEnd();
-              $getSelection()?.insertNodes([$createImageNode(id)]);
-            });
-          };
-          reader.readAsDataURL(file);
-        }
-      }
-    }
-  }, [onAttachmentsChange, editor]);
-
-  useEffect(() => {
-    const rootElement = editor.getRootElement();
-    if (rootElement) {
-      rootElement.addEventListener('paste', handlePaste);
-      return () => rootElement.removeEventListener('paste', handlePaste);
-    }
-  }, [editor, handlePaste]);
-
   useEffect(() => {
     return editor.registerCommand(
       PASTE_COMMAND,
@@ -169,16 +135,31 @@ export function PasteLogPlugin({ attachments, onAttachmentsChange }: {
           return true;
         }
 
-        const items = event.clipboardData?.items;
-        if (items) {
-          for (let i = 0; i < items.length; i++) {
-            if (items[i].type.startsWith('image/')) {
-              return false;
-            }
+        // Text wins over images: Office apps (e.g. Excel) add a rendered picture of copied text.
+        if (!plainText) {
+          const files = Array.from(event.clipboardData?.items || [])
+            .filter((item) => item.type.startsWith('image/'))
+            .map((item) => item.getAsFile())
+            .filter((file): file is File => !!file);
+          if (files.length === 0) return false;
+          event.preventDefault();
+          for (const file of files) {
+            const reader = new FileReader();
+            reader.onload = () => {
+              if (!editor.getRootElement() || typeof reader.result !== 'string') return;
+              const id = crypto.randomUUID();
+              const attachment = { id, name: file.name || 'pasted-image.png', data: reader.result.split(',')[1], mimeType: file.type, isInline: true };
+              attachmentsRef.current = [...attachmentsRef.current, attachment];
+              onAttachmentsChange(attachmentsRef.current);
+              editor.update(() => {
+                if (!$isRangeSelection($getSelection())) $getRoot().selectEnd();
+                $getSelection()?.insertNodes([$createImageNode(id)]);
+              });
+            };
+            reader.readAsDataURL(file);
           }
+          return true;
         }
-
-        if (!plainText) return false;
 
         const normalizedText = plainText.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 

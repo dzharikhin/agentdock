@@ -134,6 +134,7 @@ export default function TabBar({
           const hasWarning = flags?.warning;
           const hasUnread = flags?.unread;
           const hasProcessing = flags?.processing;
+          const hasQueued = flags?.queued && !hasProcessing;
           return (
             <div key={tab.id} className="flex min-w-[70px] flex-1 max-w-max">
               <TabItem
@@ -144,6 +145,7 @@ export default function TabBar({
                 hasWarning={hasWarning}
                 hasUnread={hasUnread}
                 hasProcessing={hasProcessing}
+                hasQueued={hasQueued}
                 isIslandsTheme={isIslandsTheme}
                 onSelectTab={onSelectTab}
                 onPointerDown={handleTabPointerDown}

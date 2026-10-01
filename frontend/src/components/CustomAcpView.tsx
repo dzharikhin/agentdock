@@ -139,7 +139,7 @@ export function CustomAcpView() {
             <div className="mt-12 flex flex-1 flex-col items-center gap-2 text-foreground-secondary">
               <Bot size={28} strokeWidth={1.5} />
               <span>No custom ACP agents configured</span>
-              <p className="max-w-[520px] text-center">
+              <p className="max-w-[400px] text-center">
                 Add a custom ACP configuration to use it as a service provider. Some plugin features may be unavailable if the ACP adapter does not support the corresponding ACP methods.
               </p>
             </div>
@@ -171,22 +171,30 @@ export function CustomAcpView() {
                   />}
                   <span className="truncate">{config.command}{label ? ` · ${label}` : ''}</span>
                 </div>
-                {message && <div className={`mt-1 max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words text-xs ${status === 'error' ? 'text-error' : 'text-foreground-secondary'}`}>
+                {status === 'error' && message && <div className="mt-1 max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-error">
                   {message}
                 </div>}
               </div>
               <div className="mt-[8px] flex shrink-0 items-center gap-2">
-                <Tooltip variant="minimal" content="Test connection">
+                <Tooltip variant="minimal" content={test?.status === 'loading' ? 'Cancel check' : 'Test connection'}>
                   <button
                     type="button"
-                    disabled={test?.status === 'loading'}
                     onClick={() => {
+                      if (test?.status === 'loading') {
+                        setStatuses(current => {
+                          const next = { ...current };
+                          delete next[config.id];
+                          return next;
+                        });
+                        ACPBridge.cancelCustomAcpConnectionTest(config.id);
+                        return;
+                      }
                       const requestId = crypto.randomUUID();
                       setStatuses(current => ({ ...current, [config.id]: { id: config.id, requestId, status: 'loading' } }));
                       ACPBridge.testCustomAcpConnection(config.id, requestId);
                     }}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground disabled:opacity-50 focus-visible:outline focus-visible:outline-1 focus-visible:outline-border"
-                    aria-label={`Test connection for ${config.name}`}
+                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
+                    aria-label={test?.status === 'loading' ? `Cancel check for ${config.name}` : `Test connection for ${config.name}`}
                   >
                     {test?.status === 'loading' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
                   </button>
@@ -195,7 +203,7 @@ export function CustomAcpView() {
                   <button
                     type="button"
                     onClick={() => { setEditingId(config.id); setForm(configToForm(config)); }}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-border"
+                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
                     aria-label={`Edit ${config.name}`}
                   >
                     <Pencil size={13} />
@@ -205,7 +213,7 @@ export function CustomAcpView() {
                   <button
                     type="button"
                     onClick={() => setDeleteTarget(config)}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-error focus-visible:outline focus-visible:outline-1 focus-visible:outline-border"
+                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-error focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
                     aria-label={`Delete ${config.name}`}
                   >
                     <Trash2 size={13} />
