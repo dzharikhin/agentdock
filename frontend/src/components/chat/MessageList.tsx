@@ -98,6 +98,7 @@ function MessageList({
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const footerRef = useRef<HTMLDivElement>(null);
+  const footerSpacerRef = useRef<HTMLDivElement>(null);
   const navigationRef = useRef<HTMLElement>(null);
   const navigationScrollIntentRef = useRef(false);
   const promptElementsRef = useRef(new Map<string, HTMLDivElement>());
@@ -342,14 +343,31 @@ function MessageList({
   };
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
-    if (footerRef.current?.contains(e.target as Node)) return;
     if (e.deltaY < 0) {
       handleUserIntentScrollUp();
     }
   };
 
+  // The footer overlays the message list outside its scroll container, so wheel scrolling that no
+  // scrollable footer element consumes is forwarded to the message list.
+  const handleFooterWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const el = containerRef.current;
+    if (!el || e.ctrlKey || e.deltaY === 0) return;
+    for (let node = e.target as HTMLElement | null; node && node !== e.currentTarget; node = node.parentElement) {
+      if (node.scrollHeight <= node.clientHeight || !/auto|scroll/.test(getComputedStyle(node).overflowY)) continue;
+      if (e.deltaY < 0 ? node.scrollTop > 0 : node.scrollTop + node.clientHeight < node.scrollHeight - 1) return;
+    }
+    handleWheel(e);
+    el.scrollTop += e.deltaY;
+  };
+
+  // A click on a non-focusable footer area leaves focus on the body, so keyboard scrolling would
+  // target the document instead of the message list.
+  const handleFooterClick = () => {
+    if (document.activeElement === document.body) containerRef.current?.focus({ preventScroll: true });
+  };
+
   const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
-    if (footerRef.current?.contains(e.target as Node)) return;
     touchStartYRef.current = e.touches[0].clientY;
   };
 
@@ -367,7 +385,6 @@ function MessageList({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (footerRef.current?.contains(e.target as Node)) return;
     if (['ArrowUp', 'PageUp', 'Home'].includes(e.key)) {
       handleUserIntentScrollUp();
     }
@@ -407,15 +424,28 @@ function MessageList({
     canMarkReadChangeRef.current?.(canMarkRead);
   }, []);
 
+  const hasFooter = Boolean(footer);
+
   useLayoutEffect(() => {
     const el = containerRef.current;
     const content = contentRef.current;
     if (!el || !content) return;
-    const observer = new ResizeObserver(updateViewport);
+    const footerEl = footerRef.current;
+    const observer = new ResizeObserver(() => {
+      const spacer = footerSpacerRef.current;
+      if (footerEl && spacer) {
+        const right = `${el.offsetWidth - el.clientWidth}px`;
+        const height = `${Math.ceil(footerEl.getBoundingClientRect().height)}px`;
+        if (footerEl.style.right !== right) footerEl.style.right = right;
+        if (spacer.style.height !== height) spacer.style.height = height;
+      }
+      updateViewport();
+    });
     observer.observe(el);
     observer.observe(content);
+    if (footerEl) observer.observe(footerEl);
     return () => observer.disconnect();
-  }, [updateViewport]);
+  }, [updateViewport, hasFooter]);
 
   useLayoutEffect(() => {
     const el = containerRef.current;
@@ -519,7 +549,8 @@ function MessageList({
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         onKeyDown={handleKeyDown}
-        className="relative flex-1 min-h-0 overflow-x-hidden overflow-y-auto scroll-auto [overflow-anchor:none]
+        tabIndex={-1}
+        className="relative flex-1 min-h-0 overflow-x-hidden overflow-y-auto scroll-auto [overflow-anchor:none] outline-none
           px-4 app-wide:px-6 opacity-100 transition-opacity duration-300"
       >
       <div ref={contentRef} className="mx-auto min-h-full w-full max-w-app-content flex flex-col">
@@ -580,19 +611,19 @@ function MessageList({
           </div>
         )}
         </div>
-        {footer && (
-          <div ref={footerRef} className="sticky bottom-0 z-20 flex shrink-0 flex-col pt-2">
-            <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-1/2 w-screen -translate-x-1/2
-              bg-background shadow-[0_4px_0_0_var(--ide-Panel-background)]">
-              <div className="absolute inset-x-0 bottom-full h-8 bg-gradient-to-b from-transparent to-background" />
-            </div>
-            <div className="relative flex flex-col">
-              {footer}
-            </div>
-          </div>
-        )}
+        {footer && <div ref={footerSpacerRef} aria-hidden="true" className="shrink-0" />}
       </div>
     </div>
+    {footer && (
+      <div ref={footerRef} onWheel={handleFooterWheel} onClick={handleFooterClick}
+        className="absolute bottom-0 left-0 right-0 z-20 bg-background px-4 pt-2 app-wide:px-6">
+        <div aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-b from-transparent to-background" />
+        <div className="relative mx-auto flex w-full max-w-app-content flex-col">
+          {footer}
+        </div>
+      </div>
+    )}
   </div>
 );
 }

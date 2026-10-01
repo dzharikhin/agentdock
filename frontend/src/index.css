@@ -151,6 +151,10 @@ html.ide-theme-islands *::-webkit-scrollbar-thumb {
   border-radius: 999px;
 }
 
+html.ide-theme-islands *::-webkit-scrollbar-track:vertical {
+  margin-bottom: 2px;
+}
+
 @keyframes tooltip-in {
   from {
     opacity: 0;
