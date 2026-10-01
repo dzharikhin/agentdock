@@ -58,7 +58,7 @@ export function ChatLoadingIndicator({ status, agentName }: ChatLoadingIndicator
 
   return (
     <div className="flex items-center mt-4 gap-2 text-foreground-secondary text-ide-small">
-      <div className="flex-shrink-0 mt-[-1px]"><ChatSpinnerIcon /></div>
+      <div className="flex-shrink-0"><ChatSpinnerIcon /></div>
       <div className="flex items-center">
         <span>{isInitializing && `Connect to ${agentName || 'agent'}...`}</span>
         {!isInitializing && (<span className="tabular-nums">{formatTime(seconds)}</span>)}

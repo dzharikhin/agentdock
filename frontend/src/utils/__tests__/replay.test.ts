@@ -239,11 +239,11 @@ describe('replay rendering rules', () => {
         }],
       }],
     };
-    const toolCall = buildReplayMessages(data)[0].contentBlocks?.find(
-      (block): block is ToolCallBlock => block.type === 'tool_call'
+    const exploring = buildReplayMessages(data)[0].contentBlocks?.find(
+      (block): block is ExploringBlock => block.type === 'exploring'
     );
 
-    expect(toolCall?.entry.result).toBe('compiling...\n\ntests...\n\ndone');
+    expect(exploring?.entries[0].result).toBe('compiling...\n\ntests...\n\ndone');
   });
 
   it('does not duplicate execute output when an update is already a full snapshot', () => {
@@ -271,11 +271,11 @@ describe('replay rendering rules', () => {
         }],
       }],
     };
-    const toolCall = buildReplayMessages(data)[0].contentBlocks?.find(
-      (block): block is ToolCallBlock => block.type === 'tool_call'
+    const exploring = buildReplayMessages(data)[0].contentBlocks?.find(
+      (block): block is ExploringBlock => block.type === 'exploring'
     );
 
-    expect(toolCall?.entry.result).toBe('compiling...\ndone');
+    expect(exploring?.entries[0].result).toBe('compiling...\ndone');
   });
 
   it('does not duplicate incremental output for non-execute tools', () => {

@@ -110,18 +110,6 @@ export const FIXTURES: Record<string, ConversationReplayData> = {
     }])],
   },
 
-  impactfulExecute: {
-    sessions: [session([{
-      blocks: [{ type: 'text', text: 'Run the build' }],
-      events: [
-        toolCall('x1', 'execute', 'npm run build', 'completed', {
-          content: [{ type: 'content', content: { type: 'text', text: 'built ok' } }],
-        }),
-      ],
-      assistantMeta: meta(),
-    }])],
-  },
-
   toolCallThenUpdate: {
     sessions: [session([{
       blocks: [{ type: 'text', text: 'Read then finish' }],

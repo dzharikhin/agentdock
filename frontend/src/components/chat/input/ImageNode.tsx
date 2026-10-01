@@ -95,7 +95,7 @@ function ImageComponent({ id, nodeKey }: { id: string; nodeKey: NodeKey }) {
     <span contentEditable={false}
       className={`inline-flex min-h-[22px] items-center gap-1.5 px-2 py-1 rounded-[6px] border  
         border-border mt-[-0.4rem] relative top-[2px] align-middle bg-background-secondary transition-all group 
-        focus-within:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] 
+        has-[:focus-visible]:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] 
         ${isAtStart ? 'ml-0 mr-0.5' : 'mx-0.5'}`}
     >
       <button type="button" onClick={onClick}

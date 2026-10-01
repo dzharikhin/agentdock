@@ -107,6 +107,10 @@ internal fun AcpBridge.installServiceCallbacks() {
                 var json = try { Json.encodeToString(update) } catch (_: Exception) { update.toString() }
                 json = convertBrokenOtherPatchToolCallJson(json)
                 val todoToolCallKey = todoToolCallKey(chatId, sessionId, update.toolCallId.value)
+                if (hasFullOutputToolKind(json)) {
+                    fullOutputToolCallKeys.add(todoToolCallKey)
+                    json = dropOversizedToolCallPayload(json)
+                }
                 val todoPlanEntries = extractTodoPlanEntriesFromToolRawJson(json)
                 val isTodoWrite = todoPlanEntries != null || isTodoWriteToolCallJson(json)
                 if (isTodoWrite) {
@@ -134,6 +138,9 @@ internal fun AcpBridge.installServiceCallbacks() {
                 var json = try { Json.encodeToString(update) } catch (_: Exception) { update.toString() }
                 json = convertBrokenOtherPatchToolCallJson(json)
                 val todoToolCallKey = todoToolCallKey(chatId, sessionId, update.toolCallId.value)
+                if (hasFullOutputToolKind(json)) fullOutputToolCallKeys.add(todoToolCallKey)
+                val fullOutput = fullOutputToolCallKeys.contains(todoToolCallKey)
+                if (fullOutput) json = dropOversizedToolCallPayload(json)
                 val todoPlanEntries = extractTodoPlanEntriesFromToolRawJson(json)
                 val isTodoWrite = todoPlanEntries != null || todoToolCallKeys.contains(todoToolCallKey) || isTodoWriteToolCallJson(json)
                 if (isTodoWrite) {
@@ -143,7 +150,7 @@ internal fun AcpBridge.installServiceCallbacks() {
                 if (shouldEmitTodoPlan) {
                     recordStoredEvent(chatId, sessionId, adapterName, buildStoredPlanChunk(todoPlanEntries), isReplay)
                 } else if (!isTodoWrite) {
-                    recordStoredEvent(chatId, sessionId, adapterName, buildStoredToolCallUpdateChunk(update.toolCallId.value, json), isReplay)
+                    recordStoredEvent(chatId, sessionId, adapterName, buildStoredToolCallUpdateChunk(update.toolCallId.value, json, fullOutput), isReplay)
                 }
                 if (!isReplay) {
                     if (!isTodoWrite || shouldEmitTodoPlan) {
@@ -152,7 +159,7 @@ internal fun AcpBridge.installServiceCallbacks() {
                     if (shouldEmitTodoPlan) {
                         pushPlanChunk(chatId, todoPlanEntries)
                     } else if (!isTodoWrite) {
-                        pushToolCallUpdateChunk(chatId, update.toolCallId.value, json)
+                        pushToolCallUpdateChunk(chatId, update.toolCallId.value, json, fullOutput)
                     }
                 }
             }

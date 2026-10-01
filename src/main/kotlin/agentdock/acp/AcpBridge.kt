@@ -53,6 +53,8 @@ class AcpBridge(
     internal val replayFreshnessProbes = ConcurrentHashMap<String, ReplayFreshnessProbe>()
     internal val suppressReplayForChatIds: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
     internal val todoToolCallKeys: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
+    // Tool calls whose output is never truncated; updates often omit the kind that identifies them.
+    internal val fullOutputToolCallKeys: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
     internal val emittedTodoPlanKeys: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
 
     internal val cli = AcpBridgeCli(service.project, host::openTerminal)

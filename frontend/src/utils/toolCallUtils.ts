@@ -37,7 +37,7 @@ export function buildToolCallEntry(chunk: ContentChunk): ToolCallEntry {
     rawJson: chunk.toolRawJson || '',
     locations: json.locations,
     content: json.content || json.diff,
-    result: resultText ? truncateToolOutputForKind(resultText, kind).text : undefined,
+    result: resultText,
   };
 }
 
@@ -228,11 +228,13 @@ export function extractResultTexts(json: Record<string, any>): string | undefine
     return undefined;
   }
 
+  const prompt = typeof json.rawInput?.prompt === 'string' ? json.rawInput.prompt.trim() : '';
   const texts: string[] = [];
   if (Array.isArray(json.content)) {
     for (const c of json.content) {
       const t = c.text || c.content?.text;
-      if (t && typeof t === 'string') texts.push(t);
+      // Subagent tool calls may echo their prompt as content; it is input, not output.
+      if (t && typeof t === 'string' && (!prompt || t.trim() !== prompt)) texts.push(t);
     }
   } else if (json.text) {
     texts.push(json.text);
@@ -248,31 +250,4 @@ export function extractResultTexts(json: Record<string, any>): string | undefine
     return undefined;
   }
   return texts.join('\n\n');
-}
-
-const MAX_TOOL_OUTPUT_LINES = 600;
-const MAX_TOOL_OUTPUT_CHARS = 10000;
-
-function buildToolOutputRemovedNotice(removedCharacters: number): string {
-  return `[Output removed: ${removedCharacters} characters]`;
-}
-
-export function truncateToolOutputForKind(text: string, kind?: string): { text: string; truncated: boolean; originalLength: number } {
-  const originalLength = text.split(/\r\n|\n|\r/).length;
-  if ((kind || '').toLowerCase() === 'edit') {
-    return { text, truncated: false, originalLength };
-  }
-  if (originalLength > MAX_TOOL_OUTPUT_LINES || text.length > MAX_TOOL_OUTPUT_CHARS) {
-    return { text: buildToolOutputRemovedNotice(text.length), truncated: true, originalLength };
-  }
-  return { text, truncated: false, originalLength };
-}
-
-export function appendToolOutput(prev: string | undefined, next: string, _maxLines?: number, kind?: string): { text: string; truncated: boolean; originalLength: number } {
-  const combined = prev ? `${prev}\n\n${next}` : next;
-  return truncateToolOutputForKind(combined, kind);
-}
-
-export function replaceToolOutput(next: string, _maxLines?: number, kind?: string): { text: string; truncated: boolean; originalLength: number } {
-  return truncateToolOutputForKind(next, kind);
 }

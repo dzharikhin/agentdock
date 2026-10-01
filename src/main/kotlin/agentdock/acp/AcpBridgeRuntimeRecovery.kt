@@ -26,6 +26,7 @@ internal fun AcpBridge.recoverRuntimeAfterFailure(reason: String) {
     replayFreshnessProbes.clear()
     suppressReplayForChatIds.clear()
     todoToolCallKeys.clear()
+    fullOutputToolCallKeys.clear()
     emittedTodoPlanKeys.clear()
 
     val affectedChatIds = lastStatusByChatId

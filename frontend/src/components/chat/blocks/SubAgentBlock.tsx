@@ -21,16 +21,26 @@ interface Props {
   block: ToolCallBlock;
 }
 
+function inputString(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
+// Some agents wrap the subagent report in one custom tag, e.g. <subagent ...>...</subagent>.
+function unwrapOuterTag(text: string): string {
+  const match = text.match(/^\s*<([a-z][\w-]*)\b[^>]*>([\s\S]*)<\/\1>\s*$/i);
+  return match && !match[2].includes(`</${match[1]}>`) ? match[2].trim() : text;
+}
+
 export const SubAgentBlock: React.FC<Props> = ({ block }) => {
   const { isPending, isError, isFinished } = parseToolStatus(block.entry.status);
   const { isExpanded, toggle } = useAutoCollapse();
 
-  const title = block.entry.title || block.entry.kind || 'Thinking...';
-  const promptText = (() => {
-    const json = safeParseJson(block.entry.rawJson);
-    const p = json?.rawInput?.prompt;
-    return typeof p === 'string' && p.trim() ? p.trim() : '';
-  })();
+  const rawInput = safeParseJson(block.entry.rawJson).rawInput;
+  const title = inputString(rawInput?.description) || block.entry.title || block.entry.kind || 'Thinking...';
+  const details = [inputString(rawInput?.subagent_type) || inputString(rawInput?.agent), inputString(rawInput?.model)]
+    .filter(Boolean).join(' · ');
+  const promptText = inputString(rawInput?.prompt);
+  const result = block.entry.result ? unwrapOuterTag(block.entry.result) : '';
 
   return (
     <div className="border border-border rounded-[6px] overflow-hidden mb-2">
@@ -38,7 +48,9 @@ export const SubAgentBlock: React.FC<Props> = ({ block }) => {
         className={`flex items-center gap-2 w-full px-3 h-9 bg-background-secondary ${chatInsetFocusClassName}`}
       >
         <div className="flex-shrink-0 text-editor-fg opacity-70 relative top-[-1px]"><BotIcon size={14} /></div>
-        <div className="flex-1 text-left font-mono truncate text-editor-fg opacity-90 pr-2">{title}</div>
+        <div className="flex-1 text-left font-mono truncate text-editor-fg opacity-90 pr-2">
+          {title}{details && <span className="opacity-60"> · {details}</span>}
+        </div>
         <div className="flex-shrink-0 flex items-center gap-2">
           {(isPending || isError) && (
             <div className={`w-2.5 h-2.5 rounded-full ${isPending ? 'bg-warning animate-pulse' : 'bg-error'}`}/>
@@ -58,8 +70,8 @@ export const SubAgentBlock: React.FC<Props> = ({ block }) => {
 
             <div className="leading-relaxed">
               {promptText && (<div className="mb-2"><b>Prompt: </b>{promptText}<hr /></div>)}
-              {block.entry.result ? (
-                <MarkdownMessage content={block.entry.result} enableCodeCopy={false} />
+              {result ? (
+                <MarkdownMessage content={result} enableCodeCopy={false} />
               ) : (
                 <span className="opacity-40 italic">
                   {isFinished ? 'Subagent finished.' : 'Waiting for response...'}

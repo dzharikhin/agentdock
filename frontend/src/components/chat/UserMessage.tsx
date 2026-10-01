@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, memo } from 'react';
 import { Message, RichContentBlock, TextBlock, ImageBlock, FileBlock, CodeReferenceBlock } from '../../types/chat';
 import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { AttachmentItem } from './shared/AttachmentItem';
@@ -53,7 +53,8 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
   const [copied, setCopied] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  // Measure before paint so a long prompt is already collapsed when the message list measures its height.
+  useLayoutEffect(() => {
     const el = contentRef.current;
     if (!el) return;
 

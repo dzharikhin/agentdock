@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { SquareTerminal } from 'lucide-react';
 import { ToolCallEntry } from '../../../types/chat';
 import { parseToolStatus, safeParseJson } from '../../../utils/toolCallUtils';
-import { Tooltip } from '../shared/Tooltip';
+import { ActivityOutput } from './ActivityOutput';
+import { ExpandableActivity } from './ExpandableActivity';
 
 interface Props {
   entry: ToolCallEntry;
@@ -35,25 +36,17 @@ function commandFromEntry(entry: ToolCallEntry): string {
   return String(entry.title || 'Terminal Command').replace(/^`|`$/g, '');
 }
 
+
 export const ExecuteActivity: React.FC<Props> = ({ entry, isActivePrompt = false }) => {
-  const { isPending, isError } = parseToolStatus(entry.status);
   const command = useMemo(() => commandFromEntry(entry), [entry.rawJson, entry.title]);
-  const showPending = isPending && isActivePrompt;
+  const showPending = parseToolStatus(entry.status).isPending && isActivePrompt;
 
   return (
-    <Tooltip variant="minimal" content={command}>
-      <div className="flex items-center gap-1.5 min-w-0 cursor-help pr-2">
-        <SquareTerminal size={13} className="text-foreground-secondary flex-shrink-0 relative" />
-        <span className="text-foreground-secondary font-mono truncate min-w-0 flex-1 block">
-          {command}
-        </span>
-        {showPending && (
-          <div className="w-1.5 h-1.5 rounded-full bg-warning animate-pulse flex-shrink-0" />
-        )}
-        {isError && (
-          <div className="w-1.5 h-1.5 rounded-full bg-error flex-shrink-0" />
-        )}
-      </div>
-    </Tooltip>
+    <ExpandableActivity icon={<SquareTerminal size={13} className="flex-shrink-0" />} label={<span className="font-mono">{command}</span>}
+      status={entry.status} isActivePrompt={isActivePrompt}
+    >
+      <ActivityOutput input={<span className="font-mono"><span className="text-foreground-secondary mr-1 select-none">$</span>{command}</span>}
+        result={entry.result} pendingText={showPending ? 'Executing...' : null} />
+    </ExpandableActivity>
   );
 };

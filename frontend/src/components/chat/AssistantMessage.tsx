@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useState, type MouseEvent } from 'react';
 import type { ExploringBlock, Message, RichContentBlock, TextBlock, ToolCallBlock } from '../../types/chat';
 import { MarkdownMessage } from './MarkdownMessage';
 import { ContentBlockRenderer } from './blocks/ContentBlockRenderer';
-import { EditGroup } from './blocks/EditGroup';
+import { WorkingBlock } from './blocks/WorkingBlock';
 import { Tooltip } from './shared/Tooltip';
 import { Check, Copy, GitFork } from 'lucide-react';
 
@@ -42,39 +42,29 @@ function formatContextUsage(used?: number, size?: number): string | null {
   return size!.toLocaleString();
 }
 
-function isThoughtExploringBlock(block: RichContentBlock): block is ExploringBlock {
-  return block.type === 'exploring' && block.entries.length > 0 && block.entries.every((entry) => entry.kind === 'thinking');
-}
-
 function isTextBlock(block: RichContentBlock): block is TextBlock {
   return block.type === 'text';
 }
 
-function isEditBlock(block: RichContentBlock | undefined): block is ToolCallBlock {
-  return block?.type === 'tool_call' && block.entry.kind === 'edit';
+function isWorkBlock(block: RichContentBlock | undefined): block is ExploringBlock | ToolCallBlock {
+  return block?.type === 'exploring'
+    || (block?.type === 'tool_call' && ['edit', 'delete', 'move'].includes(block.entry.kind ?? ''));
 }
 
 function groupAssistantBlocks(blocks: RichContentBlock[]) {
-  const groups: Array<{ key: string; blocks: RichContentBlock[]; edits?: ToolCallBlock[] }> = [];
+  const groups: Array<{ key: string; block: RichContentBlock; work?: Array<ExploringBlock | ToolCallBlock> }> = [];
 
   for (let i = 0; i < blocks.length; i++) {
     const current = blocks[i];
-    const next = blocks[i + 1];
 
-    if (isEditBlock(current)) {
-      const edits = [current];
-      while (isEditBlock(blocks[i + 1])) edits.push(blocks[++i] as ToolCallBlock);
-      groups.push({ key: `edits-${i - edits.length + 1}`, blocks: edits, edits });
+    if (isWorkBlock(current)) {
+      const work = [current];
+      while (isWorkBlock(blocks[i + 1])) work.push(blocks[++i] as ExploringBlock | ToolCallBlock);
+      groups.push({ key: `work-${i - work.length + 1}`, block: current, work });
       continue;
     }
 
-    if (isThoughtExploringBlock(current) && next && isTextBlock(next)) {
-      groups.push({ key: `thought-${i}`, blocks: [current, next] });
-      i++;
-      continue;
-    }
-
-    groups.push({ key: `block-${i}`, blocks: [current] });
+    groups.push({ key: `block-${i}`, block: current });
   }
 
   return groups;
@@ -106,15 +96,12 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
     if (message.contentBlocks && message.contentBlocks.length > 0) {
       const groupedBlocks = groupAssistantBlocks(message.contentBlocks);
       return (
-        <div className="flex flex-col gap-3 [&>.markdown-body]:my-0">
-          {groupedBlocks.map((group, groupIdx) => group.edits ? (
-            <EditGroup key={group.key} blocks={group.edits} isOpen={isActivePrompt && groupIdx === groupedBlocks.length - 1} />
+        <div className="flex flex-col gap-2 [&>.markdown-body]:my-0">
+          {groupedBlocks.map((group, groupIdx) => group.work ? (
+            <WorkingBlock key={group.key} blocks={group.work} isOpen={isActivePrompt && groupIdx === groupedBlocks.length - 1}
+              isActivePrompt={isActivePrompt} onImageClick={onImageClick} />
           ) : (
-            <div key={group.key} className={`flex flex-col [&>.markdown-body]:my-0 ${group.blocks.length > 1 ? 'gap-1' : ''}`}>
-              {group.blocks.map((block, idx) => (
-                <ContentBlockRenderer key={`${group.key}-${idx}`} block={block} isActivePrompt={isActivePrompt} onImageClick={onImageClick} />
-              ))}
-            </div>
+            <ContentBlockRenderer key={group.key} block={group.block} onImageClick={onImageClick} />
           ))}
         </div>
       );

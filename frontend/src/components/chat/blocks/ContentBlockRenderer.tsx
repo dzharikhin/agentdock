@@ -1,36 +1,20 @@
 import React from 'react';
 import { RichContentBlock } from '../../../types/chat';
-import { ExploringBlock } from './ExploringBlock';
-import { ExecuteBlock } from './ExecuteBlock';
 import { SubAgentBlock } from './SubAgentBlock';
-import { SimpleActivityBlock } from './SimpleActivityBlock';
-import { OtherToolBlock } from './OtherToolBlock';
 import { PlanBlockComponent } from './PlanBlock';
 import { MarkdownMessage } from '../MarkdownMessage';
 
 interface Props {
   block: RichContentBlock;
-  isActivePrompt?: boolean;
   onImageClick?: (src: string) => void;
 }
 
-export const ContentBlockRenderer: React.FC<Props> = ({ block, isActivePrompt = false, onImageClick }) => {
+export const ContentBlockRenderer: React.FC<Props> = ({ block, onImageClick }) => {
   switch (block.type) {
     case 'text':
       return <MarkdownMessage content={block.text} enableCodeCopy />;
-    case 'exploring':
-      return <ExploringBlock block={block} isActivePrompt={isActivePrompt} />;
     case 'tool_call':
-      if (block.entry.kind === 'execute') {
-        return <ExecuteBlock block={block} isActivePrompt={isActivePrompt} />;
-      }
-      if (block.entry.kind === 'think' || block.entry.kind === 'task') {
-        return <SubAgentBlock block={block} />;
-      }
-      if (block.entry.kind === 'delete' || block.entry.kind === 'move') {
-        return <SimpleActivityBlock block={block} />;
-      }
-      return <OtherToolBlock block={block} onImageClick={onImageClick} />;
+      return <SubAgentBlock block={block} />;
     case 'plan':
       return <PlanBlockComponent block={block} />;
     case 'image': {
