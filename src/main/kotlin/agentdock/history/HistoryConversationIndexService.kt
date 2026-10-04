@@ -94,6 +94,7 @@ internal object HistoryConversationIndexService {
                 else -> "Untitled Session"
             },
             titleUserSet = mergedConversation?.titleUserSet ?: false,
+            pinned = mergedConversation?.pinned ?: false,
             promptCount = promptCountForConversation(
                 projectPath = cleanProjectPath,
                 conversationId = cleanConversationId,
@@ -242,14 +243,15 @@ internal object HistoryConversationIndexService {
         return true
     }
 
+    /** Renames the conversation (a user-set title) and/or pins or unpins it; `null` leaves that property unchanged. */
     @Synchronized
-    fun renameConversation(projectPath: String?, conversationId: String, newTitle: String): Boolean {
+    fun updateConversation(projectPath: String?, conversationId: String, newTitle: String?, pinned: Boolean?): Boolean {
         val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
         val cleanConversationId = runCatching {
             HistoryStorage.requireSafeConversationId(conversationId)
         }.getOrElse { return false }
-        val normalizedTitle = newTitle.trim()
-        if (cleanProjectPath.isBlank() || cleanConversationId.isBlank() || normalizedTitle.isBlank()) return false
+        val normalizedTitle = newTitle?.trim()
+        if (cleanProjectPath.isBlank() || cleanConversationId.isBlank() || normalizedTitle?.isBlank() == true) return false
 
         val indexFile = HistoryStorage.ensureProjectIndexFile(cleanProjectPath)
         val existing = HistoryStorage.readProjectIndex(indexFile)
@@ -258,7 +260,11 @@ internal object HistoryConversationIndexService {
         val rewritten = existing.map { conversation ->
             if (conversation.id == cleanConversationId) {
                 updated = true
-                conversation.copy(title = normalizedTitle, titleUserSet = true)
+                conversation.copy(
+                    title = normalizedTitle ?: conversation.title,
+                    titleUserSet = conversation.titleUserSet || normalizedTitle != null,
+                    pinned = pinned ?: conversation.pinned
+                )
             } else {
                 conversation
             }
@@ -306,6 +312,7 @@ internal object HistoryConversationIndexService {
                 else -> ""
             },
             titleUserSet = left.titleUserSet || right.titleUserSet,
+            pinned = left.pinned || right.pinned,
             promptCount = mergePromptCounts(left.promptCount, right.promptCount),
             transcriptPath = when {
                 !left.transcriptPath.isNullOrBlank() -> left.transcriptPath

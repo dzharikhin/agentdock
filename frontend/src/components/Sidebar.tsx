@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { History } from 'lucide-react';
 import { isAgentRunnable } from '../types/chat';
-import type { GlobalSettings, HistorySessionMeta } from '../types/chat';
+import type { GlobalSettings } from '../types/chat';
 import { clampSidebarWidth, MIN_SIDEBAR_WIDTH } from '../hooks/app/useAppLayout';
 import { TabBarProps } from './TabBar';
 import { SidebarLayoutMenu, SidebarManageMenu, SidebarVisibilityButton } from './LayoutControls';
@@ -18,7 +18,6 @@ type SidebarProps = Omit<TabBarProps, 'isIslandsTheme' | 'onUseSidebar' | 'sideb
   overlay: boolean;
   preferredWidth: number;
   viewportWidth: number;
-  historyList: HistorySessionMeta[];
   newTabAgentId?: string;
   onWidthChange: (width: number) => void;
   onHide: () => void;
@@ -35,7 +34,6 @@ export function Sidebar({
   overlay,
   preferredWidth,
   viewportWidth,
-  historyList,
   newTabAgentId,
   onWidthChange,
   onHide,
@@ -161,7 +159,6 @@ export function Sidebar({
           <OpenChatList
             {...navigationProps}
             tabUi={navigationProps.tabUi ?? {}}
-            historyList={historyList}
           />
         </nav>
         <div

@@ -5,6 +5,7 @@ import {
   Message,
   PendingHandoffContext,
   SectionType,
+  conversationKeyOf,
   isAgentRunnable,
 } from '../../types/chat';
 import { ACPBridge } from '../../utils/bridge';
@@ -18,6 +19,19 @@ let tabCounter = 0;
 
 function nextId(prefix: string): string {
   return `${prefix}-${++tabCounter}-${Date.now()}`;
+}
+
+/** Chat continuing a history conversation; `closed` lists a pinned one without opening it. */
+function historyChat(item: HistorySessionMeta, closed = false): ChatTab {
+  return {
+    id: nextId('tab'),
+    title: item.title || 'New',
+    conversationId: item.conversationId,
+    agentId: item.adapterName,
+    historySession: item,
+    inheritedAdapterNames: item.allAdapterNames || [item.adapterName],
+    closed,
+  };
 }
 
 interface TabSessionState {
@@ -57,7 +71,9 @@ function normalizeAdapterNames(adapterNames: Array<string | undefined>): string[
 }
 
 export function useAppController() {
-  const [tabs, setTabs] = useState<ChatTab[]>([]);
+  /** Open chats and closed pinned ones, in the order of the chat list; the tab bar shows the open ones. */
+  const [chats, setChats] = useState<ChatTab[]>([]);
+  const tabs = useMemo(() => chats.filter((chat) => !chat.closed), [chats]);
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [activeSection, setActiveSection] = useState<SectionType | null>(null);
   const [mountedSections, setMountedSections] = useState<SectionType[]>([]);
@@ -73,8 +89,8 @@ export function useAppController() {
   const [pendingHandoffsByTab, setPendingHandoffsByTab] = useState<Record<string, PendingHandoffContext>>({});
   const pendingConversationContinuationsRef = useRef<Record<string, PendingConversationContinuation>>({});
 
-  const tabsRef = useRef(tabs);
-  tabsRef.current = tabs;
+  const chatsRef = useRef(chats);
+  chatsRef.current = chats;
   const activeTabIdRef = useRef(activeTabId);
   activeTabIdRef.current = activeTabId;
 
@@ -114,43 +130,71 @@ export function useAppController() {
     delete pendingConversationContinuationsRef.current[id];
   }, [cleanupTabUiState]);
 
-  /** Removes the given tabs; if the active one is among them, its left neighbour becomes active. */
+  useHistoryTitleSync(setChats, historyList);
+  const historyConversationIndex = useHistoryConversationIndex(historyList);
+
+  /**
+   * Removes the given tabs, pinned ones staying listed as closed; if the active one is among them, its left open
+   * neighbour becomes active.
+   */
   const removeTabs = useCallback((closingTabs: ChatTab[]) => {
     const closingIds = new Set(closingTabs.map((tab) => tab.id));
-    const currentTabs = tabsRef.current;
+    const currentTabs = chatsRef.current.filter((chat) => !chat.closed);
     const remainingTabs = currentTabs.filter((tab) => !closingIds.has(tab.id));
     closingTabs.forEach((tab) => cleanupTabUi(tab.id));
-    setTabs(remainingTabs);
+    setChats(chatsRef.current.flatMap((chat) => {
+      if (!closingIds.has(chat.id)) return [chat];
+      const item = historyConversationIndex.get(conversationKeyOf(chat));
+      return item?.pinned ? [historyChat(item, true)] : [];
+    }));
     if (closingIds.has(activeTabIdRef.current)) {
       const activeIndex = currentTabs.findIndex((tab) => tab.id === activeTabIdRef.current);
       setActiveTabId((remainingTabs[Math.max(0, activeIndex - 1)] ?? remainingTabs[0])?.id ?? '');
     }
-  }, [cleanupTabUi]);
+  }, [cleanupTabUi, historyConversationIndex]);
 
-  useHistoryTitleSync(setTabs, historyList);
-  const historyConversationIndex = useHistoryConversationIndex(historyList);
-
-  const conversationKeyOf = (tab: ChatTab) => tab.historySession?.conversationId || tab.conversationId;
+  // Newly pinned conversations (on the first history load all pinned ones, by date) move to the top, unpinned open
+  // ones move after the last pinned chat, and closed ones no longer pinned (or deleted) are dropped.
+  const pinnedIdsRef = useRef(new Set<string>());
+  useEffect(() => {
+    const previous = pinnedIdsRef.current;
+    const pinnedItems = historyList.filter((item) => item.pinned);
+    const pinned = new Set(pinnedItems.map((item) => item.conversationId));
+    pinnedIdsRef.current = pinned;
+    setChats((prev) => {
+      const isPinned = (chat: ChatTab) => pinned.has(conversationKeyOf(chat));
+      const top = pinnedItems.filter((item) => !previous.has(item.conversationId)).map((item) => (
+        prev.find((chat) => conversationKeyOf(chat) === item.conversationId) ?? historyChat(item, true)
+      ));
+      const unpinned = prev.filter((chat) => !chat.closed && !isPinned(chat) && previous.has(conversationKeyOf(chat)));
+      const next = [...top, ...prev.filter((chat) => (
+        !top.includes(chat) && !unpinned.includes(chat) && (!chat.closed || isPinned(chat))
+      ))];
+      const lastPinnedIndex = next.reduce((last, chat, index) => (isPinned(chat) ? index : last), -1);
+      next.splice(lastPinnedIndex + 1, 0, ...unpinned);
+      return next.length === prev.length && next.every((chat, index) => chat === prev[index]) ? prev : next;
+    });
+  }, [historyList]);
 
   const handleRenameTab = useCallback((tabId: string, newTitle: string) => {
     const title = newTitle.trim();
     if (!title) return;
-    const tab = tabsRef.current.find((item) => item.id === tabId);
+    const tab = chatsRef.current.find((item) => item.id === tabId);
     if (!tab) return;
 
     const conversationId = conversationKeyOf(tab);
-    const projectPath = historyConversationIndex.get(conversationId);
+    const projectPath = historyConversationIndex.get(conversationId)?.projectPath;
     if (projectPath) {
-      setTabs((prev) => prev.map((item) => (
+      setChats((prev) => prev.map((item) => (
         item.id === tabId ? { ...item, title } : item
       )));
-      ACPBridge.renameHistoryConversation(projectPath, conversationId, title);
+      ACPBridge.updateHistoryConversation(projectPath, conversationId, { newTitle: title });
       return;
     }
 
     // Not registered in the history index yet, so the conversation has no prompt. The title
     // lives on the tab until then: metadataTitleOverride makes the first registration use it.
-    setTabs((prev) => prev.map((item) => (
+    setChats((prev) => prev.map((item) => (
       item.id === tabId ? { ...item, title, metadataTitleOverride: title, pendingTitle: title } : item
     )));
   }, [historyConversationIndex]);
@@ -158,16 +202,16 @@ export function useAppController() {
   // Registration only forces the title once; renaming marks it user-set, so it also survives sync.
   useEffect(() => {
     const flushedTabIds = new Set<string>();
-    tabsRef.current.forEach((tab) => {
+    chatsRef.current.forEach((tab) => {
       if (!tab.pendingTitle) return;
       const conversationId = conversationKeyOf(tab);
-      const projectPath = historyConversationIndex.get(conversationId);
+      const projectPath = historyConversationIndex.get(conversationId)?.projectPath;
       if (!projectPath) return;
-      ACPBridge.renameHistoryConversation(projectPath, conversationId, tab.pendingTitle);
+      ACPBridge.updateHistoryConversation(projectPath, conversationId, { newTitle: tab.pendingTitle });
       flushedTabIds.add(tab.id);
     });
     if (flushedTabIds.size === 0) return;
-    setTabs((prev) => prev.map((tab) => (
+    setChats((prev) => prev.map((tab) => (
       flushedTabIds.has(tab.id) ? { ...tab, pendingTitle: undefined } : tab
     )));
   }, [historyConversationIndex]);
@@ -176,7 +220,7 @@ export function useAppController() {
     return ACPBridge.onHistoryDeleteRequest((e) => {
       // The backend stops the deleted conversations itself.
       const deletedIds = new Set(e.detail.conversationIds);
-      const toClose = tabsRef.current.filter((tab) => deletedIds.has(conversationKeyOf(tab)));
+      const toClose = chatsRef.current.filter((tab) => deletedIds.has(conversationKeyOf(tab)));
       if (toClose.length > 0) removeTabs(toClose);
     });
   }, [removeTabs]);
@@ -184,8 +228,9 @@ export function useAppController() {
   useEffect(() => {
     return ACPBridge.onAdapterDeleted((e) => {
       const deletedId = e.detail.adapterId;
-      setTabs(prev => {
+      setChats(prev => {
         const toClose = prev.filter(tab => {
+          if (tab.closed) return false;
           const currentAdapter = tabSessionState[tab.id]?.adapterName;
           return currentAdapter ? currentAdapter === deletedId : tab.agentId === deletedId;
         });
@@ -218,7 +263,7 @@ export function useAppController() {
     const newId = nextId('tab');
     const newConversationId = nextId('conv');
     const title = 'New';
-    setTabs((prev) => [...prev, { id: newId, title, conversationId: newConversationId, agentId: resolvedAgentId }]);
+    setChats((prev) => [...prev, { id: newId, title, conversationId: newConversationId, agentId: resolvedAgentId }]);
     initTabUi(newId);
     activateChat(newId);
   }, [activateChat, defaultNewTabAgentId, initTabUi, runnableAgents]);
@@ -231,7 +276,7 @@ export function useAppController() {
       }
       return { ...prev, [tabId]: state };
     });
-    setTabs(prev => prev.map(tab => {
+    setChats(prev => prev.map(tab => {
       if (tab.id !== tabId) return tab;
       if (!state.acpSessionId.trim() || !state.adapterName.trim()) return tab;
       const inherited = tab.historySession?.allAdapterNames || tab.inheritedAdapterNames || [];
@@ -248,7 +293,7 @@ export function useAppController() {
     if (state.acpSessionId === pendingContinuation.previousSessionId) return;
     if (state.adapterName !== pendingContinuation.targetAgentId) return;
 
-    const tab = tabsRef.current.find(item => item.id === tabId);
+    const tab = chatsRef.current.find(item => item.id === tabId);
     ACPBridge.continueConversationWithSession({
       previousSessionId: pendingContinuation.previousSessionId,
       previousAdapterName: pendingContinuation.previousAdapterName,
@@ -260,13 +305,13 @@ export function useAppController() {
   }, []);
 
   const requestAgentSwitch = useCallback((tabId: string, payload: { agentId: string; handoffText: string }) => {
-    const tab = tabsRef.current.find(item => item.id === tabId);
+    const tab = chatsRef.current.find(item => item.id === tabId);
     if (!tab) return;
 
     const currentSession = tabSessionState[tabId];
     const hasConversationToContinue = Boolean(currentSession?.acpSessionId && payload.handoffText.trim());
     if (!hasConversationToContinue) {
-      setTabs(prev => prev.map(item => (
+      setChats(prev => prev.map(item => (
         item.id === tabId
           ? { ...item, agentId: payload.agentId, historySession: undefined }
           : item
@@ -286,7 +331,7 @@ export function useAppController() {
   const handleContinueInNewTab = useCallback(() => {
     if (!pendingAgentSwitch) return;
 
-    const closingTab = tabsRef.current.find(item => item.id === pendingAgentSwitch.tabId);
+    const closingTab = chatsRef.current.find(item => item.id === pendingAgentSwitch.tabId);
     if (closingTab && typeof window.__stopAgent === 'function') {
       try {
         window.__stopAgent(closingTab.conversationId);
@@ -302,7 +347,7 @@ export function useAppController() {
     const newConversationId = nextId('conv');
     const title = 'New';
 
-    setTabs(prev => {
+    setChats(prev => {
       const remaining = prev.filter(item => item.id !== pendingAgentSwitch.tabId);
       return [...remaining, { id: newId, title, conversationId: newConversationId, agentId: resolvedAgentId }];
     });
@@ -336,7 +381,7 @@ export function useAppController() {
       }));
     }
 
-    setTabs(prev => prev.map(tab => (
+    setChats(prev => prev.map(tab => (
       tab.id === pendingAgentSwitch.tabId
         ? { ...tab, agentId: pendingAgentSwitch.targetAgentId, historySession: undefined }
         : tab
@@ -356,7 +401,7 @@ export function useAppController() {
   }, []);
 
   const handleForkRequest = useCallback((tabId: string, payload: { agentId: string; messages: Message[]; handoffText: string }) => {
-    const sourceTab = tabsRef.current.find(item => item.id === tabId);
+    const sourceTab = chatsRef.current.find(item => item.id === tabId);
     if (!sourceTab) return;
     const resolvedAgentId = runnableAgents.some(agent => agent.id === payload.agentId)
       ? payload.agentId
@@ -382,7 +427,7 @@ export function useAppController() {
       text: payload.handoffText,
     };
 
-    setTabs(prev => [
+    setChats(prev => [
       ...prev,
       {
         id: newId,
@@ -415,7 +460,7 @@ export function useAppController() {
   const closeActiveSection = useCallback(() => setActiveSection(null), []);
 
   const closeTabs = useCallback((ids: string[]) => {
-    const closingTabs = tabsRef.current.filter((tab) => ids.includes(tab.id));
+    const closingTabs = chatsRef.current.filter((tab) => ids.includes(tab.id));
     closingTabs.forEach((tab) => {
       try {
         window.__stopAgent?.(tab.conversationId);
@@ -442,7 +487,7 @@ export function useAppController() {
   };
 
   const tabUsesAdapter = (tab: ChatTab, adapterId: string) =>
-    (tabSessionState[tab.id]?.adapterName || tab.agentId) === adapterId;
+    !tab.closed && (tabSessionState[tab.id]?.adapterName || tab.agentId) === adapterId;
 
   const hasOpenConversationsForAdapter = (adapterId: string) =>
     tabs.some((tab) => tabUsesAdapter(tab, adapterId));
@@ -450,12 +495,12 @@ export function useAppController() {
   const handleUpdateAgent = (adapterId: string) => {
     if (typeof window.__updateAgent !== 'function') return;
 
-    const currentTabs = tabsRef.current;
+    const currentTabs = chatsRef.current;
     currentTabs.filter((tab) => tabUsesAdapter(tab, adapterId)).forEach((tab) => {
       try { window.__stopAgent?.(tab.conversationId); } catch (_) {}
       cleanupTabUi(tab.id);
     });
-    setTabs(currentTabs.filter((tab) => !tabUsesAdapter(tab, adapterId)));
+    setChats(currentTabs.filter((tab) => !tabUsesAdapter(tab, adapterId)));
 
     window.__updateAgent(adapterId);
   };
@@ -465,7 +510,7 @@ export function useAppController() {
       return;
     }
 
-    setTabs((prev) => {
+    setChats((prev) => {
       const draggedTab = prev.find((tab) => tab.id === draggedId);
       if (!draggedTab || !prev.some((tab) => tab.id === targetId)) {
         return prev;
@@ -485,46 +530,46 @@ export function useAppController() {
   }, []);
 
   const handleCloseAllChats = useCallback(() => {
-    requestCloseTabs(tabsRef.current.map((tab) => tab.id));
-  }, [requestCloseTabs]);
+    requestCloseTabs(tabs.map((tab) => tab.id));
+  }, [requestCloseTabs, tabs]);
 
+  /** Opens a history conversation; a closed pinned chat opens in its place in the list. */
   const handleOpenHistory = useCallback((item: HistorySessionMeta) => {
     const conversationKey = item.conversationId;
-    const existing = tabsRef.current.find((tab) => {
+    const existing = chatsRef.current.find((tab) => {
       if (tab.conversationId === conversationKey) return true;
       return tab.historySession?.conversationId === conversationKey;
     });
-    if (existing) {
+    if (existing && !existing.closed) {
       activateChat(existing.id);
       return;
     }
 
-    const newId = nextId('tab');
-    const title = item.title || 'New';
-
-    const historyTab: ChatTab = {
-      id: newId,
-      title,
-      conversationId: conversationKey,
-      agentId: item.adapterName,
-      historySession: item,
-      inheritedAdapterNames: item.allAdapterNames || [item.adapterName]
-    };
-    setTabs((prev) => [...prev, historyTab]);
-    initTabUi(newId);
-    activateChat(newId);
+    const historyTab = historyChat(item);
+    setChats((prev) => (existing
+      ? prev.map((chat) => (chat.id === existing.id ? historyTab : chat))
+      : [...prev, historyTab]));
+    initTabUi(historyTab.id);
+    activateChat(historyTab.id);
   }, [activateChat, initTabUi]);
 
   const handleSelectTab = useCallback((id: string) => {
+    const chat = chatsRef.current.find((item) => item.id === id);
+    const closedItem = chat?.closed ? historyConversationIndex.get(conversationKeyOf(chat)) : undefined;
+    if (closedItem) {
+      handleOpenHistory(closedItem);
+      return;
+    }
     activateChat(id);
     markTabReadIfAllowed(id);
-  }, [activateChat, markTabReadIfAllowed]);
+  }, [activateChat, handleOpenHistory, historyConversationIndex, markTabReadIfAllowed]);
 
   const handleUserMessageSent = useCallback((tabId: string) => {
     clearTabUnread(tabId);
   }, [clearTabUnread]);
 
   return {
+    chats,
     tabs,
     activeTabId,
     activeSection,

@@ -233,7 +233,12 @@ export interface ChatTab {
   pendingTitle?: string;
   inheritedAdapterNames?: string[];
   forkBase?: ForkConversationBase;
+  /** A pinned conversation listed among the chats without being open. */
+  closed?: boolean;
 }
+
+/** The conversation a chat continues, the key of its history entry. */
+export const conversationKeyOf = (tab: ChatTab) => tab.historySession?.conversationId || tab.conversationId;
 
 export interface HistoryDeleteFailure {
   conversationId: string;
@@ -262,6 +267,7 @@ export interface HistorySessionMeta {
   createdAt: number;
   updatedAt: number;
   deletable?: boolean;
+  pinned?: boolean;
 }
 
 export interface ContentChunk {
@@ -555,7 +561,12 @@ declare global {
     __requestHistoryList?: (projectPath?: string) => void;
     __syncHistoryList?: (projectPath?: string) => void;
     __deleteHistoryConversations?: (payload: { projectPath: string; conversationIds: string[] }) => void;
-    __renameHistoryConversation?: (payload: { projectPath: string; conversationId: string; newTitle: string }) => void;
+    __updateHistoryConversation?: (payload: {
+      projectPath: string;
+      conversationId: string;
+      newTitle?: string;
+      pinned?: boolean;
+    }) => void;
     __loadHistoryConversation?: (conversationId: string, projectPath: string, historyConversationId: string) => void;
     __recoverRuntime?: (reason?: string, requestId?: string) => void;
     __loginAgent?: (adapterId: string, methodId: string) => void;

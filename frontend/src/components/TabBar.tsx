@@ -1,6 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
 import { History, Menu, SquarePen } from 'lucide-react';
-import { AgentOption, ChatTab, GlobalSettings, SectionType, TabUiFlags, isAgentRunnable } from '../types/chat';
+import {
+  AgentOption,
+  ChatTab,
+  GlobalSettings,
+  HistorySessionMeta,
+  SectionType,
+  TabUiFlags,
+  isAgentRunnable,
+} from '../types/chat';
 import { UseSidebarButton } from './LayoutControls';
 import { TabItem } from './tabbar/TabItem';
 import { NavigationMenu } from './tabbar/NavigationMenu';
@@ -15,7 +23,10 @@ const controlClassName = (keyboardFocused: boolean) => `flex h-[24px] w-[24px] i
 
 export interface TabBarProps {
   isIslandsTheme: boolean;
+  /** Open chats and closed pinned ones; `tabs` are the open ones. */
+  chats: ChatTab[];
   tabs: ChatTab[];
+  historyList: HistorySessionMeta[];
   activeTabId: string;
   activeSection: SectionType | null;
   tabUi?: Record<string, TabUiFlags>;
@@ -41,7 +52,9 @@ export interface TabBarProps {
 
 export default function TabBar({
   isIslandsTheme,
+  chats,
   tabs,
+  historyList,
   activeTabId,
   activeSection,
   tabUi = {},
@@ -225,7 +238,8 @@ export default function TabBar({
             <NavigationMenu
               menuListRef={menuListRef}
               menuButtonRef={menuButtonRef}
-              tabs={tabs}
+              chats={chats}
+              historyList={historyList}
               tabUi={tabUi}
               activeTabId={activeTabId}
               activeSection={activeSection}

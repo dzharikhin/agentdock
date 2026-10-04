@@ -1,4 +1,4 @@
-import { Bot, Check, Pencil, SquareTerminal, Trash2, X } from 'lucide-react';
+import { Bot, Check, Pencil, Pin, SquareTerminal, Trash2, X } from 'lucide-react';
 import { ACPBridge } from '../../utils/bridge';
 import type { AgentOption, HistorySessionMeta } from '../../types/chat';
 import { Checkbox } from '../ui/Checkbox';
@@ -196,6 +196,17 @@ export function HistoryListItem({
               </button>
             </Tooltip>
           )}
+
+          <Tooltip variant="minimal" content={item.pinned ? 'Unpin chat' : 'Pin chat'}>
+            <button
+              onClick={() => ACPBridge.updateHistoryConversation(item.projectPath, conversationId, { pinned: !item.pinned })}
+              className={`m-0.5 rounded-[4px] p-0.5 text-foreground-secondary transition-opacity hover:text-primary
+                ${item.pinned ? '' : 'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100'}
+                focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none`}
+            >
+              <Pin className="m-px h-3.5 w-3.5 rotate-45" fill={item.pinned ? 'currentColor' : 'none'} />
+            </button>
+          </Tooltip>
 
           <Checkbox
             checked={isSelected}

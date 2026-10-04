@@ -21,6 +21,8 @@ interface RowActionProps {
   /** In the tab bar menu: a menu item. */
   menu: boolean;
   wide?: boolean;
+  /** Shown also while the row is not revealed. */
+  visible?: boolean;
   placement?: 'top' | 'bottom';
   className?: string;
   onClick?: () => void;
@@ -29,12 +31,13 @@ interface RowActionProps {
   children: ReactNode;
 }
 
-/** Action button at the end of a row (`group`), shown while the row is revealed. */
+/** Action button at the end of a row (`group`), shown while the row is revealed unless `visible`. */
 export function RowAction({
   label,
   tooltip = label,
   menu,
   wide = false,
+  visible = false,
   placement = 'bottom',
   className = '',
   onClick,
@@ -42,8 +45,8 @@ export function RowAction({
   children,
 }: RowActionProps) {
   return (
-    <div className={`flex w-0 overflow-hidden opacity-0 pointer-events-none group-reveal:opacity-100 group-reveal:pointer-events-auto
-      ${wide ? 'group-reveal:w-7' : 'group-reveal:w-6'} ${className}`}
+    <div className={`flex overflow-hidden ${visible ? '' : `w-0 opacity-0 pointer-events-none group-reveal:opacity-100
+      group-reveal:pointer-events-auto ${wide ? 'group-reveal:w-7' : 'group-reveal:w-6'}`} ${className}`}
     >
       <Tooltip variant="minimal" placement={placement} content={tooltip} className="flex">
         <button

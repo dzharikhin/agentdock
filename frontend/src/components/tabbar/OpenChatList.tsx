@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { Clock, EllipsisVertical, Pencil, Trash2, X } from 'lucide-react';
+import { Clock, EllipsisVertical, Pencil, Pin, SquareTerminal, Trash2, X } from 'lucide-react';
+import { conversationKeyOf } from '../../types/chat';
 import type { AgentOption, ChatTab, HistorySessionMeta, TabUiFlags } from '../../types/chat';
 import { ACPBridge } from '../../utils/bridge';
 import ConfirmationModal from '../ConfirmationModal';
@@ -13,7 +14,9 @@ import { useTabReordering } from './useTabReordering';
 import { menuRowClassName, rowButtonClassName, rowFocusClassName, RowAction, sidebarRowClassName } from './rows';
 
 export interface OpenChatListProps {
-  tabs: ChatTab[];
+  /** Open chats and closed pinned ones. */
+  chats: ChatTab[];
+  historyList: HistorySessionMeta[];
   tabUi: Record<string, TabUiFlags>;
   activeTabId: string;
   agents: AgentOption[];
@@ -24,13 +27,20 @@ export interface OpenChatListProps {
   onRenameTab: (tabId: string, title: string) => void;
 }
 
+/** Tilted, filled while pinned. */
+const PinIcon = ({ pinned }: { pinned: boolean }) => (
+  <Pin size={12} fill={pinned ? 'currentColor' : 'none'} className="rotate-45" aria-hidden="true" />
+);
+
 /**
- * The header offers "Close all chats" once more than one chat is open. In the sidebar (`historyList` given) rows can be
- * reordered by dragging, and renaming and deleting sit in a row menu; in the tab bar menu, where a nested menu would be
- * awkward, rename is a row button and `onAction` closes the menu.
+ * The header names the listed chats and offers "Close all" once more than one chat is open. Pinned chats always show
+ * the pin (unpinning them) before the status indicator; closed ones have no close button. In the sidebar rows can be
+ * reordered by dragging, and pinning, renaming, opening in the terminal and deleting sit in a row menu; in the tab bar
+ * menu (`onAction` given, closing the menu), where a nested menu would be awkward, pin and rename are row buttons.
  */
 export function OpenChatList({
-  tabs,
+  chats,
+  historyList,
   tabUi,
   activeTabId,
   agents,
@@ -39,13 +49,13 @@ export function OpenChatList({
   onCloseTab,
   onCloseAllChats,
   onRenameTab,
-  historyList,
   onAction,
-}: OpenChatListProps & { historyList?: HistorySessionMeta[]; onAction?: () => void }) {
+}: OpenChatListProps & { onAction?: () => void }) {
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
   const [pendingDeleteChat, setPendingDeleteChat] = useState<{
     conversationId: string;
     projectPath: string;
+    open: boolean;
   } | null>(null);
   const {
     listRef,
@@ -53,12 +63,16 @@ export function OpenChatList({
     startReordering,
     shouldSuppressClick,
   } = useTabReordering('vertical', onReorderTabs);
-  const sidebar = historyList !== undefined;
+  const sidebar = !onAction;
   const itemRole = onAction ? 'menuitem' : undefined;
   const tooltipPlacement = sidebar ? 'top' : 'bottom';
-  const historyByConversationId = new Map((historyList ?? []).map((item) => [item.conversationId, item]));
+  const historyByConversationId = new Map(historyList.map((item) => [item.conversationId, item]));
 
-  if (tabs.length === 0) return null;
+  if (chats.length === 0) return null;
+
+  const hasPinned = chats.some((chat) => historyByConversationId.get(conversationKeyOf(chat))?.pinned);
+  const openCount = chats.filter((chat) => !chat.closed).length;
+  const heading = !hasPinned ? 'Open chats' : openCount === 0 ? 'Pinned chats' : 'Pinned & open chats';
 
   // React events bubble out of the portaled row menu too, hence `[role=menu]`.
   const handlePointerDown = (id: string, event: ReactPointerEvent<HTMLDivElement>) => {
@@ -72,8 +86,8 @@ export function OpenChatList({
   return (
     <div className={sidebar ? undefined : 'mb-1'}>
       <div className="flex min-h-7 items-center pl-3.5 pr-3 text-ide-small text-[var(--ide-Label-disabledForeground)]">
-        <span className="min-w-0 flex-1 truncate">Open chats</span>
-        {tabs.length > 1 ? (
+        <span className="min-w-0 flex-1 truncate">{heading}</span>
+        {openCount > 1 ? (
           <Tooltip variant="minimal" placement="bottom" content="Close all">
             <button
               type="button"
@@ -92,16 +106,23 @@ export function OpenChatList({
       </div>
 
       <div ref={listRef} className={sidebar ? 'pb-1' : undefined}>
-        {tabs.map((tab) => {
+        {chats.map((tab) => {
           const flags = tabUi[tab.id];
           const hasWarning = flags?.warning;
           const hasProcessing = flags?.processing;
           const hasQueued = flags?.queued && !hasProcessing;
           const hasUnread = flags?.unread;
           const hasStatus = hasWarning || hasProcessing || hasQueued || hasUnread;
-          const conversationId = tab.historySession?.conversationId || tab.conversationId;
-          const deleteProjectPath = tab.historySession?.projectPath
-            || historyByConversationId.get(conversationId)?.projectPath;
+          const conversationId = conversationKeyOf(tab);
+          const historyItem = historyByConversationId.get(conversationId);
+          const pinned = historyItem?.pinned === true;
+          const pinLabel = pinned ? 'Unpin' : 'Pin';
+          const togglePin = historyItem
+            ? () => ACPBridge.updateHistoryConversation(historyItem.projectPath, conversationId, { pinned: !pinned })
+            : undefined;
+          // Pinned chats show the pin, the tab bar menu also offers it on unpinned ones.
+          const showPinButton = togglePin && (pinned || !sidebar);
+          const canOpenCli = agents.some((agent) => agent.id === historyItem?.adapterName && agent.cliResumeAvailable);
           const isActive = tab.id === activeTabId;
           const statusIndicator = hasWarning ? (
             <span className="ml-1 mr-3 h-2 w-2 shrink-0 self-center rounded-full bg-warning" />
@@ -176,11 +197,23 @@ export function OpenChatList({
                     >
                       {popupMenuActions([
                         { label: 'Rename', icon: <Pencil size={12} aria-hidden="true" />, onClick: () => setRenamingTabId(tab.id) },
-                        ...(deleteProjectPath ? [{
+                        ...(historyItem && canOpenCli ? [{
+                          label: 'Open in terminal',
+                          icon: <SquareTerminal size={12} aria-hidden="true" />,
+                          onClick: () => ACPBridge.openHistoryConversationCli(historyItem.projectPath, conversationId),
+                        }] : []),
+                        ...(historyItem ? [{
                           label: 'Delete',
                           icon: <Trash2 size={12} aria-hidden="true" />,
-                          onClick: () => setPendingDeleteChat({ conversationId, projectPath: deleteProjectPath }),
+                          onClick: () => setPendingDeleteChat({
+                            conversationId,
+                            projectPath: historyItem.projectPath,
+                            open: !tab.closed,
+                          }),
                         }] : []),
+                        ...(togglePin && !pinned
+                          ? [{ label: 'Pin', icon: <PinIcon pinned={false} />, onClick: togglePin }]
+                          : []),
                       ], true)}
                     </PopupMenu>
                   ) : (
@@ -189,11 +222,20 @@ export function OpenChatList({
                       <Pencil size={12} strokeWidth={2.5} aria-hidden="true" />
                     </RowAction>
                   )}
-                  <RowAction label={`Close ${tab.title}`} tooltip="Close" menu={!sidebar} placement={tooltipPlacement}
-                    className={hasStatus ? '' : 'group-reveal:mr-1'}
-                    onClick={() => onCloseTab(tab.id)}>
-                    <X size={14} aria-hidden="true" />
-                  </RowAction>
+                  {tab.closed ? null : (
+                    <RowAction label={`Close ${tab.title}`} tooltip="Close" menu={!sidebar} placement={tooltipPlacement}
+                      className={hasStatus || showPinButton ? '' : 'group-reveal:mr-1'}
+                      onClick={() => onCloseTab(tab.id)}>
+                      <X size={14} aria-hidden="true" />
+                    </RowAction>
+                  )}
+                  {showPinButton ? (
+                    <RowAction label={`${pinLabel} ${tab.title}`} tooltip={pinLabel} menu={!sidebar} visible={pinned}
+                      placement={tooltipPlacement} className={hasStatus ? '' : pinned ? 'mr-1' : 'group-reveal:mr-1'}
+                      onClick={togglePin}>
+                      <PinIcon pinned={pinned} />
+                    </RowAction>
+                  ) : null}
                 </>
               )}
               {statusIndicator}
@@ -204,7 +246,9 @@ export function OpenChatList({
       <ConfirmationModal
         isOpen={pendingDeleteChat !== null}
         title="Delete Chat"
-        message={'Do you want to delete this chat?\nThis chat is open and will be closed before deletion.'}
+        message={`Do you want to delete this chat?${
+          pendingDeleteChat?.open ? '\nThis chat is open and will be closed before deletion.' : ''
+        }`}
         onConfirm={() => {
           if (!pendingDeleteChat) return;
           ACPBridge.deleteHistoryConversations(

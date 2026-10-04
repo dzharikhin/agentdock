@@ -479,8 +479,13 @@ export const ACPBridge = {
     window.__deleteHistoryConversations?.({ projectPath, conversationIds });
   },
 
-  renameHistoryConversation: (projectPath: string, conversationId: string, newTitle: string) => {
-    window.__renameHistoryConversation?.({ projectPath, conversationId, newTitle });
+  /** Sets the user's title and/or the pinned flag of a conversation in the history index. */
+  updateHistoryConversation: (
+    projectPath: string,
+    conversationId: string,
+    changes: { newTitle?: string; pinned?: boolean }
+  ) => {
+    window.__updateHistoryConversation?.({ projectPath, conversationId, ...changes });
   },
 
   updateSessionMetadata: (payload: SessionMetadataUpdatePayload) => {

@@ -89,6 +89,7 @@ function App() {
   }, []);
 
   const {
+    chats,
     tabs,
     activeTabId,
     activeSection,
@@ -135,7 +136,9 @@ function App() {
 
   const navigationProps: TabBarProps = {
     isIslandsTheme,
+    chats,
     tabs,
+    historyList,
     activeTabId,
     activeSection,
     tabUi,
@@ -198,7 +201,6 @@ function App() {
           overlay={!isWide}
           preferredWidth={sidebarWidth}
           viewportWidth={viewportWidth}
-          historyList={historyList}
           newTabAgentId={defaultNewTabAgentId}
           onWidthChange={setSidebarWidth}
           onHide={() => setSidebarVisibility(true)}

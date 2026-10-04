@@ -392,9 +392,10 @@ internal object HistorySyncService {
                     },
                     allAdapterNames = visibleAdapterNames.ifEmpty {
                         visibleSessions.map { it.adapterName }.distinct()
-                    }
+                    },
+                    pinned = conversation.pinned
                 )
-            }.sortedByDescending { it.updatedAt }
+            }.sortedWith(compareByDescending<SessionMeta> { it.pinned }.thenByDescending { it.updatedAt })
     }
 
     private data class AdapterSessionScan(

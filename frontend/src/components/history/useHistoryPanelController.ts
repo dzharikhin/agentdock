@@ -214,7 +214,7 @@ export function useHistoryPanelController(
       return;
     }
     
-    ACPBridge.renameHistoryConversation(projectPath, conversationId, editTitle.trim());
+    ACPBridge.updateHistoryConversation(projectPath, conversationId, { newTitle: editTitle.trim() });
     setEditingId(null);
   };
 
