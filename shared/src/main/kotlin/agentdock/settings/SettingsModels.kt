@@ -72,13 +72,11 @@ data class GlobalSettings(
     val userMessageCustomColor: String = "#193d70",
     val audioTranscription: AudioTranscriptionSettings = AudioTranscriptionSettings(),
     val gitCommitGeneration: GitCommitGenerationSettings = GitCommitGenerationSettings(),
-    val systemInstructionsEnabled: Boolean = false,
     val quotaWidgetEnabled: Boolean = false,
     val openInEditor: Boolean = true,
     val promptNavigationHoverOnly: Boolean = true,
     val sidebarEnabled: Boolean = true,
-    val sidebarPosition: String = "left",
-    val sidebarExpandedSections: List<String> = listOf("recent-chats", "sections")
+    val sidebarPosition: String = "left"
 )
 
 @Serializable

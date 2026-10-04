@@ -186,7 +186,7 @@ export function McpServersView() {
   };
 
   return (
-    <div className="h-full overflow-hidden bg-background text-foreground text-ide-small">
+    <div className="flex min-h-0 flex-col bg-background text-foreground text-ide-small">
       <SectionPage actions={(
         <Button
           onClick={openAdd}
@@ -196,9 +196,9 @@ export function McpServersView() {
         >
           Add
         </Button>
-      )} title="MCP Servers">
+      )}>
 
-        {servers.length === 0 && !form && (
+        {servers.length === 0 && (
           <div className="flex-1 flex flex-col mt-12 items-center gap-2 text-foreground-secondary">
             <Network size={28} strokeWidth={1.5} />
             <span>No MCP servers configured</span>

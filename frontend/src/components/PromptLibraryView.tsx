@@ -109,7 +109,7 @@ export function PromptLibraryView() {
   };
 
   return (
-    <div className="h-full overflow-hidden bg-background text-foreground text-ide-small">
+    <div className="flex min-h-0 flex-col bg-background text-foreground text-ide-small">
       <SectionPage actions={(
         <Button
           onClick={openAdd}
@@ -119,9 +119,9 @@ export function PromptLibraryView() {
         >
           <span>Add</span>
         </Button>
-      )} title="Prompt Library">
+      )}>
 
-        {prompts.length === 0 && !form && (
+        {prompts.length === 0 && (
           <div className="flex-1 flex flex-col mt-12 items-center gap-2 text-foreground-secondary">
             <Bookmark size={28} strokeWidth={1.5} />
             <span>Prompt library is empty</span>

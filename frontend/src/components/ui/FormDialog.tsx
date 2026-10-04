@@ -1,5 +1,7 @@
-import { ReactNode, useEffect, useId, useRef } from 'react';
+import { ReactNode, useContext, useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { ModalContainerContext } from '../ConfirmationModal';
 
 interface FormDialogProps {
   isOpen: boolean;
@@ -19,6 +21,7 @@ export function FormDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusedElementRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
+  const container = useContext(ModalContainerContext);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -40,20 +43,18 @@ export function FormDialog({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !container) return null;
 
-  return (
-    <div
-      className="absolute inset-0 z-[100] flex items-start justify-center bg-black/50 px-3 pb-3 pt-24"
-    >
+  // In flow inside the section popup modal layer, so the popup grows to fit the dialog.
+  return createPortal(
+    <div className="flex min-h-0 flex-1 items-center justify-center bg-black/50 p-4">
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative flex w-full max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border
-         mx-4 bg-background text-foreground`}
+        className="relative flex max-h-full w-full max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border bg-background text-foreground"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
@@ -76,7 +77,7 @@ export function FormDialog({
           </button>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto px-3 py-2">
+        <div className="min-h-0 overflow-y-auto px-3 py-2">
           {children}
         </div>
 
@@ -86,6 +87,7 @@ export function FormDialog({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    container
   );
 }

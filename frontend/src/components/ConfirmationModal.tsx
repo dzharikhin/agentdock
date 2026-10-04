@@ -1,7 +1,10 @@
 import { X } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from './ui/Button';
+
+/** Element that confirmation dialogs cover and center in; the section popup provides its own frame. */
+export const ModalContainerContext = createContext<HTMLElement | null>(null);
 
 interface ConfirmationModalProps {
   isOpen: boolean;
@@ -29,6 +32,7 @@ export default function ConfirmationModal({
   onCancel
 }: ConfirmationModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  const container = useContext(ModalContainerContext);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -131,6 +135,6 @@ export default function ConfirmationModal({
         </div>
       </div>
     </div>,
-    document.getElementById('app-content') ?? document.body
+    container ?? document.getElementById('app-content') ?? document.body
   );
 }

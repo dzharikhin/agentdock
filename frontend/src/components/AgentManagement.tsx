@@ -243,8 +243,8 @@ export function AgentManagementView({
 
   return (
     <AdapterUsageLifecycleProvider value={{ mode: 'provider', enabled: isActive }}>
-      <div className="flex flex-col h-full bg-background text-foreground overflow-hidden">
-      <SectionPage className="pb-16" actions={(
+      <div className="flex min-h-0 flex-col bg-background text-foreground">
+      <SectionPage actions={(
         <Tooltip variant="minimal" content="Refresh status">
           <button
             onClick={handleRefresh}
@@ -255,7 +255,7 @@ export function AgentManagementView({
             <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
           </button>
         </Tooltip>
-      )} title="Service Providers">
+      )}>
           {agents.map((agent, index) => {
             const isDownloadedKnown = agent.downloadedKnown === true;
             const isDownloaded = agent.downloaded === true;

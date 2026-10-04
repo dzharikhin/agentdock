@@ -1,4 +1,4 @@
-import { Bot, Check, Pencil, Terminal, Trash2, X } from 'lucide-react';
+import { Bot, Check, Pencil, SquareTerminal, Trash2, X } from 'lucide-react';
 import { ACPBridge } from '../../utils/bridge';
 import type { AgentOption, HistorySessionMeta } from '../../types/chat';
 import { Checkbox } from '../ui/Checkbox';
@@ -192,7 +192,7 @@ export function HistoryListItem({
                   hover:text-primary group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100
                   focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
               >
-                <Terminal className="w-5 h-5" />
+                <SquareTerminal className="w-5 h-5" />
               </button>
             </Tooltip>
           )}

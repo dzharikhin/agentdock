@@ -352,7 +352,7 @@ export default function ChatDropdown({
                         setOpen(false);
                         setHoveredOptionId(null);
                       }}
-                      className={`flex items-center w-full my-0.5 px-2 min-h-8 text-left transition-colors 
+                      className={`flex items-center w-full my-0.5 pl-2 pr-3 min-h-8 text-left transition-colors 
                         rounded min-w-[70px] outline-none 
                         focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)] 
                         ${option.id === value && !subValue ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent hover:text-accent-foreground'
@@ -402,7 +402,7 @@ export default function ChatDropdown({
                         setOpen(false);
                         setHoveredOptionId(null);
                       }}
-                      className={`flex items-center w-full my-0.5 px-2 min-h-8 text-left transition-colors rounded outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)] ${
+                      className={`flex items-center w-full my-0.5 pl-2 pr-3 min-h-8 text-left transition-colors rounded outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)] ${
                         sub.id === (subValues?.[hoveredOption.id] ?? (hoveredOption.id === value ? subValue : undefined)) ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent hover:text-accent-foreground'
                       }`}
                     >

@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import type { AgentOption, ChatTab, HistorySessionMeta } from '../types/chat';
 import ConfirmationModal from './ConfirmationModal';
-import { RefreshCw, Funnel, X } from 'lucide-react';
+import { RefreshCw, Funnel, Search, X } from 'lucide-react';
 import { Button } from './ui/Button';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { Tooltip } from './chat/shared/Tooltip';
@@ -75,9 +75,9 @@ export default function HistoryPanel({
   const hasOpenPendingChat = tabs.some((tab) => pendingDeleteIds.includes(tab.historySession?.conversationId || tab.conversationId));
 
   return (
-    <div className="h-full bg-background text-foreground z-10 w-full overflow-hidden relative">
-      <SectionPage className="pb-4" title="History">
-      <div className="sticky top-0 flex items-center justify-between min-h-12 px-3 py-1 border-b border-border shrink-0 z-20 bg-background">
+    <div className="flex min-h-0 w-full flex-col bg-background text-foreground">
+      <SectionPage toolbar={(
+      <div className="flex items-center justify-between min-h-12 px-3 py-1 border-b border-border">
         <div className="flex min-w-0 items-center gap-2">
           <Tooltip variant="minimal" content="Synchronize history">
             <button
@@ -163,7 +163,8 @@ export default function HistoryPanel({
             )}
           </div>
           
-          <div className="relative w-32 min-w-0">
+          <div className="relative flex w-36 min-w-0 items-center">
+            <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2 text-foreground-secondary" />
             <input
               ref={searchInputRef}
               type="text"
@@ -171,10 +172,10 @@ export default function HistoryPanel({
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search…"
               aria-label="Search chats by title"
-              className="w-full min-w-0 rounded-[4px] border border-border bg-input pl-2 pr-6 text-ide-small
+              className="h-7 w-full min-w-0 rounded-[4px] border border-border bg-input pl-7 pr-6 text-ide-small
                 text-foreground focus:outline-none"
             />
-            {searchQuery && (
+            {searchQuery ? (
               <button
                 type="button"
                 aria-label="Clear search"
@@ -182,12 +183,11 @@ export default function HistoryPanel({
                   setSearchQuery('');
                   searchInputRef.current?.focus();
                 }}
-                className="absolute right-1 top-1/2 -translate-y-1/2 rounded-[4px] p-0.5 text-foreground-secondary
-                  hover:text-foreground focus-visible:outline-none"
+                className="absolute right-1 rounded-[4px] p-0.5 text-foreground-secondary hover:text-foreground focus-visible:outline-none"
               >
                 <X size={12} />
               </button>
-            )}
+            ) : null}
           </div>
 
           <span className="shrink-0 pl-1 text-foreground-secondary text-ide-small max-[399px]:hidden">
@@ -217,7 +217,7 @@ export default function HistoryPanel({
           )}
         </div>
       </div>
-
+      )}>
       <div className="flex flex-1 flex-col w-full space-y-1 mt-1">
         {isLoading ? (
           <div className="flex justify-center p-8 text-foreground">Loading history...</div>

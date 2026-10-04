@@ -123,7 +123,7 @@ export function CustomAcpView() {
   };
 
   return (
-    <div className="h-full overflow-hidden bg-background text-foreground text-ide-small">
+    <div className="flex min-h-0 flex-col bg-background text-foreground text-ide-small">
       <SectionPage actions={(
             <Button
               onClick={() => { setEditingId(null); setForm(emptyForm()); }}
@@ -133,9 +133,9 @@ export function CustomAcpView() {
             >
               Add
             </Button>
-          )} title="Custom ACP agents">
+          )}>
 
-          {configs.length === 0 && !form ? (
+          {configs.length === 0 ? (
             <div className="mt-12 flex flex-1 flex-col items-center gap-2 text-foreground-secondary">
               <Bot size={28} strokeWidth={1.5} />
               <span>No custom ACP agents configured</span>

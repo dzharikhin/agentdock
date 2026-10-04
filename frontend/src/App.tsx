@@ -4,35 +4,23 @@ import { Sidebar } from './components/Sidebar';
 import { AppTabContent } from './components/AppTabContent';
 import { AppSectionContent } from './components/AppSectionContent';
 import { EmptyStateView } from './components/EmptyStateView';
-import { SidebarLayoutControls } from './components/LayoutControls';
+import { SidebarVisibilityButton } from './components/LayoutControls';
+import { SectionPopup } from './components/SectionPopup';
+import { getNavigationActions } from './components/tabbar/NavigationActions';
 import ConfirmationModal from './components/ConfirmationModal';
 import { useAppController } from './hooks/app/useAppController';
 import { useAppLayout } from './hooks/app/useAppLayout';
 import { ACPBridge } from './utils/bridge';
-import {
-  DEFAULT_SIDEBAR_EXPANDED_SECTIONS,
-  type GlobalSettings,
-  type SidebarSectionId,
-} from './types/chat';
+import type { GlobalSettings } from './types/chat';
 
 const SIDEBAR_ANIMATION_MS = 200;
 /** From this content width `app-wide:` widens side padding and the chat prompt navigation. */
 const WIDE_CONTENT_MIN_WIDTH_PX = 720;
 
-function normalizeSidebarExpandedSections(value: unknown): SidebarSectionId[] {
-  if (!Array.isArray(value)) return [...DEFAULT_SIDEBAR_EXPANDED_SECTIONS];
-  return [...new Set(value.filter((section): section is SidebarSectionId => (
-    section === 'new-chat' || section === 'recent-chats' || section === 'sections'
-  )))];
-}
-
 function App() {
   const { isWide, isIslandsTheme, viewportWidth } = useAppLayout();
   const [openInEditor, setOpenInEditor] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.openInEditor ?? true
-  );
-  const [systemInstructionsEnabled, setSystemInstructionsEnabled] = useState(
-    () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.systemInstructionsEnabled ?? false
   );
   const [promptNavigationHoverOnly, setPromptNavigationHoverOnly] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.promptNavigationHoverOnly ?? true
@@ -44,11 +32,6 @@ function App() {
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.sidebarPosition === 'right' ? 'right' : 'left'
   );
   const [sidebarWidth, setSidebarWidth] = useState(260);
-  const [sidebarExpandedSections, setSidebarExpandedSections] = useState<SidebarSectionId[]>(
-    () => normalizeSidebarExpandedSections(
-      ACPBridge.getGlobalSettingsSnapshot()?.settings?.sidebarExpandedSections
-    )
-  );
   const [sidebarHidden, setSidebarHidden] = useState(false);
   const [sidebarVisibilityAnimating, setSidebarVisibilityAnimating] = useState(false);
   const sidebarAnimationTimerRef = useRef<number>();
@@ -78,13 +61,11 @@ function App() {
   useEffect(() => {
     const applyGlobalSettings = (payload: { settings?: Partial<GlobalSettings> } | undefined) => {
       setOpenInEditor(payload?.settings?.openInEditor ?? true);
-      setSystemInstructionsEnabled(payload?.settings?.systemInstructionsEnabled ?? false);
       setPromptNavigationHoverOnly(payload?.settings?.promptNavigationHoverOnly ?? true);
       const nextSidebarEnabled = payload?.settings?.sidebarEnabled ?? true;
       setSidebarEnabled(nextSidebarEnabled);
       if (!nextSidebarEnabled) setSidebarHidden(false);
       setSidebarPosition(payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left');
-      setSidebarExpandedSections(normalizeSidebarExpandedSections(payload?.settings?.sidebarExpandedSections));
       const contentMaxWidthPx = payload?.settings?.contentMaxWidthPx ?? 760;
       document.documentElement.style.setProperty('--app-content-max-width', contentMaxWidthPx ? `${contentMaxWidthPx}px` : 'none');
     };
@@ -131,6 +112,7 @@ function App() {
     handleCloseAllChats,
     hasOpenConversationsForAdapter,
     handleUpdateAgent,
+    defaultNewTabAgentId,
     handleNewTab,
     handleOpenHistory,
     openSection,
@@ -151,22 +133,16 @@ function App() {
     handleCancelAgentSwitch,
   } = useAppController();
 
-  useEffect(() => {
-    if (!systemInstructionsEnabled && activeSection === 'system-instructions') closeActiveSection();
-  }, [systemInstructionsEnabled, activeSection, closeActiveSection]);
-
   const navigationProps: TabBarProps = {
     isIslandsTheme,
     tabs,
     activeTabId,
     activeSection,
-    systemInstructionsEnabled,
     tabUi,
     onSelectTab: handleSelectTab,
     onReorderTabs: handleReorderTabs,
     onCloseTab: handleCloseTab,
     onCloseAllChats: handleCloseAllChats,
-    onCloseActiveSection: closeActiveSection,
     onNewTab: () => handleNewTab(),
     onNewTabWithAgent: (agentId) => handleNewTab(agentId),
     onRenameTab: handleRenameTab,
@@ -209,17 +185,6 @@ function App() {
     }
   };
 
-  const setSidebarSectionExpanded = (section: SidebarSectionId, expanded: boolean) => {
-    const next = expanded
-      ? [...new Set([...sidebarExpandedSections, section])]
-      : sidebarExpandedSections.filter((item) => item !== section);
-    setSidebarExpandedSections(next);
-    const settings = ACPBridge.getGlobalSettingsSnapshot()?.settings;
-    if (settings) {
-      ACPBridge.saveGlobalSettings({ ...settings, sidebarExpandedSections: next });
-    }
-  };
-
   return (
     <div
       className={`relative h-full min-w-[300px] bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'} ${!sidebarEnabled || isWide ? '[--content-top-inset:1rem]' : ''}`}
@@ -234,9 +199,7 @@ function App() {
           preferredWidth={sidebarWidth}
           viewportWidth={viewportWidth}
           historyList={historyList}
-          expandedSections={sidebarExpandedSections}
-          onSectionExpandedChange={setSidebarSectionExpanded}
-          onOpenRecentConversation={(session) => handleOpenHistory(session, true)}
+          newTabAgentId={defaultNewTabAgentId}
           onWidthChange={setSidebarWidth}
           onHide={() => setSidebarVisibility(true)}
           onUseTabBar={() => setSidebarLayoutEnabled(false)}
@@ -255,15 +218,10 @@ function App() {
       ) : null}
 
       {sidebarEnabled && sidebarHidden ? (
-        <SidebarLayoutControls
+        <SidebarVisibilityButton
           position={sidebarPosition}
           hidden
-          onToggleVisibility={() => setSidebarVisibility(false)}
-          onUseTabBar={() => setSidebarLayoutEnabled(false)}
-          openInEditor={openInEditor}
-          onToggleOpenInEditor={toggleOpenInEditor}
-          onTogglePosition={toggleSidebarPosition}
-          floating
+          onClick={() => setSidebarVisibility(false)}
         />
       ) : null}
 
@@ -295,7 +253,23 @@ function App() {
           );
         })}
 
-        {/* Sections mount on first use and remain cached without becoming tabs. */}
+        {/* Empty state */}
+        {!activeTabId && (
+          <EmptyStateView
+            runnableAgents={runnableAgents}
+            adaptersResolved={agentAvailabilityResolved}
+            onStartWithAgent={handleNewTab}
+            onOpenManagement={() => openSection('management')}
+          />
+        )}
+      </div>
+
+      {/* Sections mount on first use and remain cached without becoming tabs. */}
+      <SectionPopup
+        open={activeSection !== null}
+        action={getNavigationActions(navigationProps).find((action) => action.type === activeSection)}
+        onClose={closeActiveSection}
+      >
         {mountedSections.map((section) => (
           <AppSectionContent
             key={section}
@@ -310,17 +284,7 @@ function App() {
             onOpenHistory={handleOpenHistory}
           />
         ))}
-
-        {/* Empty state */}
-        {!activeTabId && !activeSection && (
-          <EmptyStateView
-            runnableAgents={runnableAgents}
-            adaptersResolved={agentAvailabilityResolved}
-            onStartWithAgent={handleNewTab}
-            onOpenManagement={() => openSection('management')}
-          />
-        )}
-      </div>
+      </SectionPopup>
 
       <ConfirmationModal
         isOpen={pendingCloseTabIds !== null}

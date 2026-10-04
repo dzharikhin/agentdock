@@ -1,21 +1,24 @@
 import type { ReactNode } from 'react';
 
 interface SectionPageProps {
-  title: ReactNode;
+  toolbar?: ReactNode;
   actions?: ReactNode;
-  className?: string;
   children: ReactNode;
 }
 
-export function SectionPage({ title, actions, className = '', children }: SectionPageProps) {
+/**
+ * Body of a section in the section popup, which owns the title. The toolbar stays fixed above the scrolling content;
+ * actions open the content, right-aligned.
+ */
+export function SectionPage({ toolbar, actions, children }: SectionPageProps) {
   return (
-    <div className={`h-full w-full overflow-y-auto app-wide:px-2 ${className}`}>
-      <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-        <div className="flex shrink-0 items-center justify-between gap-4 px-4 pb-6 pt-[calc(1rem+var(--content-top-inset,0px))]">
-          <h2 className="min-w-0 text-ide-h2 font-normal leading-tight">{title}</h2>
-          {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+    <div className="flex min-h-0 flex-col">
+      {toolbar}
+      <div className="min-h-0 overflow-y-auto">
+        <div className="flex flex-col pb-12 pt-5">
+          {actions ? <div className="flex items-center justify-end gap-2 px-4 pb-2">{actions}</div> : null}
+          {children}
         </div>
-        {children}
       </div>
     </div>
   );

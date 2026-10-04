@@ -32,7 +32,7 @@ export function AppSectionContent({
   onOpenHistory,
 }: AppSectionContentProps) {
   return (
-    <div className={`absolute inset-0 h-full w-full bg-background ${isActive ? 'z-10 visible' : 'z-0 invisible'}`}>
+    <div className={isActive ? 'flex min-h-0 flex-col' : 'hidden'}>
       {section === 'management' && (
         <AgentManagementView
           initialAgents={availableAgents}

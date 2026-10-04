@@ -506,13 +506,6 @@ export interface GitCommitGenerationSettings {
   instructions: string;
 }
 
-export type SidebarSectionId = 'new-chat' | 'recent-chats' | 'sections';
-
-export const DEFAULT_SIDEBAR_EXPANDED_SECTIONS: SidebarSectionId[] = [
-  'recent-chats',
-  'sections',
-];
-
 export interface GlobalSettings {
   audioNotificationsEnabled: boolean;
   uiZoomPercent: number;
@@ -521,13 +514,11 @@ export interface GlobalSettings {
   userMessageCustomColor: string;
   audioTranscription: AudioTranscriptionSettings;
   gitCommitGeneration: GitCommitGenerationSettings;
-  systemInstructionsEnabled: boolean;
   quotaWidgetEnabled: boolean;
   openInEditor: boolean;
   promptNavigationHoverOnly: boolean;
   sidebarEnabled: boolean;
   sidebarPosition: 'left' | 'right';
-  sidebarExpandedSections: SidebarSectionId[];
 }
 
 export interface GlobalSettingsPayload {

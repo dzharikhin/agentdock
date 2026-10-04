@@ -19,7 +19,7 @@ export const getAgentIcon = (agentId: string | undefined, agents: AgentOption[])
         <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center text-foreground" dangerouslySetInnerHTML={{ __html: sanitizeSvg(agent.iconPath) }} />
       );
     }
-    return <img src={agent.iconPath} className="w-4 h-4 flex-shrink-0" alt="icon" />;
+    return <img src={agent.iconPath} draggable={false} className="w-4 h-4 flex-shrink-0" alt="icon" />;
   }
   return <Bot size={14} className="text-foreground flex-shrink-0" />;
 };

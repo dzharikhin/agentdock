@@ -88,10 +88,17 @@ export default {
       addVariant('chat-max-400', '@container chat-input (max-width: 400px)');
       addVariant('chat-max-600', '@container chat-input (max-width: 600px)');
       addVariant('app-wide', '#app-content[data-wide] &');
+      // A row is revealed while hovered, while it holds focus, and while one of its popup menus is open.
+      const revealed = [':hover', ':focus-within', ':has([aria-haspopup][aria-expanded=true])'];
+      addVariant('reveal', revealed.map((state) => `&${state}`));
+      addVariant('group-reveal', revealed.map((state) => `.group${state} &`));
+      // Tint over the element's own background, leaving its content untouched: lighter in dark themes, darker in light.
+      const tint = (percent) => ({
+        'background-image': `linear-gradient(color-mix(in srgb, var(--ide-Label-foreground) ${percent}, transparent) 0 0)`,
+      });
       addUtilities({
-        '.bg-hover': {
-          'filter': 'var(--ide-surface-hover-filter)',
-        },
+        '.bg-hover': tint('var(--ide-surface-hover-tint)'),
+        '.bg-active': tint('var(--ide-surface-active-tint)'),
       })
     },
   ],

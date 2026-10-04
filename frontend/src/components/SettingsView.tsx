@@ -6,7 +6,6 @@ import {
   GitCommitGenerationSettings as GitCommitGenerationSettingsValue,
   GlobalSettingsPayload
 } from '../types/chat';
-import { DEFAULT_SIDEBAR_EXPANDED_SECTIONS } from '../types/chat';
 import { ACPBridge } from '../utils/bridge';
 import { AudioTranscriptionSettingsView } from './audio/AudioTranscriptionSettingsView';
 import { normalizeAudioTranscriptionProvider } from './audio/audioTranscription';
@@ -86,15 +85,11 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
         providers: payload?.settings?.audioTranscription?.providers ?? {}
       },
       gitCommitGeneration: normalizeGitCommitGenerationSettings(payload?.settings?.gitCommitGeneration),
-      systemInstructionsEnabled: payload?.settings?.systemInstructionsEnabled ?? false,
       quotaWidgetEnabled: payload?.settings?.quotaWidgetEnabled ?? false,
       openInEditor: payload?.settings?.openInEditor ?? true,
       promptNavigationHoverOnly: payload?.settings?.promptNavigationHoverOnly ?? true,
       sidebarEnabled: payload?.settings?.sidebarEnabled ?? true,
-      sidebarPosition: payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left',
-      sidebarExpandedSections: Array.isArray(payload?.settings?.sidebarExpandedSections)
-        ? payload.settings.sidebarExpandedSections
-        : [...DEFAULT_SIDEBAR_EXPANDED_SECTIONS]
+      sidebarPosition: payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left'
     }
   };
 }
@@ -221,9 +216,9 @@ export function SettingsView() {
   };
 
   return (
-    <div className='flex h-full flex-col overflow-hidden'>
-      <SectionPage title='Settings'>
-          <div className='flex flex-col gap-8 px-4 pb-8 text-ide-small'>
+    <div className='flex min-h-0 flex-col'>
+      <SectionPage>
+          <div className='flex flex-col gap-8 px-4 text-ide-small'>
           <SettingsSection title='Appearance' compact>
             <SettingsCheckbox
               title='Open in Editor'
@@ -346,14 +341,6 @@ export function SettingsView() {
               checked={globalSettings.settings.quotaWidgetEnabled}
               onToggle={() => updateGlobalSettings({ quotaWidgetEnabled: !globalSettings.settings.quotaWidgetEnabled })}
               ariaLabel='Enable status bar quota widget'
-            />
-
-            <SettingsCheckbox
-              title='System Instructions'
-              description='Manage custom instructions that are sent to AI agents in every session'
-              checked={globalSettings.settings.systemInstructionsEnabled}
-              onToggle={() => updateGlobalSettings({ systemInstructionsEnabled: !globalSettings.settings.systemInstructionsEnabled })}
-              ariaLabel='Enable system instructions'
             />
 
             <GitCommitGenerationSettings

@@ -19,7 +19,7 @@ export function DesignSystemView() {
     ];
 
     return (
-        <SectionPage className="bg-background text-foreground" title="Design System">
+        <SectionPage>
             <div className="space-y-8 p-6">
             {/* Colors */}
             <section className="space-y-4">

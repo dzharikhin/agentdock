@@ -105,7 +105,7 @@ export function SystemInstructionsView() {
   };
 
   return (
-    <div className="h-full overflow-hidden text-ide-small">
+    <div className="flex min-h-0 flex-col text-ide-small">
       <SectionPage actions={(
         <Button
           onClick={openAdd}
@@ -115,9 +115,9 @@ export function SystemInstructionsView() {
         >
           <span>Add</span>
         </Button>
-      )} title="System Instructions">
+      )}>
 
-        {instructions.length === 0 && !form && (
+        {instructions.length === 0 && (
           <div className="flex-1 flex flex-col mt-12 items-center gap-2 text-foreground-secondary">
             <FileText size={28} strokeWidth={1.5} />
             <span>No system instructions configured</span>
