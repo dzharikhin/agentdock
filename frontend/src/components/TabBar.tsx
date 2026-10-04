@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
-import { History, Menu, SquarePen } from 'lucide-react';
+import { Menu, SquarePen } from 'lucide-react';
 import {
   AgentOption,
   ChatTab,
   GlobalSettings,
   HistorySessionMeta,
-  SectionType,
   TabUiFlags,
   isAgentRunnable,
 } from '../types/chat';
@@ -16,7 +15,7 @@ import { focusMenuItem } from './tabbar/menuFocus';
 import { useTabReordering } from './tabbar/useTabReordering';
 import { Tooltip } from './chat/shared/Tooltip';
 
-/** New chat, history and menu buttons; the focus ring is drawn outside, so the buttons need a gap between them. */
+/** New chat and menu buttons; the focus ring is drawn outside, so the buttons need a gap between them. */
 const controlClassName = (keyboardFocused: boolean) => `flex h-[24px] w-[24px] items-center justify-center rounded
   bg-background hover:bg-hover hover:text-foreground transition-colors focus:outline-none
   ${keyboardFocused ? 'shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]' : ''}`;
@@ -28,7 +27,6 @@ export interface TabBarProps {
   tabs: ChatTab[];
   historyList: HistorySessionMeta[];
   activeTabId: string;
-  activeSection: SectionType | null;
   tabUi?: Record<string, TabUiFlags>;
   onSelectTab: (id: string) => void;
   onReorderTabs: (draggedId: string, targetId: string, position: 'before' | 'after') => void;
@@ -56,7 +54,6 @@ export default function TabBar({
   tabs,
   historyList,
   activeTabId,
-  activeSection,
   tabUi = {},
   onSelectTab,
   onReorderTabs,
@@ -68,17 +65,11 @@ export default function TabBar({
   agents,
   onOpenHistory,
   onOpenManagement,
-  onOpenDesignSystem,
-  onOpenMcp,
-  onOpenCustomAcp,
-  onOpenPromptLibrary,
-  onOpenSystemInstructions,
-  onOpenSettings,
   sidebarPosition = 'left',
   onUseSidebar,
 }: TabBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [tabFocusedControl, setTabFocusedControl] = useState<'new' | 'history' | 'menu' | null>(null);
+  const [tabFocusedControl, setTabFocusedControl] = useState<'new' | 'menu' | null>(null);
   const [focusedTabId, setFocusedTabId] = useState<string | null>(null);
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -179,7 +170,7 @@ export default function TabBar({
       </div>
 
       {/* Controls: new chat and navigation */}
-      <div className="flex shrink-0 items-center bg-background pl-1 pr-2 gap-0.5 z-10 shadow-[-10px_0_10px_-5px_var(--background)]">
+      <div className="flex shrink-0 items-center bg-background pl-1 pr-2 gap-1 z-10 shadow-[-10px_0_10px_-5px_var(--background)]">
         {/* New Tab (matches default agent) */}
         <Tooltip variant="minimal" placement="bottom" content="New chat" className="flex">
           <button
@@ -190,22 +181,6 @@ export default function TabBar({
             aria-label="New chat"
           >
             <SquarePen size={15} aria-hidden="true" />
-          </button>
-        </Tooltip>
-
-        <Tooltip variant="minimal" placement="bottom" content="Chat History" className="flex">
-          <button
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              onOpenHistory();
-            }}
-            onFocus={() => setTabFocusedControl(lastInteractionWasTabRef.current ? 'history' : null)}
-            onBlur={() => setTabFocusedControl((current) => current === 'history' ? null : current)}
-            className={controlClassName(tabFocusedControl === 'history')}
-            aria-label="Chat History"
-          >
-            <History size={15} aria-hidden="true" />
           </button>
         </Tooltip>
 
@@ -242,7 +217,6 @@ export default function TabBar({
               historyList={historyList}
               tabUi={tabUi}
               activeTabId={activeTabId}
-              activeSection={activeSection}
               agents={agents}
               runnableAgents={runnableAgents}
               onSelectTab={onSelectTab}
@@ -254,12 +228,6 @@ export default function TabBar({
               onCloseMenu={() => setMenuOpen(false)}
               onOpenHistory={onOpenHistory}
               onOpenManagement={onOpenManagement}
-              onOpenDesignSystem={onOpenDesignSystem}
-              onOpenMcp={onOpenMcp}
-              onOpenCustomAcp={onOpenCustomAcp}
-              onOpenPromptLibrary={onOpenPromptLibrary}
-              onOpenSystemInstructions={onOpenSystemInstructions}
-              onOpenSettings={onOpenSettings}
             />
           )}
         </div>

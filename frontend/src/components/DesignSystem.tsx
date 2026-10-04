@@ -19,7 +19,7 @@ export function DesignSystemView() {
     ];
 
     return (
-        <SectionPage>
+        <SectionPage padding="pb-12 pt-5">
             <div className="space-y-8 p-6">
             {/* Colors */}
             <section className="space-y-4">

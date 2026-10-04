@@ -28,7 +28,7 @@ export interface OpenChatListProps {
 }
 
 /** Tilted, filled while pinned. */
-const PinIcon = ({ pinned }: { pinned: boolean }) => (
+export const PinIcon = ({ pinned }: { pinned: boolean }) => (
   <Pin size={12} fill={pinned ? 'currentColor' : 'none'} className="rotate-45" aria-hidden="true" />
 );
 
@@ -122,7 +122,8 @@ export function OpenChatList({
             : undefined;
           // Pinned chats show the pin, the tab bar menu also offers it on unpinned ones.
           const showPinButton = togglePin && (pinned || !sidebar);
-          const canOpenCli = agents.some((agent) => agent.id === historyItem?.adapterName && agent.cliResumeAvailable);
+          // Resuming in the terminal suits only closed chats.
+          const canOpenCli = tab.closed && agents.some((agent) => agent.id === historyItem?.adapterName && agent.cliResumeAvailable);
           const isActive = tab.id === activeTabId;
           const statusIndicator = hasWarning ? (
             <span className="ml-1 mr-3 h-2 w-2 shrink-0 self-center rounded-full bg-warning" />

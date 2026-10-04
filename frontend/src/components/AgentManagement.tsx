@@ -119,7 +119,6 @@ export function AgentManagementView({
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [confirmUpdateId, setConfirmUpdateId] = useState<string | null>(null);
   const [authActions, setAuthActions] = useState<Map<string, string>>(new Map());
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const prevIsActiveRef = useRef(isActive);
   const hasActivatedRef = useRef(false);
 
@@ -149,14 +148,9 @@ export function AgentManagementView({
         return next;
       });
     });
-    const disposeRefreshState = ACPBridge.onAdapterRefreshState((e) => {
-      setIsRefreshing(e.detail.refreshing);
-    });
-
     ACPBridge.requestAdapters();
 
     return () => {
-      disposeRefreshState();
       dispose();
     };
   }, []);
@@ -236,26 +230,10 @@ export function AgentManagementView({
     window.__openAgentCli?.(agent.id);
   };
 
-  const handleRefresh = () => {
-    setIsRefreshing(true);
-    ACPBridge.requestAdapters(true);
-  };
-
   return (
     <AdapterUsageLifecycleProvider value={{ mode: 'provider', enabled: isActive }}>
       <div className="flex min-h-0 flex-col bg-background text-foreground">
-      <SectionPage actions={(
-        <Tooltip variant="minimal" content="Refresh status">
-          <button
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className={`p-1 text-foreground-secondary hover:text-foreground disabled:opacity-70 transition-colors ${linkButtonFocusClassName}`}
-            aria-label="Refresh service providers"
-          >
-            <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
-        </Tooltip>
-      )}>
+      <SectionPage padding="px-5 pb-6">
           {agents.map((agent, index) => {
             const isDownloadedKnown = agent.downloadedKnown === true;
             const isDownloaded = agent.downloaded === true;
@@ -315,7 +293,7 @@ export function AgentManagementView({
 
             return (
               <div key={agent.id} className={`flex group ${!isLast ? 'border-b border-border' : ''}`}>
-                <div className="flex items-start gap-3 w-full px-2 py-1">
+                <div className="flex items-start gap-3 w-full py-1">
                   <div className="flex flex-col items-center shrink-0 w-10 min-w-10 py-4">
                     {agent.custom ? (
                       <Bot className="h-8 w-8 text-foreground-secondary opacity-75" strokeWidth={1.5} />
@@ -336,6 +314,17 @@ export function AgentManagementView({
                         {isStatusUnknown ? (<LoadingSpinner className="w-3 h-3" />) : (
                           <span className={`${statusClass} font-semibold`}>{statusLabel}</span>
                         )}
+                        <Tooltip variant="minimal" content="Refresh status" className="flex relative top-[-1px]">
+                          <button
+                            onClick={() => ACPBridge.requestAdapters(agent.id)}
+                            disabled={agent.refreshing || isProcessing}
+                            className={`text-foreground-secondary hover:text-foreground disabled:opacity-70
+                              ${linkButtonFocusClassName}`}
+                            aria-label={`Refresh ${agent.name} status`}
+                          >
+                            <RefreshCw className={`h-3 w-3 ${agent.refreshing ? 'animate-spin' : ''}`} />
+                          </button>
+                        </Tooltip>
                         {isStarting && initializationDetail && (
                           <span
                             className="min-w-0 truncate text-foreground-secondary"
@@ -363,9 +352,15 @@ export function AgentManagementView({
                       {!isInstalling && !agent.custom && isDownloaded && agent.downloadPath && (
                         <div className="flex items-center gap-1.5">
                           <span className="shrink-0">Path:</span>
-                          <span className="font-mono truncate" title={agent.downloadPath}>
-                            {agent.downloadPath}
-                          </span>
+                          {/* Wraps in the tooltip, so narrow windows show the whole path. */}
+                          <Tooltip
+                            variant="minimal"
+                            content={agent.downloadPath}
+                            className="min-w-0"
+                            contentClassName="!whitespace-normal break-all font-mono"
+                          >
+                            <div className="font-mono truncate">{agent.downloadPath}</div>
+                          </Tooltip>
                         </div>
                       )}
 

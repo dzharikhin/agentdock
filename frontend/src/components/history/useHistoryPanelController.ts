@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent, MouseEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 import { ACPBridge } from '../../utils/bridge';
 import type { AgentOption, HistorySessionMeta } from '../../types/chat';
 
@@ -54,7 +54,6 @@ export function useHistoryPanelController(
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
   const filterButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -202,34 +201,6 @@ export function useHistoryPanelController(
     setDeleteProjectPath(deletableItems[0].projectPath);
   };
 
-  const startEditing = (item: HistorySessionMeta, e: MouseEvent) => {
-    e.stopPropagation();
-    setEditingId(item.conversationId);
-    setEditTitle(item.title);
-  };
-
-  const submitRename = (projectPath: string, conversationId: string) => {
-    if (!editTitle.trim()) {
-      setEditingId(null);
-      return;
-    }
-    
-    ACPBridge.updateHistoryConversation(projectPath, conversationId, { newTitle: editTitle.trim() });
-    setEditingId(null);
-  };
-
-  const handleEditKeyDown = (e: KeyboardEvent<HTMLInputElement>, projectPath: string, conversationId: string) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      e.stopPropagation();
-      submitRename(projectPath, conversationId);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      setEditingId(null);
-    }
-  };
-
   const closeFilter = (restoreFocus = false) => {
     setIsFilterOpen(false);
     if (restoreFocus) {
@@ -300,7 +271,6 @@ export function useHistoryPanelController(
     searchQuery,
     isFilterOpen,
     editingId,
-    editTitle,
     isDeleting,
     deleteErrors,
     filterButtonRef,
@@ -317,16 +287,12 @@ export function useHistoryPanelController(
     setSelectedAgents,
     setSearchQuery,
     setIsFilterOpen,
-    setEditTitle,
     setEditingId,
     closeFilter,
     confirmDelete,
     refreshHistory,
     toggleSelectAllFiltered,
     openDeleteConfirmation,
-    startEditing,
-    submitRename,
-    handleEditKeyDown,
     handleFilterButtonKeyDown,
     handleFilterOptionKeyDown,
     toggleSelection,

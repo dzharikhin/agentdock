@@ -3,7 +3,7 @@ import { createContext, useContext, useEffect, useRef, type ReactNode } from 're
 import { createPortal } from 'react-dom';
 import { Button } from './ui/Button';
 
-/** Element that confirmation dialogs cover and center in; the section popup provides its own frame. */
+/** Element that confirmation dialogs cover and center in; each section in the section popup provides its own frame. */
 export const ModalContainerContext = createContext<HTMLElement | null>(null);
 
 interface ConfirmationModalProps {
@@ -53,7 +53,7 @@ export default function ConfirmationModal({
 
   return createPortal(
     <div
-      className="absolute inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+      className="absolute inset-0 z-[100] flex items-center justify-center p-4"
       onClick={onCancel}
     >
       <div
@@ -63,7 +63,7 @@ export default function ConfirmationModal({
         aria-labelledby="confirmation-dialog-title"
         tabIndex={-1}
         className="relative flex w-full max-w-[400px] flex-col rounded-[9px] border border-border
-          bg-[var(--ide-Panel-background)] text-foreground"
+          bg-[var(--ide-Panel-background)] text-foreground shadow-popup"
         onClick={(e) => e.stopPropagation()}
         onKeyDown={(e) => {
           if (e.key === 'Escape') {

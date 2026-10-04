@@ -217,8 +217,8 @@ export function SettingsView() {
 
   return (
     <div className='flex min-h-0 flex-col'>
-      <SectionPage>
-          <div className='flex flex-col gap-8 px-4 text-ide-small'>
+      <SectionPage padding="pb-12 pt-3">
+          <div className='flex flex-col gap-8 px-5 text-ide-small'>
           <SettingsSection title='Appearance' compact>
             <SettingsCheckbox
               title='Open in Editor'

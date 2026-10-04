@@ -1,16 +1,19 @@
-import { RefObject } from 'react';
+import { ReactNode, RefObject } from 'react';
+import { History, Settings } from 'lucide-react';
 import { AgentOption } from '../../types/chat';
 import { moveMenuFocus } from './menuFocus';
 import { AgentRow } from './NewChatSplitButton';
-import { NavigationActions, NavigationActionsProps } from './NavigationActions';
 import { OpenChatList, OpenChatListProps } from './OpenChatList';
+import { menuRowClassName, rowButtonClassName } from './rows';
 
-interface NavigationMenuProps extends NavigationActionsProps, OpenChatListProps {
+interface NavigationMenuProps extends OpenChatListProps {
   menuListRef: RefObject<HTMLDivElement>;
   menuButtonRef: RefObject<HTMLButtonElement>;
   runnableAgents: AgentOption[];
   onNewTabWithAgent: (agentId: string) => void;
   onCloseMenu: () => void;
+  onOpenHistory: () => void;
+  onOpenManagement: () => void;
 }
 
 export function NavigationMenu({
@@ -19,6 +22,8 @@ export function NavigationMenu({
   runnableAgents,
   onNewTabWithAgent,
   onCloseMenu,
+  onOpenHistory,
+  onOpenManagement,
   ...props
 }: NavigationMenuProps) {
   const { agents } = props;
@@ -47,6 +52,8 @@ export function NavigationMenu({
         }
       }}
     >
+      <SectionRow label="Chat History" icon={<History size={14} aria-hidden="true" />}
+        onClick={() => { onOpenHistory(); onCloseMenu(); }} />
       <div className="flex min-h-7 items-center px-3.5 text-ide-small text-[var(--ide-Label-disabledForeground)]">New Chat</div>
       {runnableAgents.length > 0 ? (
         runnableAgents.map((agent) => (
@@ -57,7 +64,19 @@ export function NavigationMenu({
       )}
       <OpenChatList {...props} onAction={onCloseMenu} />
       <div className="h-px bg-border my-1 mx-2" />
-      <NavigationActions {...props} onAction={onCloseMenu} />
+      <SectionRow label="Manage" icon={<Settings size={14} aria-hidden="true" />}
+        onClick={() => { onOpenManagement(); onCloseMenu(); }} />
+    </div>
+  );
+}
+
+function SectionRow({ label, icon, onClick }: { label: string; icon: ReactNode; onClick: () => void }) {
+  return (
+    <div className={menuRowClassName(false)}>
+      <button type="button" role="menuitem" onClick={onClick} className={rowButtonClassName}>
+        <span className="flex shrink-0">{icon}</span>
+        <span className="truncate">{label}</span>
+      </button>
     </div>
   );
 }

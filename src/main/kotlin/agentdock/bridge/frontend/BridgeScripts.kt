@@ -26,7 +26,7 @@ internal object BridgeScripts {
             // React has registered its own handler is dropped instead of throwing.
             var callbacks = [
                 '__onAcpLog', '__onContentChunk', '__onStatus', '__onBridgeOperationResult',
-                '__onSessionId', '__onAdapters', '__onAdapterRefreshState', '__onAvailableCommands',
+                '__onSessionId', '__onAdapters', '__onAvailableCommands',
                 '__onMode', '__onSessionConfigOptions', '__onPermissionRequest', '__onUndoResult',
                 '__onChangesState', '__onFileChangeStats', '__onConversationTranscriptSaved',
                 '__onConversationReplayLoaded', '__onAdapterDeleted', '__onFilesResult',
@@ -45,8 +45,8 @@ internal object BridgeScripts {
                 invoke('ready', isDark === '0' ? 'light' : 'dark');
             };
 
-            window.__requestAdapters = function(forceRefresh) {
-                invoke('listAdapters', forceRefresh === true ? 'refresh' : '');
+            window.__requestAdapters = function(adapterIdToRefresh) {
+                invoke('listAdapters', adapterIdToRefresh || '');
             };
             window.__rememberAgentConfigOption = function(adapterId, configId, value) {
                 invoke('rememberConfigOption', JSON.stringify({ adapterId: adapterId, configValues: { [configId]: value } }));

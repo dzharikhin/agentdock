@@ -71,6 +71,9 @@ export default {
       borderRadius: {
         'ide': '6px',
       },
+      boxShadow: {
+        popup: '0 6px 24px rgba(0, 0, 0, 0.35)',
+      },
       maxWidth: {
         'app-content': 'var(--app-content-max-width, 760px)',
       },

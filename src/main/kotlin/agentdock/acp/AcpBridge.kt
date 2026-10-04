@@ -44,8 +44,8 @@ class AcpBridge(
     internal val agentVersionJobs = ConcurrentHashMap<String, Job>()
     internal val agentVersionStates = ConcurrentHashMap<String, String>()
     internal val initialAdapterRefreshStarted = AtomicBoolean(false)
-    internal val fullAdapterRefreshInProgress = AtomicBoolean(false)
-    internal val fullAdapterRefreshDispatching = AtomicBoolean(false)
+    /** Adapters being refreshed; true while their runtime checks are still being started. */
+    internal val refreshingAdapters = ConcurrentHashMap<String, Boolean>()
     internal val livePromptCaptures = ConcurrentHashMap<String, LivePromptCapture>()
     internal val lateHistoryEventQueues = ConcurrentHashMap<String, Channel<LateHistoryEvent>>()
     internal val historyReplayCaptures = ConcurrentHashMap<String, HistoryReplayCapture>()

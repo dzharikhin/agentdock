@@ -181,6 +181,8 @@ export interface AgentOption {
   updateChecking?: boolean;
   updateKnown?: boolean;
   updateAvailable?: boolean;
+  /** Its status checks (installation, login, versions) are being rerun. */
+  refreshing?: boolean;
   cliAvailable?: boolean;
   cliResumeAvailable?: boolean;
   custom?: boolean;
@@ -548,7 +550,7 @@ declare global {
       adapterId?: string,
       configValues?: Record<string, string>
     ) => void;
-    __requestAdapters?: (forceRefresh?: boolean) => void;
+    __requestAdapters?: (adapterIdToRefresh?: string) => void;
     __rememberAgentConfigOption?: (adapterId: string, configId: string, value: string) => void;
     __notifyReady?: () => void;
     __respondPermission?: (requestId: string, decision: string) => void;
@@ -597,7 +599,6 @@ declare global {
     __onAssistantActivity?: (chatId: string) => void;
     __onSessionId?: (chatId: string, id: string) => void;
     __onAdapters?: (adapters: AgentOption[]) => void;
-    __onAdapterRefreshState?: (refreshing: boolean) => void;
     __onAvailableCommands?: (adapterId: string, commands: AvailableCommand[]) => void;
     __onMode?: (chatId: string, modeId: string) => void;
     __onSessionConfigOptions?: (payload: SessionConfigOptionsPayload) => void;

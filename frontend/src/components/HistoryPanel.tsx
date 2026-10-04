@@ -36,7 +36,6 @@ export default function HistoryPanel({
     searchQuery,
     isFilterOpen,
     editingId,
-    editTitle,
     isDeleting,
     deleteErrors,
     filterButtonRef,
@@ -53,16 +52,12 @@ export default function HistoryPanel({
     setSelectedAgents,
     setSearchQuery,
     setIsFilterOpen,
-    setEditTitle,
     setEditingId,
     closeFilter,
     confirmDelete,
     refreshHistory,
     toggleSelectAllFiltered,
     openDeleteConfirmation,
-    startEditing,
-    submitRename,
-    handleEditKeyDown,
     handleFilterButtonKeyDown,
     handleFilterOptionKeyDown,
     toggleSelection,
@@ -77,7 +72,7 @@ export default function HistoryPanel({
 
   return (
     <div className="flex min-h-0 w-full flex-col bg-background text-foreground">
-      <SectionPage toolbar={(
+      <SectionPage padding="px-5 pb-2" toolbar={(
       <div className="flex items-center justify-between min-h-12 px-3 py-1 border-b border-border">
         <div className="flex min-w-0 items-center gap-2">
           <Tooltip variant="minimal" content="Synchronize history">
@@ -219,7 +214,7 @@ export default function HistoryPanel({
         </div>
       </div>
       )}>
-      <div className="flex flex-1 flex-col w-full space-y-1 mt-1">
+      <div className="flex flex-1 flex-col w-full space-y-1">
         {isLoading ? (
           <div className="flex justify-center p-8 text-foreground">Loading history...</div>
         ) : filteredHistoryList.length === 0 ? (
@@ -235,17 +230,13 @@ export default function HistoryPanel({
                 item={item}
                 adapterDisplay={adapterDisplay}
                 isSelected={selectedConversationIds.includes(conversationId)}
+                isOpen={tabs.some((tab) => conversationKeyOf(tab) === conversationId)}
                 conversationLength={formatConversationLength(item.promptCount)}
                 deleteError={deleteErrors[conversationId]}
-                editingId={editingId}
-                editTitle={editTitle}
+                isEditing={editingId === conversationId}
                 formatDate={formatDate}
                 onOpenSession={onOpenSession}
-                onEditTitleChange={setEditTitle}
-                onEditKeyDown={handleEditKeyDown}
-                onSubmitRename={submitRename}
-                onCancelEdit={() => setEditingId(null)}
-                onStartEditing={startEditing}
+                onEditingChange={(editing) => setEditingId(editing ? conversationId : null)}
                 onOpenDeleteConfirmation={openDeleteConfirmation}
                 onToggleSelection={toggleSelection}
               />
@@ -275,8 +266,7 @@ export default function HistoryPanel({
 
       {isDeleting && (
         <div className="absolute inset-0 z-[90] flex items-center justify-center transition-all duration-200">
-          <div className="absolute inset-0 bg-black opacity-50" />
-          <div className="relative flex flex-col items-center gap-3 bg-[var(--ide-Panel-background)] border border-border p-5 rounded text-foreground">
+          <div className="relative flex flex-col items-center gap-3 bg-[var(--ide-Panel-background)] border border-border p-5 rounded text-foreground shadow-popup">
             <LoadingSpinner className="w-6 h-6 text-foreground-secondary" />
             <span className="text-ide-small font-medium leading-none mt-1">Deleting...</span>
           </div>

@@ -19,6 +19,8 @@ const WIDE_CONTENT_MIN_WIDTH_PX = 720;
 
 function App() {
   const { isWide, isIslandsTheme, viewportWidth } = useAppLayout();
+  /** Narrower windows leave no room for the section names in the section popup. */
+  const compactSections = viewportWidth < 700;
   const [openInEditor, setOpenInEditor] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.openInEditor ?? true
   );
@@ -140,7 +142,6 @@ function App() {
     tabs,
     historyList,
     activeTabId,
-    activeSection,
     tabUi,
     onSelectTab: handleSelectTab,
     onReorderTabs: handleReorderTabs,
@@ -268,8 +269,9 @@ function App() {
 
       {/* Sections mount on first use and remain cached without becoming tabs. */}
       <SectionPopup
-        open={activeSection !== null}
-        action={getNavigationActions(navigationProps).find((action) => action.type === activeSection)}
+        sections={getNavigationActions(navigationProps)}
+        activeSection={activeSection}
+        compact={compactSections}
         onClose={closeActiveSection}
       >
         {mountedSections.map((section) => (

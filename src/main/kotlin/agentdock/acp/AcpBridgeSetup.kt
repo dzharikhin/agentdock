@@ -343,7 +343,7 @@ internal fun AcpBridge.installAdapterQueries() {
                 try {
                     downloadStatuses[adapterId] = "Starting download..."
                     resetDownloadProbeState(adapterId)
-                    pushAdapters(includeRuntimeChecks = true, adapterIdToRefresh = adapterId)
+                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
 
                     service.stopSharedProcess(adapterId)
                     AcpConfigOptionsCache.remove(adapterId)
@@ -371,7 +371,7 @@ internal fun AcpBridge.installAdapterQueries() {
                         setDownloadProbeState(adapterId, target, downloaded = true, installedVersion = installedVersion)
                         service.initializeAdapterInBackground(adapterId)
                         refreshAdapterLoginStatus(adapterId)
-                        pushAdapters(includeRuntimeChecks = true, adapterIdToRefresh = adapterId)
+                        pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
                     } else {
                         downloadStatuses.compute(adapterId) { _, previous ->
                             previous?.takeIf { it.startsWith("Error:") }
@@ -424,7 +424,7 @@ internal fun AcpBridge.installAdapterQueries() {
                 } else {
                     downloadStatuses[adapterId] = "Error: Unable to remove adapter files"
                 }
-                pushAdapters(includeRuntimeChecks = true, adapterIdToRefresh = adapterId)
+                pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
             }
         }
     }
@@ -461,7 +461,7 @@ internal fun AcpBridge.installAdapterQueries() {
 
                     downloadStatuses[adapterId] = "Updating to $latestVersion..."
                     resetDownloadProbeState(adapterId)
-                    pushAdapters(includeRuntimeChecks = true, adapterIdToRefresh = adapterId)
+                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
 
                     service.stopSharedProcess(adapterId)
                     AcpConfigOptionsCache.remove(adapterId)
@@ -492,7 +492,7 @@ internal fun AcpBridge.installAdapterQueries() {
                         setDownloadProbeState(adapterId, target, downloaded = true, installedVersion = latestVersion)
                         service.initializeAdapterInBackground(adapterId)
                         refreshAdapterLoginStatus(adapterId)
-                        pushAdapters(includeRuntimeChecks = true, adapterIdToRefresh = adapterId)
+                        pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
                     } else {
                         downloadStatuses.compute(adapterId) { _, previous ->
                             previous?.takeIf { it.startsWith("Error:") }

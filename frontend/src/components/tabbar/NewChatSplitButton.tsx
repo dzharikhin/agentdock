@@ -27,7 +27,7 @@ export function AgentRow({ agent, agents, onNewTabWithAgent, onAction }: AgentRo
           onNewTabWithAgent(agent.id);
           onAction?.();
         }}
-        className={`${rowButtonClassName} ${menu ? '' : 'pl-[calc(0.5rem_+_14px_+_0.5rem)]'}`}
+        className={`${rowButtonClassName} ${menu ? '' : 'pl-[calc(0.5rem_+_12px_+_0.5rem)]'}`}
       >
         <span className="flex shrink-0">{getAgentIcon(agent.id, agents)}</span>
         <span className="truncate">{agent.name}</span>
@@ -102,7 +102,7 @@ export function NewChatSplitButton({
             {runnableAgents.length > 0 ? runnableAgents.map((agent) => (
               <AgentRow key={agent.id} agent={agent} agents={agents} onNewTabWithAgent={onNewTabWithAgent} />
             )) : (
-              <div className="flex h-8 items-center pl-[calc(0.5rem_+_14px_+_0.5rem)] italic text-[var(--ide-Label-disabledForeground)]">No available agents</div>
+              <div className="flex h-8 items-center pl-[calc(0.5rem_+_12px_+_0.5rem)] italic text-[var(--ide-Label-disabledForeground)]">No available agents</div>
             )}
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { KeyboardEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { focusMenuItem, moveMenuFocus } from '../tabbar/menuFocus';
+import { focusMenuItem, getMenuItems, moveMenuFocus } from '../tabbar/menuFocus';
 
 /** Styled like the chat input dropdowns (`ChatDropdown`). */
 const popupMenuItemClassName = `my-0.5 flex w-full items-center rounded pl-2 pr-3 text-left text-foreground outline-none
@@ -52,17 +52,17 @@ const WINDOW_EDGE_PX = 8;
  * overflow (the sidebar) do not cut it off.
  */
 interface PopupMenuProps {
-  className?: string;
   renderTrigger: (props: PopupMenuTriggerProps) => ReactNode;
   children: (close: () => void) => ReactNode;
 }
 
-export function PopupMenu({ className = '', renderTrigger, children }: PopupMenuProps) {
+export function PopupMenu({ renderTrigger, children }: PopupMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const focusFirstItemRef = useRef(false);
+  /** Item to focus once the panel opens; -1 is the last. */
+  const focusItemRef = useRef<number | null>(null);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
 
   // The panel is first rendered transparent (still focusable) at the top left, measured, then placed.
@@ -81,9 +81,9 @@ export function PopupMenu({ className = '', renderTrigger, children }: PopupMenu
 
   useEffect(() => {
     if (!open) return;
-    if (focusFirstItemRef.current) {
-      focusFirstItemRef.current = false;
-      focusMenuItem(panelRef.current, 0);
+    if (focusItemRef.current !== null) {
+      focusMenuItem(panelRef.current, focusItemRef.current);
+      focusItemRef.current = null;
     }
     const closeOutside = (event: PointerEvent) => {
       const target = event.target as Node;
@@ -96,20 +96,30 @@ export function PopupMenu({ className = '', renderTrigger, children }: PopupMenu
   const close = () => setOpen(false);
 
   return (
-    <div ref={rootRef} className={`flex min-w-0 ${className}`}>
+    <div ref={rootRef} className="flex min-w-0">
       {renderTrigger({
         ref: triggerRef,
         'aria-haspopup': 'menu',
         'aria-expanded': open,
         onClick: () => setOpen((current) => !current),
+        // As in `ChatDropdown`: keys open the panel and focus its first item, ArrowUp its last; the portaled panel is
+        // not next in the tab order, so Tab from the trigger moves into it while it is open.
         onKeyDown: (event) => {
-          if (event.key === 'ArrowDown' && !open) {
-            event.preventDefault();
-            focusFirstItemRef.current = true;
-            setOpen(true);
-          } else if (event.key === 'Escape' && open) {
+          if (event.key === 'Escape' && open) {
             event.preventDefault();
             close();
+            return;
+          }
+          const index = event.key === 'ArrowUp' ? -1
+            : ['ArrowDown', 'Enter', ' '].includes(event.key) || (open && event.key === 'Tab' && !event.shiftKey) ? 0
+              : null;
+          if (index === null) return;
+          event.preventDefault();
+          if (open) {
+            focusMenuItem(panelRef.current, index);
+          } else {
+            focusItemRef.current = index;
+            setOpen(true);
           }
         },
       })}
@@ -125,6 +135,21 @@ export function PopupMenu({ className = '', renderTrigger, children }: PopupMenu
             } else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
               event.preventDefault();
               moveMenuFocus(panelRef.current, event.key === 'ArrowDown' ? 1 : -1);
+            } else if (event.key === 'Tab') {
+              const items = getMenuItems(panelRef.current);
+              const next = items.indexOf(document.activeElement as HTMLButtonElement) + (event.shiftKey ? -1 : 1);
+              if (next >= 0 && next < items.length) {
+                event.preventDefault();
+                items[next].focus();
+                return;
+              }
+              // Past the ends focus returns to the trigger; going forward the panel closes and Tab moves on from it.
+              triggerRef.current?.focus();
+              if (event.shiftKey) {
+                event.preventDefault();
+              } else {
+                close();
+              }
             }
           }}
           style={position ?? { top: 0, left: 0, opacity: 0 }}

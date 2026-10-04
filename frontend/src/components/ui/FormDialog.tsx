@@ -45,17 +45,23 @@ export function FormDialog({
 
   if (!isOpen || !container) return null;
 
-  // In flow inside the section popup modal layer, so the popup grows to fit the dialog.
+  // In flow inside the section popup modal layer, so the popup grows to fit the dialog. A press beside the dialog closes
+  // it; a press, unlike a click, does not count a text selection dragged out of a field.
   return createPortal(
-    <div className="flex min-h-0 flex-1 items-center justify-center bg-black/50 p-4">
+    <div
+      className="flex min-h-0 flex-1 items-center justify-center px-4 py-10"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
       <div
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative flex max-h-full w-full max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border bg-background text-foreground"
-        onClick={(event) => event.stopPropagation()}
+        className="relative flex max-h-full w-full max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border
+          bg-background text-foreground shadow-popup"
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.preventDefault();

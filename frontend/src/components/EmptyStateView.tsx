@@ -73,7 +73,7 @@ export function EmptyStateView({
                   Install at least one AI agent from Service Providers to start a new chat.
                 </p>
                 <div className="mt-6">
-                  <Button onClick={onOpenManagement} variant="secondary">Service Providers</Button>
+                  <Button data-section-opener onClick={onOpenManagement} variant="secondary">Service Providers</Button>
                 </div>
               </>
             )}

@@ -11,11 +11,9 @@ import {
   Settings,
   SquareArrowDownLeft,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
 import type { GlobalSettings } from '../types/chat';
 import { Tooltip } from './chat/shared/Tooltip';
-import { PopupMenu, popupMenuActions, type PopupMenuAction } from './ui/PopupMenu';
-import type { NavigationAction } from './tabbar/NavigationActions';
+import { PopupMenu, popupMenuActions } from './ui/PopupMenu';
 import { rowFocusClassName } from './tabbar/rows';
 
 export const iconButtonClassName = `flex h-7 w-7 items-center justify-center rounded-[4px] text-foreground-secondary
@@ -86,37 +84,28 @@ export function SidebarLayoutMenu({
   ];
 
   return (
-    <SidebarIconMenu label="Layout" icon={<EllipsisVertical size={16} aria-hidden="true" />} items={items} />
-  );
-}
-
-export function SidebarManageMenu({ actions, className }: { actions: NavigationAction[]; className?: string }) {
-  return (
-    <SidebarIconMenu label="Manage" icon={<Settings size={16} aria-hidden="true" />} items={actions} className={className} />
-  );
-}
-
-interface SidebarIconMenuProps {
-  label: string;
-  icon: ReactNode;
-  items: PopupMenuAction[];
-  className?: string;
-}
-
-function SidebarIconMenu({ label, icon, items, className }: SidebarIconMenuProps) {
-  return (
     <PopupMenu
-      className={className}
       renderTrigger={(triggerProps) => (
-        <Tooltip variant="minimal" placement="bottom" content={label}>
-          <button type="button" {...triggerProps} className={iconButtonClassName} aria-label={label}>
-            {icon}
+        <Tooltip variant="minimal" placement="bottom" content="Layout">
+          <button type="button" {...triggerProps} className={iconButtonClassName} aria-label="Layout">
+            <EllipsisVertical size={16} aria-hidden="true" />
           </button>
         </Tooltip>
       )}
     >
       {popupMenuActions(items)}
     </PopupMenu>
+  );
+}
+
+/** Opens the section popup at Service Providers. */
+export function SidebarManageButton({ onClick, className }: { onClick: () => void; className: string }) {
+  return (
+    <Tooltip variant="minimal" placement="bottom" content="Manage" className={`flex ${className}`}>
+      <button type="button" data-section-opener onClick={onClick} className={iconButtonClassName} aria-label="Manage">
+        <Settings size={16} aria-hidden="true" />
+      </button>
+    </Tooltip>
   );
 }
 

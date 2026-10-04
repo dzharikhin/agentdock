@@ -5,8 +5,7 @@ import { isAgentRunnable } from '../types/chat';
 import type { GlobalSettings } from '../types/chat';
 import { clampSidebarWidth, MIN_SIDEBAR_WIDTH } from '../hooks/app/useAppLayout';
 import { TabBarProps } from './TabBar';
-import { SidebarLayoutMenu, SidebarManageMenu, SidebarVisibilityButton } from './LayoutControls';
-import { getMenuActions } from './tabbar/NavigationActions';
+import { SidebarLayoutMenu, SidebarManageButton, SidebarVisibilityButton } from './LayoutControls';
 import { rowButtonClassName, sidebarRowClassName } from './tabbar/rows';
 import { NewChatSplitButton } from './tabbar/NewChatSplitButton';
 import { OpenChatList } from './tabbar/OpenChatList';
@@ -133,8 +132,8 @@ export function Sidebar({
               openInEditor={openInEditor}
               onToggleOpenInEditor={onToggleOpenInEditor}
             />
-            <SidebarManageMenu
-              actions={getMenuActions(navigationProps)}
+            <SidebarManageButton
+              onClick={navigationProps.onOpenManagement}
               className={position === 'right' ? 'mr-auto' : 'ml-auto'}
             />
           </div>
@@ -146,7 +145,12 @@ export function Sidebar({
             onNewTabWithAgent={onNewTabWithAgent}
           />
           <div className={`${sidebarRowClassName(false)} h-8`}>
-            <button type="button" onClick={navigationProps.onOpenHistory} className={rowButtonClassName}>
+            <button
+              type="button"
+              data-section-opener
+              onClick={navigationProps.onOpenHistory}
+              className={rowButtonClassName}
+            >
               <History size={14} aria-hidden="true" className="shrink-0" />
               <span className="truncate">Chat History</span>
             </button>

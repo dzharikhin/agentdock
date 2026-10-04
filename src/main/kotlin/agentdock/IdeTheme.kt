@@ -134,7 +134,7 @@ object IdeTheme {
         // Dynamic border color (must be different from both backgrounds)
         val originalBorder = uiColor(
             "Borders.color",
-            adjustBrightness(baseBackground, if (isDark) 1.8 else 0.8)
+            adjustBrightness(baseBackground, if (isDark) 1.8 else 0.85)
         )
         val borderColor = if (isTransparent(originalBorder) ||
                              areColorsSimilar(originalBorder, baseBackground) ||
@@ -142,7 +142,7 @@ object IdeTheme {
             // Border is too similar to backgrounds - adjust it
             // In dark theme: make lighter than both backgrounds
             // In light theme: make darker than both backgrounds
-            adjustBrightness(baseBackground, if (isDark) 1.8 else 0.8)
+            adjustBrightness(baseBackground, if (isDark) 1.8 else 0.85)
         } else {
             // Border is distinct - use original
             originalBorder

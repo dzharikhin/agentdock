@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Bot, Loader2, Pencil, PlugZap, Plus, Trash2 } from 'lucide-react';
+import { Bot, Loader2, PlugZap } from 'lucide-react';
 import { CustomAcpConfig, CustomAcpStatusUpdate } from '../types/customAcp';
 import { AgentOption } from '../types/chat';
 import { ACPBridge } from '../utils/bridge';
+import { parseLines, parsePairs } from '../utils/lines';
 import ConfirmationModal from './ConfirmationModal';
-import { Tooltip } from './chat/shared/Tooltip';
 import { Button } from './ui/Button';
-import { Checkbox } from './ui/Checkbox';
 import { FormDialog } from './ui/FormDialog';
+import { SectionEmptyState, SectionListRow, SectionRowButton, StatusLine } from './ui/SectionList';
 import { SectionPage } from './ui/SectionPage';
 
 interface FormState {
@@ -23,18 +23,6 @@ interface FormState {
 const emptyForm = (): FormState => ({
   name: '', command: '', args: '', env: '', cliCommand: '', cliArgs: '', cliResumeArg: '',
 });
-
-function parseLines(value: string): string[] {
-  return value.split('\n').map(line => line.trim()).filter(Boolean);
-}
-
-function parseEnvironment(value: string) {
-  return parseLines(value).flatMap(line => {
-    const separator = line.indexOf('=');
-    if (separator <= 0) return [];
-    return [{ name: line.slice(0, separator).trim(), value: line.slice(separator + 1) }];
-  });
-}
 
 function configToForm(config: CustomAcpConfig): FormState {
   return {
@@ -56,7 +44,7 @@ function formToConfig(form: FormState, id: string): CustomAcpConfig {
     name: form.name.trim(),
     command: form.command.trim(),
     args: parseLines(form.args),
-    env: parseEnvironment(form.env),
+    env: parsePairs(form.env, '='),
     cliCommand: form.cliCommand.trim() || undefined,
     cliArgs: parseLines(form.cliArgs),
     cliResumeArgs: cliResumeArg ? [cliResumeArg, '{sessionId}'] : [],
@@ -124,110 +112,65 @@ export function CustomAcpView() {
 
   return (
     <div className="flex min-h-0 flex-col bg-background text-foreground text-ide-small">
-      <SectionPage actions={(
-            <Button
-              onClick={() => { setEditingId(null); setForm(emptyForm()); }}
-              variant="primary"
-              leftIcon={<Plus size={14} />}
-              className="max-h-8"
-            >
-              Add
-            </Button>
-          )}>
+      <SectionPage onAdd={() => { setEditingId(null); setForm(emptyForm()); }}>
+        {configs.length === 0 ? (
+          <SectionEmptyState icon={Bot} title="No custom ACP agents configured">
+            Add a custom ACP configuration to use it as a service provider. Some plugin features may be unavailable if the ACP adapter does not support the corresponding ACP methods.
+          </SectionEmptyState>
+        ) : null}
 
-          {configs.length === 0 ? (
-            <div className="mt-12 flex flex-1 flex-col items-center gap-2 text-foreground-secondary">
-              <Bot size={28} strokeWidth={1.5} />
-              <span>No custom ACP agents configured</span>
-              <p className="max-w-[400px] text-center">
-                Add a custom ACP configuration to use it as a service provider. Some plugin features may be unavailable if the ACP adapter does not support the corresponding ACP methods.
-              </p>
-            </div>
-          ) : null}
-
-          {configs.map(config => {
-            const test = statuses[config.id];
-            const adapter = config.enabled ? availableAgents.find(agent => agent.id === config.id) : undefined;
-            const status = test?.status ?? (adapter?.initializing ? 'loading'
-              : adapter?.initializationError ? 'error' : adapter?.ready ? 'connected' : undefined);
-            const label = status === 'loading' ? (test ? 'Checking…' : 'Initializing…')
-              : status === 'connected' ? (test ? 'Reachable' : 'Ready') : status === 'error' ? 'Error' : undefined;
-            const message = test ? test.message : adapter?.initializationError;
-            return (
-            <div key={config.id} className="flex items-start gap-3 border-b border-border px-4 py-2.5 last:border-b-0">
-              <Checkbox
-                checked={config.enabled}
-                onCheckedChange={() => save(configs.map(item => item.id === config.id ? { ...item, enabled: !item.enabled } : item))}
-                aria-label={`${config.enabled ? 'Disable' : 'Enable'} ${config.name}`}
-                className="mt-[11px]"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="truncate">{config.name}</div>
-                <div className="mt-1 flex items-center gap-1.5 text-xs text-foreground-secondary">
-                  {label && <span
-                    role="img"
-                    aria-label={label}
-                    className={`inline-block h-2 w-2 mt-[-2px] shrink-0 rounded-full ${status === 'loading' ? 'bg-warning animate-pulse' : status === 'error' ? 'bg-error' : 'bg-success'}`}
-                  />}
-                  <span className="truncate">{config.command}{label ? ` · ${label}` : ''}</span>
-                </div>
-                {status === 'error' && message && <div className="mt-1 max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-error">
-                  {message}
-                </div>}
-              </div>
-              <div className="mt-[8px] flex shrink-0 items-center gap-2">
-                <Tooltip variant="minimal" content={test?.status === 'loading' ? 'Cancel check' : 'Test connection'}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (test?.status === 'loading') {
-                        setStatuses(current => {
-                          const next = { ...current };
-                          delete next[config.id];
-                          return next;
-                        });
-                        ACPBridge.cancelCustomAcpConnectionTest(config.id);
-                        return;
-                      }
-                      const requestId = crypto.randomUUID();
-                      setStatuses(current => ({ ...current, [config.id]: { id: config.id, requestId, status: 'loading' } }));
-                      ACPBridge.testCustomAcpConnection(config.id, requestId);
-                    }}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                    aria-label={test?.status === 'loading' ? `Cancel check for ${config.name}` : `Test connection for ${config.name}`}
-                  >
-                    {test?.status === 'loading' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
-                  </button>
-                </Tooltip>
-                <Tooltip variant="minimal" content="Edit">
-                  <button
-                    type="button"
-                    onClick={() => { setEditingId(config.id); setForm(configToForm(config)); }}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                    aria-label={`Edit ${config.name}`}
-                  >
-                    <Pencil size={13} />
-                  </button>
-                </Tooltip>
-                <Tooltip variant="minimal" content="Delete">
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTarget(config)}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-error focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                    aria-label={`Delete ${config.name}`}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </Tooltip>
-              </div>
-            </div>
-            );
-          })}
+        {configs.map(config => {
+          const test = statuses[config.id];
+          const adapter = config.enabled ? availableAgents.find(agent => agent.id === config.id) : undefined;
+          const status = test?.status ?? (adapter?.initializing ? 'loading'
+            : adapter?.initializationError ? 'error' : adapter?.ready ? 'connected' : undefined);
+          return (
+            <SectionListRow
+              key={config.id}
+              name={config.name}
+              description={(
+                <StatusLine
+                  text={config.command}
+                  status={status}
+                  // Without a test the status is that of the adapter's initialization.
+                  label={test ? undefined : status === 'loading' ? 'Initializing…' : status === 'connected' ? 'Ready' : undefined}
+                />
+              )}
+              error={status === 'error' ? (test ? test.message : adapter?.initializationError) : undefined}
+              enabled={config.enabled}
+              onToggle={() => save(configs.map(item => item.id === config.id ? { ...item, enabled: !item.enabled } : item))}
+              actions={(
+                <SectionRowButton
+                  label={test?.status === 'loading' ? 'Cancel check' : 'Test connection'}
+                  aria-label={test?.status === 'loading' ? `Cancel check for ${config.name}` : `Test connection for ${config.name}`}
+                  onClick={() => {
+                    if (test?.status === 'loading') {
+                      setStatuses(current => {
+                        const next = { ...current };
+                        delete next[config.id];
+                        return next;
+                      });
+                      ACPBridge.cancelCustomAcpConnectionTest(config.id);
+                      return;
+                    }
+                    const requestId = crypto.randomUUID();
+                    setStatuses(current => ({ ...current, [config.id]: { id: config.id, requestId, status: 'loading' } }));
+                    ACPBridge.testCustomAcpConnection(config.id, requestId);
+                  }}
+                >
+                  {test?.status === 'loading' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
+                </SectionRowButton>
+              )}
+              onEdit={() => { setEditingId(config.id); setForm(configToForm(config)); }}
+              onDelete={() => setDeleteTarget(config)}
+            />
+          );
+        })}
       </SectionPage>
 
       <FormDialog
         isOpen={form !== null}
-        title={editingId ? 'Edit Custom ACP agent configuration' : 'New Custom ACP agent configuration'}
+        title={editingId ? 'Edit Custom ACP Agent Configuration' : 'New Custom ACP Agent Configuration'}
         onClose={closeForm}
         footer={(
           <>
@@ -310,7 +253,7 @@ export function CustomAcpView() {
 
       <ConfirmationModal
         isOpen={deleteTarget !== null}
-        title="Delete Custom ACP agent configuration"
+        title="Delete Custom ACP Agent Configuration"
         message={deleteTarget ? `Do you want to delete "${deleteTarget.name}"?` : ''}
         confirmLabel="Yes"
         cancelLabel="No"

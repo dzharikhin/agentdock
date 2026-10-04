@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, Network, Pencil, PlugZap, Plus, Trash2 } from 'lucide-react';
-import { McpServerConfig, McpStatus, McpStatusUpdate, McpTransport } from '../types/mcp';
+import { Loader2, Network, PlugZap } from 'lucide-react';
+import { McpServerConfig, McpStatusUpdate, McpTransport } from '../types/mcp';
 import { ACPBridge } from '../utils/bridge';
+import { parseLines, parsePairs } from '../utils/lines';
 import { Button } from './ui/Button';
-import { Checkbox } from './ui/Checkbox';
-import { Tooltip } from './chat/shared/Tooltip';
+import { SectionEmptyState, SectionListRow, SectionRowButton, StatusLine } from './ui/SectionList';
 import { SectionPage } from './ui/SectionPage';
 import ConfirmationModal from './ConfirmationModal';
 import { DropdownSelect } from './ui/DropdownSelect';
@@ -23,18 +23,6 @@ interface FormState {
 const emptyForm = (): FormState => ({
   name: '', transport: 'http', command: '', args: '', env: '', url: '', headers: '',
 });
-
-function parseLines(raw: string): string[] {
-  return raw.split('\n').map(s => s.trim()).filter(Boolean);
-}
-
-function parsePairs(raw: string, sep: string): { name: string; value: string }[] {
-  return parseLines(raw).flatMap(line => {
-    const idx = line.indexOf(sep);
-    if (idx < 0) return [];
-    return [{ name: line.slice(0, idx).trim(), value: line.slice(idx + sep.length).trim() }];
-  });
-}
 
 function serverToForm(s: McpServerConfig): FormState {
   return {
@@ -82,38 +70,6 @@ function retainStatuses(
 ): Record<string, McpStatusUpdate> {
   return Object.fromEntries(
     Object.entries(previous).filter(([id]) => previousSignatures[id] === nextSignatures[id])
-  );
-}
-
-interface StatusVisual {
-  dotClass: string;
-  pulse: boolean;
-  label: string;
-}
-
-// Lookup keyed by the McpStatus type: adding a status forces a new entry (exhaustive)
-const STATUS_VISUALS: Record<McpStatus, StatusVisual | null> = {
-  connected: { dotClass: 'bg-success', pulse: false, label: 'Reachable' },
-  loading: { dotClass: 'bg-warning', pulse: true, label: 'Checking…' },
-  error: { dotClass: 'bg-error', pulse: false, label: 'Error' },
-  unknown: null,
-};
-
-function McpStatusLine({ transport, status }: { transport: McpTransport; status: McpStatus }) {
-  const visual = STATUS_VISUALS[status];
-  return (
-    <div className='mt-1 flex items-center gap-1.5 text-xs text-foreground-secondary'>
-      {visual && (
-        <span
-          role="img"
-          aria-label={visual.label}
-          className={`inline-block h-2 w-2 mt-[-2px] flex-shrink-0 rounded-full ${visual.dotClass}${visual.pulse ? ' animate-pulse' : ''}`}
-        />
-      )}
-      <span className='truncate'>
-        {transport.toUpperCase()}{visual ? ` · ${visual.label}` : ''}
-      </span>
-    </div>
   );
 }
 
@@ -187,100 +143,45 @@ export function McpServersView() {
 
   return (
     <div className="flex min-h-0 flex-col bg-background text-foreground text-ide-small">
-      <SectionPage actions={(
-        <Button
-          onClick={openAdd}
-          variant="primary"
-          leftIcon={<Plus size={14} />}
-          className="max-h-8"
-        >
-          Add
-        </Button>
-      )}>
-
+      <SectionPage onAdd={openAdd}>
         {servers.length === 0 && (
-          <div className="flex-1 flex flex-col mt-12 items-center gap-2 text-foreground-secondary">
-            <Network size={28} strokeWidth={1.5} />
-            <span>No MCP servers configured</span>
-            <p className="max-w-[400px] text-center">
-              MCP servers provide access to external tools and resources for AI agents
-            </p>
-          </div>
+          <SectionEmptyState icon={Network} title="No MCP servers configured">
+            MCP servers provide access to external tools and resources for AI agents.
+          </SectionEmptyState>
         )}
 
-          {servers.map(s => {
-            const statusUpdate = statusMap[s.id];
-            const status: McpStatus = statusUpdate?.status ?? 'unknown';
-            const statusMessage = statusUpdate?.message;
-            return (
-            <div
+        {servers.map(s => {
+          const statusUpdate = statusMap[s.id];
+          const status = statusUpdate?.status ?? 'unknown';
+          return (
+            <SectionListRow
               key={s.id}
-              className="flex items-start gap-3 px-4 py-2.5 border-b border-border last:border-b-0"
-            >
-              <Checkbox
-                checked={s.enabled}
-                onCheckedChange={() => toggle(s.id)}
-                aria-label={`${s.enabled ? 'Disable' : 'Enable'} ${s.name}`}
-                // Centered against the name + status lines at the default IDE font size.
-                // Kept as a fixed offset so an expanded error block below cannot drag it down.
-                className='mt-[11px]'
-              />
-              <div className="flex-1 min-w-0">
-                <div className="truncate">
-                  {s.name}
-                </div>
-                <McpStatusLine transport={s.transport} status={status} />
-                {status === 'error' && statusMessage && (
-                  // Errors are shown in full: wrapped over as many lines as needed,
-                  // with scrolling only as a guard against unusually long output.
-                  <div className='mt-1 max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-error'>
-                    {statusMessage}
-                  </div>
-                )}
-              </div>
-
-              {/* Same fixed offset as the checkbox, so both edges sit on the
-                  centre line of the name + status lines. */}
-              <div className='mt-[8px] flex flex-shrink-0 items-center gap-2'>
-                <Tooltip variant="minimal" content={status === 'loading' ? 'Cancel check' : 'Test connection'}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (status !== 'loading') {
-                        ACPBridge.checkMcpStatus(s.id);
-                        return;
-                      }
-                      setStatusMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], status: 'unknown', message: undefined } }));
-                      ACPBridge.cancelMcpStatus(s.id);
-                    }}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                    aria-label={status === 'loading' ? `Cancel check for ${s.name}` : `Test connection for ${s.name}`}
-                  >
-                    {status === 'loading' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
-                  </button>
-                </Tooltip>
-                <Tooltip variant="minimal" content="Edit">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(s)}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                    aria-label={`Edit ${s.name}`}
-                  >
-                    <Pencil size={13} />
-                  </button>
-                </Tooltip>
-                <Tooltip variant="minimal" content="Delete">
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTarget(s)}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-error focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                    aria-label={`Delete ${s.name}`}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </Tooltip>
-              </div>
-            </div>
+              name={s.name}
+              description={(
+                <StatusLine text={s.transport.toUpperCase()} status={status === 'unknown' ? undefined : status} />
+              )}
+              error={status === 'error' ? statusUpdate?.message : undefined}
+              enabled={s.enabled}
+              onToggle={() => toggle(s.id)}
+              actions={(
+                <SectionRowButton
+                  label={status === 'loading' ? 'Cancel check' : 'Test connection'}
+                  aria-label={status === 'loading' ? `Cancel check for ${s.name}` : `Test connection for ${s.name}`}
+                  onClick={() => {
+                    if (status !== 'loading') {
+                      ACPBridge.checkMcpStatus(s.id);
+                      return;
+                    }
+                    setStatusMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], status: 'unknown', message: undefined } }));
+                    ACPBridge.cancelMcpStatus(s.id);
+                  }}
+                >
+                  {status === 'loading' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
+                </SectionRowButton>
+              )}
+              onEdit={() => openEdit(s)}
+              onDelete={() => setDeleteTarget(s)}
+            />
           );
         })}
       </SectionPage>

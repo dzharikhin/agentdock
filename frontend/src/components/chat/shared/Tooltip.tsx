@@ -56,9 +56,11 @@ export const Tooltip: React.FC<TooltipProps> = ({
   }, [visible, coords.x, coords.y, placement]);
 
   const handleMouseEnter = () => {
+    clearTimeout(timerRef.current);
     setOffset(0);
     updatePosition();
     timerRef.current = setTimeout(() => {
+      if (!triggerRef.current?.matches(':hover') || !document.hasFocus()) return;
       onShow?.();
       setVisible(true);
     }, delay);
@@ -84,9 +86,23 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   const handleBlur = (event: FocusEvent<HTMLDivElement>) => {
     if (triggerRef.current?.contains(event.relatedTarget as Node | null)) return;
-    if (timerRef.current) clearTimeout(timerRef.current);
-    setVisible(false);
+    handleMouseLeave();
   };
+
+  useEffect(() => {
+    if (!visible) return;
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!triggerRef.current?.contains(event.target as Node | null)) handleMouseLeave();
+    };
+    window.addEventListener('pointermove', handlePointerMove, true);
+    window.addEventListener('scroll', handleMouseLeave, true);
+    window.addEventListener('blur', handleMouseLeave);
+    return () => {
+      window.removeEventListener('pointermove', handlePointerMove, true);
+      window.removeEventListener('scroll', handleMouseLeave, true);
+      window.removeEventListener('blur', handleMouseLeave);
+    };
+  }, [visible]);
 
   useEffect(() => {
     return () => {
