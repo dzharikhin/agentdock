@@ -389,7 +389,8 @@ internal fun AcpBridge.installAdapterQueries() {
                 } finally {
                     adapterInstallJobs.remove(adapterId)
                     adapterInstallCancellations.remove(adapterId)
-                    pushAdapters()
+                    // Checks the files again, as a cancellation leaves the installed state unknown.
+                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
                 }
             }
             adapterInstallJobs[adapterId] = job
@@ -509,7 +510,8 @@ internal fun AcpBridge.installAdapterQueries() {
                 } finally {
                     adapterInstallJobs.remove(adapterId)
                     adapterInstallCancellations.remove(adapterId)
-                    pushAdapters()
+                    // Checks the files again, as a cancellation leaves the installed state unknown.
+                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
                 }
             }
             adapterInstallJobs[adapterId] = job

@@ -90,6 +90,9 @@ export default {
     function({ addUtilities, addVariant }) {
       addVariant('chat-max-400', '@container chat-input (max-width: 400px)');
       addVariant('chat-max-600', '@container chat-input (max-width: 600px)');
+      // A section popup content too narrow for the buttons beside the text, and then for the agent icons.
+      addVariant('section-medium', '@container section (max-width: 450px)');
+      addVariant('section-narrow', '@container section (max-width: 300px)');
       addVariant('app-wide', '#app-content[data-wide] &');
       // A row is revealed while hovered, while it holds focus, and while one of its popup menus is open.
       const revealed = [':hover', ':focus-within', ':has([aria-haspopup][aria-expanded=true])'];

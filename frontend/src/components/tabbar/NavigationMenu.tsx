@@ -54,14 +54,14 @@ export function NavigationMenu({
     >
       <SectionRow label="Chat History" icon={<History size={14} aria-hidden="true" />}
         onClick={() => { onOpenHistory(); onCloseMenu(); }} />
-      <div className="flex min-h-7 items-center px-3.5 text-ide-small text-[var(--ide-Label-disabledForeground)]">New Chat</div>
       {runnableAgents.length > 0 ? (
-        runnableAgents.map((agent) => (
-          <AgentRow key={agent.id} agent={agent} agents={agents} onNewTabWithAgent={onNewTabWithAgent} onAction={onCloseMenu} />
-        ))
-      ) : (
-        <div className="px-4 min-h-8 text-[var(--ide-Label-disabledForeground)] italic">No available agents</div>
-      )}
+        <>
+          <div className="flex min-h-7 items-center px-3.5 text-ide-small text-[var(--ide-Label-disabledForeground)]">New Chat</div>
+          {runnableAgents.map((agent) => (
+            <AgentRow key={agent.id} agent={agent} agents={agents} onNewTabWithAgent={onNewTabWithAgent} onAction={onCloseMenu} />
+          ))}
+        </>
+      ) : null}
       <OpenChatList {...props} onAction={onCloseMenu} />
       <div className="h-px bg-border my-1 mx-2" />
       <SectionRow label="Manage" icon={<Settings size={14} aria-hidden="true" />}

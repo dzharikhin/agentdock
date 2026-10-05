@@ -84,7 +84,7 @@ export function SectionPopup({ sections, activeSection, compact, onClose, childr
   return (
     <div
       className={`pointer-events-none absolute inset-0 z-50 flex items-start justify-center px-4
-        py-[clamp(1.5rem,10vh,5rem)] ${open ? 'visible' : 'invisible'}`}
+        pt-[clamp(1.5rem,10vh,4rem)] pb-[clamp(1.5rem,10vh,2rem)] ${open ? 'visible' : 'invisible'}`}
     >
       <div
         ref={setDialog}
@@ -134,10 +134,7 @@ export function SectionPopup({ sections, activeSection, compact, onClose, childr
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
           <div className="flex h-10 shrink-0 select-none items-center gap-2 pl-4 pr-2" onPointerDown={startDrag}>
             {compact ? (
-              <div className="flex min-w-0 items-center gap-2 text-foreground-secondary [&_svg]:text-current">
-                <span className="flex shrink-0">{action?.icon}</span>
-                <span className="truncate text-ide-regular">{label}</span>
-              </div>
+              <span className="truncate text-ide-regular text-foreground-secondary">{label}</span>
             ) : null}
             <Tooltip variant="minimal" placement="bottom" content="Close" className="ml-auto flex">
               <button
@@ -150,7 +147,9 @@ export function SectionPopup({ sections, activeSection, compact, onClose, childr
               </button>
             </Tooltip>
           </div>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col [container-type:inline-size] [container-name:section]">
+            {children}
+          </div>
         </div>
       </div>
     </div>

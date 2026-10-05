@@ -99,11 +99,9 @@ export function NewChatSplitButton({
       >
         <div className="min-h-0 overflow-hidden">
           <div className="flex flex-col gap-0.5 pt-0.5">
-            {runnableAgents.length > 0 ? runnableAgents.map((agent) => (
+            {runnableAgents.map((agent) => (
               <AgentRow key={agent.id} agent={agent} agents={agents} onNewTabWithAgent={onNewTabWithAgent} />
-            )) : (
-              <div className="flex h-8 items-center pl-[calc(0.5rem_+_12px_+_0.5rem)] italic text-[var(--ide-Label-disabledForeground)]">No available agents</div>
-            )}
+            ))}
           </div>
         </div>
       </div>

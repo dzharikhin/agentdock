@@ -74,7 +74,7 @@ export function HistoryListItem({
           onClick={() => { if (!isEditing) onOpenSession(item); }}
           onKeyDown={(event) => handleHistoryRowKeyDown(event, isEditing, () => onOpenSession(item))}
         >
-          <div className="flex flex-col items-center shrink-0 gap-0.5 pt-0.5 mx-0.5 max-[350px]:hidden">
+          <div className="flex flex-col items-center shrink-0 gap-0.5 pt-0.5 mx-0.5 section-narrow:hidden">
             {mainAgent?.custom ? (
               <Bot className="h-7 w-7 text-foreground-secondary opacity-75" strokeWidth={1.5} />
             ) : mainAgent?.iconPath ? (

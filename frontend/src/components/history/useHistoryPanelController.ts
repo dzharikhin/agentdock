@@ -1,38 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { ACPBridge } from '../../utils/bridge';
+import { formatDate } from '../../utils/formatDate';
 import type { AgentOption, HistorySessionMeta } from '../../types/chat';
 
 function getItemAgents(item: HistorySessionMeta): string[] {
   return item.allAdapterNames && item.allAdapterNames.length > 0
     ? item.allAdapterNames
     : [item.adapterName];
-}
-
-function formatDate(ms: number) {
-  const d = new Date(ms);
-  const now = new Date();
-  const isToday = d.getDate() === now.getDate() &&
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear();
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday = d.getDate() === yesterday.getDate() &&
-    d.getMonth() === yesterday.getMonth() &&
-    d.getFullYear() === yesterday.getFullYear();
-
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  const timeStr = `${hours}:${minutes}`;
-
-  if (isToday) return `Today ${timeStr}`;
-  if (isYesterday) return `Yesterday ${timeStr}`;
-  
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}.${month}.${year} ${timeStr}`;
 }
 
 function formatConversationLength(promptCount?: number) {

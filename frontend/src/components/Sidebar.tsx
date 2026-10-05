@@ -42,6 +42,7 @@ export function Sidebar({
   onTogglePosition,
   onNewTab,
   onNewTabWithAgent,
+  noRunnableAgents,
   ...navigationProps
 }: SidebarProps) {
   const { agents } = navigationProps;
@@ -137,13 +138,15 @@ export function Sidebar({
               className={position === 'right' ? 'mr-auto' : 'ml-auto'}
             />
           </div>
-          <NewChatSplitButton
-            agents={agents}
-            runnableAgents={agents.filter(isAgentRunnable)}
-            defaultAgentId={newTabAgentId}
-            onNewTab={onNewTab}
-            onNewTabWithAgent={onNewTabWithAgent}
-          />
+          {!noRunnableAgents ? (
+            <NewChatSplitButton
+              agents={agents}
+              runnableAgents={agents.filter(isAgentRunnable)}
+              defaultAgentId={newTabAgentId}
+              onNewTab={onNewTab}
+              onNewTabWithAgent={onNewTabWithAgent}
+            />
+          ) : null}
           <div className={`${sidebarRowClassName(false)} h-8`}>
             <button
               type="button"

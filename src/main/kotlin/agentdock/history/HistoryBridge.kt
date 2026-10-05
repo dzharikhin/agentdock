@@ -71,6 +71,8 @@ class HistoryBridge(
                     val history = AgentDockHistoryService.getHistoryList(projectPath)
                     pushHistoryList(permissiveJson.encodeToString(history))
                 } catch (e: Exception) {
+                    // An empty list, so the views waiting for the history do not wait forever.
+                    pushHistoryList("[]")
                     sendJsError("Failed to list history: ${e.message}")
                 }
             }

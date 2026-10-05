@@ -293,8 +293,9 @@ export function AgentManagementView({
 
             return (
               <div key={agent.id} className={`flex group ${!isLast ? 'border-b border-border' : ''}`}>
-                <div className="flex items-start gap-3 w-full py-1">
-                  <div className="flex flex-col items-center shrink-0 w-10 min-w-10 py-4">
+                <div className="flex items-start gap-3 w-full py-1 section-medium:flex-wrap section-medium:gap-y-0">
+                  {/* A narrow section leaves the room to the text; the name identifies the agent. */}
+                  <div className="flex flex-col items-center shrink-0 w-10 min-w-10 py-4 section-medium:hidden">
                     {agent.custom ? (
                       <Bot className="h-8 w-8 text-foreground-secondary opacity-75" strokeWidth={1.5} />
                     ) : (
@@ -402,7 +403,10 @@ export function AgentManagementView({
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 flex-col items-end gap-2 py-4 whitespace-nowrap">
+                  {/* A narrow section moves the buttons to a row below the text. */}
+                  <div className="flex shrink-0 flex-col items-end gap-2 py-4 whitespace-nowrap empty:hidden
+                    section-medium:w-full section-medium:flex-row section-medium:flex-wrap section-medium:items-center
+                    section-medium:pt-0">
                     {isInstalling ? (
                       <Button
                         onClick={() => handleCancelInstall(agent.id)}
@@ -466,6 +470,8 @@ export function AgentManagementView({
                             <MenuButton
                               label="Log in"
                               variant="primary"
+                              // In a narrow section the button starts at the left edge, so the menu opens rightward.
+                              menuClassName="section-medium:left-0 section-medium:right-auto"
                               disabled={isProcessing || isLoggingOut}
                               items={[
                                 ...(usesAcpLogin

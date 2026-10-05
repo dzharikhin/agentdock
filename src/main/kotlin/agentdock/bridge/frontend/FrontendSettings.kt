@@ -17,12 +17,19 @@ object FrontendSettings {
     var current: GlobalSettings = GlobalSettings()
         private set
 
+    /** The first snapshot has arrived; before it [current] holds the defaults, not the saved settings. */
+    @Volatile
+    var received = false
+        private set
+
     private val listeners = mutableListOf<(GlobalSettings, GlobalSettings) -> Unit>()
 
     fun apply(updated: GlobalSettings) {
         val previous = current
-        if (previous == updated) return
+        // The first snapshot is announced even when it matches the defaults.
+        if (received && previous == updated) return
         current = updated
+        received = true
         val snapshot = synchronized(listeners) { listeners.toList() }
         snapshot.forEach { listener -> runCatching { listener(previous, updated) } }
     }

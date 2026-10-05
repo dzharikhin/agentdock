@@ -11,6 +11,7 @@ import ConfirmationModal from './components/ConfirmationModal';
 import { useAppController } from './hooks/app/useAppController';
 import { useAppLayout } from './hooks/app/useAppLayout';
 import { ACPBridge } from './utils/bridge';
+import { conversationKeyOf } from './types/chat';
 import type { GlobalSettings } from './types/chat';
 
 const SIDEBAR_ANIMATION_MS = 200;
@@ -33,8 +34,11 @@ function App() {
   const [sidebarPosition, setSidebarPosition] = useState<GlobalSettings['sidebarPosition']>(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.sidebarPosition === 'right' ? 'right' : 'left'
   );
-  const [sidebarWidth, setSidebarWidth] = useState(260);
-  const [sidebarHidden, setSidebarHidden] = useState(false);
+  // Nothing is shown until the saved settings arrive, so the layout does not jump from the defaults on load.
+  const [settingsLoaded, setSettingsLoaded] = useState(() => ACPBridge.getGlobalSettingsSnapshot() !== undefined);
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  // A narrow window starts with the sidebar hidden, so it does not cover the content.
+  const [sidebarHidden, setSidebarHidden] = useState(!isWide);
   const [sidebarVisibilityAnimating, setSidebarVisibilityAnimating] = useState(false);
   const sidebarAnimationTimerRef = useRef<number>();
 
@@ -50,6 +54,11 @@ function App() {
 
   useEffect(() => () => window.clearTimeout(sidebarAnimationTimerRef.current), []);
 
+  // Narrowing the window past the breakpoint hides the sidebar instead of laying it over the content.
+  useEffect(() => {
+    if (!isWide) setSidebarVisibility(true);
+  }, [isWide]);
+
   const appContentRef = useRef<HTMLDivElement>(null);
   const [contentWide, setContentWide] = useState(false);
   useLayoutEffect(() => {
@@ -58,7 +67,7 @@ function App() {
     const observer = new ResizeObserver(() => setContentWide(el.clientWidth >= WIDE_CONTENT_MIN_WIDTH_PX));
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [settingsLoaded]);
 
   useEffect(() => {
     const applyGlobalSettings = (payload: { settings?: Partial<GlobalSettings> } | undefined) => {
@@ -70,6 +79,7 @@ function App() {
       setSidebarPosition(payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left');
       const contentMaxWidthPx = payload?.settings?.contentMaxWidthPx ?? 760;
       document.documentElement.style.setProperty('--app-content-max-width', contentMaxWidthPx ? `${contentMaxWidthPx}px` : 'none');
+      setSettingsLoaded(true);
     };
 
     const cleanup = ACPBridge.onGlobalSettings((e) => {
@@ -151,6 +161,7 @@ function App() {
     onNewTabWithAgent: (agentId) => handleNewTab(agentId),
     onRenameTab: handleRenameTab,
     agents: availableAgents,
+    noRunnableAgents: agentAvailabilityResolved && runnableAgents.length === 0,
     onOpenHistory: () => openSection('history'),
     onOpenManagement: () => openSection('management'),
     onOpenDesignSystem: () => openSection('design'),
@@ -189,9 +200,11 @@ function App() {
     }
   };
 
+  if (!settingsLoaded) return <div className="h-full bg-background" />;
+
   return (
     <div
-      className={`relative h-full min-w-[300px] bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'} ${!sidebarEnabled || isWide ? '[--content-top-inset:1rem]' : ''}`}
+      className={`relative h-full min-w-[320px] bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'} ${!sidebarEnabled || isWide ? '[--content-top-inset:1rem]' : ''}`}
     >
       {sidebarEnabled ? (
         <Sidebar
@@ -260,9 +273,17 @@ function App() {
         {!activeTabId && (
           <EmptyStateView
             runnableAgents={runnableAgents}
-            adaptersResolved={agentAvailabilityResolved}
+            loaded={agentAvailabilityResolved && historyLoaded}
             onStartWithAgent={handleNewTab}
             onOpenManagement={() => openSection('management')}
+            agents={availableAgents}
+            // In the history order, pinned ones first; open chats are left out.
+            recentChats={historyList
+              .filter((item) => !tabs.some((tab) => conversationKeyOf(tab) === item.conversationId))
+              .slice(0, 5)}
+            historyCount={historyList.length}
+            onOpenChat={handleOpenHistory}
+            onOpenHistory={() => openSection('history')}
           />
         )}
       </div>

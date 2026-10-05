@@ -183,7 +183,7 @@ export function CustomAcpView() {
       >
         {form ? (
           <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-2">
+            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
               <span className="text-foreground-secondary">Name <span className="text-error" aria-hidden="true">*</span></span>
               <input
                 data-autofocus="true"
@@ -194,7 +194,7 @@ export function CustomAcpView() {
                 aria-required="true"
               />
             </div>
-            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-2">
+            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
               <span className="text-foreground-secondary">Executable <span className="text-error" aria-hidden="true">*</span></span>
               <input
                 value={form.command}
@@ -222,7 +222,7 @@ export function CustomAcpView() {
                 rows={3}
               />
             </div>
-            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-2">
+            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
               <span className="text-foreground-secondary">CLI executable</span>
               <input
                 value={form.cliCommand}
@@ -239,7 +239,7 @@ export function CustomAcpView() {
                 rows={3}
               />
             </div>
-            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-2">
+            <div className="grid grid-cols-[132px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
               <span className="text-foreground-secondary">CLI resume argument</span>
               <input
                 value={form.cliResumeArg}

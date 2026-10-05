@@ -199,7 +199,7 @@ export function McpServersView() {
       >
         {form ? (
           <div className="flex flex-col gap-3">
-            <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2">
+            <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
               <span className="text-foreground-secondary">Name <span className="text-error" aria-hidden="true">*</span></span>
               <input
                 data-autofocus="true"
@@ -210,7 +210,7 @@ export function McpServersView() {
               />
             </div>
 
-            <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2">
+            <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
               <span className="text-foreground-secondary">Transport</span>
               <DropdownSelect
                 value={form.transport}
@@ -227,7 +227,7 @@ export function McpServersView() {
 
             {form.transport === 'stdio' ? (
               <>
-                <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2">
+                <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
                   <span className="text-foreground-secondary">Command <span className="text-error" aria-hidden="true">*</span></span>
                   <input
                     value={form.command}
@@ -257,7 +257,7 @@ export function McpServersView() {
               </>
             ) : (
               <>
-                <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2">
+                <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
                   <span className="text-foreground-secondary">URL <span className="text-error" aria-hidden="true">*</span></span>
                   <input
                     value={form.url}

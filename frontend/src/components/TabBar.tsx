@@ -36,6 +36,8 @@ export interface TabBarProps {
   onNewTabWithAgent: (agentId: string) => void;
   onRenameTab: (tabId: string, newTitle: string) => void;
   agents: AgentOption[];
+  /** The agents are known and none can start a chat, so the new chat controls are hidden. */
+  noRunnableAgents: boolean;
   onOpenHistory: () => void;
   onOpenManagement: () => void;
   onOpenDesignSystem: () => void;
@@ -63,6 +65,7 @@ export default function TabBar({
   onNewTabWithAgent,
   onRenameTab,
   agents,
+  noRunnableAgents,
   onOpenHistory,
   onOpenManagement,
   sidebarPosition = 'left',
@@ -172,17 +175,19 @@ export default function TabBar({
       {/* Controls: new chat and navigation */}
       <div className="flex shrink-0 items-center bg-background pl-1 pr-2 gap-1 z-10 shadow-[-10px_0_10px_-5px_var(--background)]">
         {/* New Tab (matches default agent) */}
-        <Tooltip variant="minimal" placement="bottom" content="New chat" className="flex">
-          <button
-            onClick={onNewTab}
-            onFocus={() => setTabFocusedControl(lastInteractionWasTabRef.current ? 'new' : null)}
-            onBlur={() => setTabFocusedControl((current) => current === 'new' ? null : current)}
-            className={controlClassName(tabFocusedControl === 'new')}
-            aria-label="New chat"
-          >
-            <SquarePen size={15} aria-hidden="true" />
-          </button>
-        </Tooltip>
+        {!noRunnableAgents ? (
+          <Tooltip variant="minimal" placement="bottom" content="New chat" className="flex">
+            <button
+              onClick={onNewTab}
+              onFocus={() => setTabFocusedControl(lastInteractionWasTabRef.current ? 'new' : null)}
+              onBlur={() => setTabFocusedControl((current) => current === 'new' ? null : current)}
+              className={controlClassName(tabFocusedControl === 'new')}
+              aria-label="New chat"
+            >
+              <SquarePen size={15} aria-hidden="true" />
+            </button>
+          </Tooltip>
+        ) : null}
 
         {/* Navigation menu */}
         <div className="relative" ref={menuRef}>

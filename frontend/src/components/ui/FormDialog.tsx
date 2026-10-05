@@ -49,7 +49,7 @@ export function FormDialog({
   // it; a press, unlike a click, does not count a text selection dragged out of a field.
   return createPortal(
     <div
-      className="flex min-h-0 flex-1 items-center justify-center px-4 py-10"
+      className="flex min-h-0 min-w-0 flex-1 items-center justify-center px-4 py-10"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -60,7 +60,7 @@ export function FormDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="relative flex max-h-full w-full max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border
+        className="relative flex max-h-full w-full min-w-0 max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border
           bg-background text-foreground shadow-popup"
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
@@ -71,7 +71,7 @@ export function FormDialog({
       >
         <div className="flex items-center justify-between px-3 py-2.5">
 
-          <div id={titleId} className="truncate text-foreground">{title}</div>
+          <div id={titleId} className="min-w-0 truncate text-foreground">{title}</div>
 
           <button
             type="button"
