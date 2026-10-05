@@ -53,7 +53,11 @@
 
     <change-notes><![CDATA[
         <ul>
-            <li>Fixed Claude Code config options bug.</li>
+            <li>Added chat pinning.</li>
+            <li>Improved the display of agent tool calls.</li>
+            <li>Plugin management sections now open in pop-up windows.</li>
+            <li>Redesigned the sidebar.</li>
+            <li>Minor bug fixes and UI refinements.</li>
         </ul>
     ]]></change-notes>
 
