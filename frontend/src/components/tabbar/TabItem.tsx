@@ -1,5 +1,6 @@
-import { X } from 'lucide-react';
+import { Clock, X } from 'lucide-react';
 import { AgentOption, ChatTab } from '../../types/chat';
+import { ChatSpinnerIcon } from '../chat/ChatLoadingIndicator';
 import { Tooltip } from '../chat/shared/Tooltip';
 import { getTabIcon } from './TabIcons';
 import { TabTitleInput } from './TabTitleInput';
@@ -12,6 +13,7 @@ interface TabItemProps {
   hasWarning: boolean;
   hasUnread: boolean;
   hasProcessing: boolean;
+  hasQueued: boolean;
   isIslandsTheme: boolean;
   onSelectTab: (id: string) => void;
   onPointerDown: (id: string, event: React.PointerEvent<HTMLDivElement>) => void;
@@ -34,6 +36,7 @@ export function TabItem({
   hasWarning,
   hasUnread,
   hasProcessing,
+  hasQueued,
   isIslandsTheme,
   onSelectTab,
   onPointerDown,
@@ -49,8 +52,8 @@ export function TabItem({
 }: TabItemProps) {
   const activeClassName = isActive
     ? isIslandsTheme
-      ? 'text-foreground before:absolute before:inset-[3px_3px] before:rounded-[6px] before:bg-background before:[filter:var(--ide-surface-active-filter)] before:shadow-[inset_0_0_0_1px_var(--ide-Button-startBorderColor)]'
-      : 'text-foreground before:absolute before:inset-0 before:bg-background before:[filter:var(--ide-surface-active-filter)] after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-[var(--ide-Button-default-focusColor)]'
+      ? 'text-foreground before:absolute before:inset-[3px_3px] before:rounded-[6px] before:bg-background before:bg-active before:shadow-[inset_0_0_0_1px_var(--ide-Borders-color)]'
+      : 'text-foreground bg-active after:absolute after:bottom-0 after:left-0 after:right-0 after:h-[3px] after:bg-[var(--ide-Button-default-focusColor)]'
     : '';
   const tabRadiusClassName = isIslandsTheme ? 'rounded-[6px]' : 'rounded-[4px]';
   const tabHeightClassName = isIslandsTheme ? 'h-[32px] self-center' : 'h-full';
@@ -124,13 +127,24 @@ export function TabItem({
           {tabIcon}
           <div className="min-w-0 flex-1 overflow-hidden">
             <Tooltip variant="minimal" placement="bottom" content={tab.title} className="!w-full min-w-0">
-              <div className={`w-full truncate text-ide-small relative top-[1px] ${hasProcessing ? 'tab-shimmer-text' : ''}`}>{tab.title}</div>
+              <div className={`w-full truncate text-ide-small relative top-[1px]`}>{tab.title}</div>
             </Tooltip>
           </div>
         </button>
       )}
       {hasWarning ? (
         <span className="relative z-10 mx-0.5 h-2 w-2 flex-shrink-0 rounded-full bg-warning" />
+      ) : hasProcessing ? (
+        <span className="relative z-10 mx-0.5 flex shrink-0 text-foreground-secondary">
+          <ChatSpinnerIcon size={14} />
+        </span>
+      ) : hasQueued ? (
+        <Tooltip variant="minimal" placement="bottom" content="Queued prompts"
+          className="relative z-10 mx-0.5 shrink-0 cursor-default">
+          <span role="img" aria-label="Queued prompts" className="flex text-foreground-secondary">
+            <Clock size={14} aria-hidden="true" />
+          </span>
+        </Tooltip>
       ) : hasUnread ? (
         <span className="relative z-10 mx-0.5 h-2 w-2 flex-shrink-0 rounded-full bg-sky-500" />
       ) : null}

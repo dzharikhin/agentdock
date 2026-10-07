@@ -5,6 +5,7 @@ import HistoryPanel from './HistoryPanel';
 import { McpServersView } from './McpServersView';
 import { CustomAcpView } from './CustomAcpView';
 import { PromptLibraryView } from './PromptLibraryView';
+import { SectionFrame } from './SectionPopup';
 import { SettingsView } from './SettingsView';
 import { SystemInstructionsView } from './SystemInstructionsView';
 
@@ -32,7 +33,7 @@ export function AppSectionContent({
   onOpenHistory,
 }: AppSectionContentProps) {
   return (
-    <div className={`absolute inset-0 h-full w-full bg-background ${isActive ? 'z-10 visible' : 'z-0 invisible'}`}>
+    <SectionFrame hidden={!isActive}>
       {section === 'management' && (
         <AgentManagementView
           initialAgents={availableAgents}
@@ -57,6 +58,6 @@ export function AppSectionContent({
       {section === 'prompt-library' && <PromptLibraryView />}
       {section === 'system-instructions' && <SystemInstructionsView />}
       {section === 'settings' && <SettingsView />}
-    </div>
+    </SectionFrame>
   );
 }

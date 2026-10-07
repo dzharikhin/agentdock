@@ -32,10 +32,11 @@ class HistoryBridge(
     )
 
     @Serializable
-    private data class RenameHistoryPayload(
+    private data class UpdateHistoryPayload(
         val projectPath: String,
         val conversationId: String,
-        val newTitle: String
+        val newTitle: String? = null,
+        val pinned: Boolean? = null
     )
 
     @Serializable
@@ -70,6 +71,8 @@ class HistoryBridge(
                     val history = AgentDockHistoryService.getHistoryList(projectPath)
                     pushHistoryList(permissiveJson.encodeToString(history))
                 } catch (e: Exception) {
+                    // An empty list, so the views waiting for the history do not wait forever.
+                    pushHistoryList("[]")
                     sendJsError("Failed to list history: ${e.message}")
                 }
             }
@@ -144,21 +147,26 @@ class HistoryBridge(
             }
         }
 
-        host.register("renameHistoryConversation") { payload ->
+        host.register("updateHistoryConversation") { payload ->
             if (payload.isBlank()) return@register
 
             scope.launch(Dispatchers.Default) {
-                var failedRequest: RenameHistoryPayload? = null
+                var failedRequest: UpdateHistoryPayload? = null
                 try {
-                    val request = permissiveJson.decodeFromString<RenameHistoryPayload>(payload)
+                    val request = permissiveJson.decodeFromString<UpdateHistoryPayload>(payload)
                     failedRequest = request
-                    val success = AgentDockHistoryService.renameConversation(request.projectPath, request.conversationId, request.newTitle)
+                    val success = AgentDockHistoryService.updateConversation(
+                        request.projectPath,
+                        request.conversationId,
+                        request.newTitle,
+                        request.pinned
+                    )
                     val history = AgentDockHistoryService.getHistoryList(request.projectPath)
                     pushHistoryList(permissiveJson.encodeToString(history))
                     if (success) {
                         return@launch
                     }
-                    sendJsError("Failed to rename conversation")
+                    sendJsError("Failed to update conversation")
                 } catch (e: Exception) {
                     failedRequest?.let { request ->
                         runCatching {
@@ -166,7 +174,7 @@ class HistoryBridge(
                             pushHistoryList(permissiveJson.encodeToString(history))
                         }
                     }
-                    sendJsError("Error during rename: ${e.message}")
+                    sendJsError("Error during conversation update: ${e.message}")
                 }
             }
         }

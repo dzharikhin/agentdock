@@ -44,8 +44,8 @@ class AcpBridge(
     internal val agentVersionJobs = ConcurrentHashMap<String, Job>()
     internal val agentVersionStates = ConcurrentHashMap<String, String>()
     internal val initialAdapterRefreshStarted = AtomicBoolean(false)
-    internal val fullAdapterRefreshInProgress = AtomicBoolean(false)
-    internal val fullAdapterRefreshDispatching = AtomicBoolean(false)
+    /** Adapters being refreshed; true while their runtime checks are still being started. */
+    internal val refreshingAdapters = ConcurrentHashMap<String, Boolean>()
     internal val livePromptCaptures = ConcurrentHashMap<String, LivePromptCapture>()
     internal val lateHistoryEventQueues = ConcurrentHashMap<String, Channel<LateHistoryEvent>>()
     internal val historyReplayCaptures = ConcurrentHashMap<String, HistoryReplayCapture>()
@@ -53,6 +53,8 @@ class AcpBridge(
     internal val replayFreshnessProbes = ConcurrentHashMap<String, ReplayFreshnessProbe>()
     internal val suppressReplayForChatIds: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
     internal val todoToolCallKeys: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
+    // Tool calls whose output is never truncated; updates often omit the kind that identifies them.
+    internal val fullOutputToolCallKeys: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
     internal val emittedTodoPlanKeys: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
 
     internal val cli = AcpBridgeCli(service.project, host::openTerminal)

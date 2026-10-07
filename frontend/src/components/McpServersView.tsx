@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Network, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
-import { McpServerConfig, McpStatus, McpStatusUpdate, McpTransport } from '../types/mcp';
+import { Loader2, Network, PlugZap } from 'lucide-react';
+import { McpServerConfig, McpStatusUpdate, McpTransport } from '../types/mcp';
 import { ACPBridge } from '../utils/bridge';
+import { parseLines, parsePairs } from '../utils/lines';
 import { Button } from './ui/Button';
-import { Checkbox } from './ui/Checkbox';
-import { Tooltip } from './chat/shared/Tooltip';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionEmptyState, SectionListRow, SectionRowButton, StatusLine } from './ui/SectionList';
+import { SectionPage } from './ui/SectionPage';
 import ConfirmationModal from './ConfirmationModal';
 import { DropdownSelect } from './ui/DropdownSelect';
 import { FormDialog } from './ui/FormDialog';
@@ -23,18 +23,6 @@ interface FormState {
 const emptyForm = (): FormState => ({
   name: '', transport: 'http', command: '', args: '', env: '', url: '', headers: '',
 });
-
-function parseLines(raw: string): string[] {
-  return raw.split('\n').map(s => s.trim()).filter(Boolean);
-}
-
-function parsePairs(raw: string, sep: string): { name: string; value: string }[] {
-  return parseLines(raw).flatMap(line => {
-    const idx = line.indexOf(sep);
-    if (idx < 0) return [];
-    return [{ name: line.slice(0, idx).trim(), value: line.slice(idx + sep.length).trim() }];
-  });
-}
 
 function serverToForm(s: McpServerConfig): FormState {
   return {
@@ -85,44 +73,10 @@ function retainStatuses(
   );
 }
 
-interface StatusVisual {
-  dotClass: string;
-  pulse: boolean;
-  label: string;
-}
-
-// Lookup keyed by the McpStatus type: adding a status forces a new entry (exhaustive)
-const STATUS_VISUALS: Record<McpStatus, StatusVisual | null> = {
-  connected: { dotClass: 'bg-success', pulse: false, label: 'Reachable' },
-  loading: { dotClass: 'bg-warning', pulse: true, label: 'Checking…' },
-  error: { dotClass: 'bg-error', pulse: false, label: 'Error' },
-  disabled: null,
-  unknown: null,
-};
-
-function McpStatusLine({ transport, status }: { transport: McpTransport; status: McpStatus }) {
-  const visual = STATUS_VISUALS[status];
-  return (
-    <div className='mt-1 flex items-center gap-1.5 text-xs text-foreground-secondary'>
-      {visual && (
-        <span
-          role="img"
-          aria-label={visual.label}
-          className={`inline-block h-2 w-2 mt-[-2px] flex-shrink-0 rounded-full ${visual.dotClass}${visual.pulse ? ' animate-pulse' : ''}`}
-        />
-      )}
-      <span className='truncate'>
-        {transport.toUpperCase()}{visual ? ` · ${visual.label}` : ''}
-      </span>
-    </div>
-  );
-}
-
 export function McpServersView() {
   const [servers, setServers] = useState<McpServerConfig[]>([]);
   const [statusMap, setStatusMap] = useState<Record<string, McpStatusUpdate>>({});
   const statusSignaturesRef = useRef<Record<string, string>>({});
-  const latestStatusRunRef = useRef(0);
   const [form, setForm] = useState<FormState | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<McpServerConfig | null>(null);
@@ -137,10 +91,14 @@ export function McpServersView() {
     });
     const cleanupStatus = ACPBridge.onMcpStatus(e => {
       const update = e.detail.update;
-      const runId = update.runId ?? 0;
-      if (runId < latestStatusRunRef.current) return;
-      latestStatusRunRef.current = runId;
-      setStatusMap(prev => ({ ...prev, [update.id]: update }));
+      setStatusMap(prev => {
+        const current = prev[update.id];
+        const runId = update.runId ?? 0;
+        const currentRunId = current?.runId ?? 0;
+        // A run's result is accepted only while that run is still loading (not finished or cancelled).
+        if (current && (runId < currentRunId || (runId === currentRunId && current.status !== 'loading'))) return prev;
+        return { ...prev, [update.id]: update };
+      });
     });
     ACPBridge.loadMcpServers();
     return () => { cleanupServers(); cleanupStatus(); };
@@ -184,105 +142,49 @@ export function McpServersView() {
   };
 
   return (
-    <div className="h-full overflow-hidden bg-background text-foreground text-ide-small">
-      <div className="h-full w-full overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-      <SectionTitle actions={(
-        <>
-          <Button
-            onClick={() => ACPBridge.checkMcpStatus()}
-            variant="secondary"
-            leftIcon={<RefreshCw size={14} />}
-            className="max-h-8"
-          >
-            Check Status
-          </Button>
-          <Button
-            onClick={openAdd}
-            variant="primary"
-            leftIcon={<Plus size={14} />}
-            className="max-h-8"
-          >
-            Add
-          </Button>
-        </>
-      )}>
-        MCP Servers
-      </SectionTitle>
-
-        {servers.length === 0 && !form && (
-          <div className="flex-1 flex flex-col mt-12 items-center gap-2 text-foreground-secondary">
-            <Network size={28} strokeWidth={1.5} />
-            <span>No MCP servers configured</span>
-            <p className="max-w-[400px] text-center">
-              MCP servers provide access to external tools and resources for AI agents
-            </p>
-          </div>
+    <div className="flex min-h-0 flex-col bg-background text-foreground text-ide-small">
+      <SectionPage onAdd={openAdd}>
+        {servers.length === 0 && (
+          <SectionEmptyState icon={Network} title="No MCP servers configured">
+            MCP servers provide access to external tools and resources for AI agents.
+          </SectionEmptyState>
         )}
 
-          {servers.map(s => {
-            const statusUpdate = statusMap[s.id];
-            const status: McpStatus = statusUpdate?.status ?? 'unknown';
-            const statusMessage = statusUpdate?.message;
-            const displayStatus: McpStatus = s.enabled ? status : 'disabled';
-            const displayStatusMessage = s.enabled ? statusMessage : undefined;
-            return (
-            <div
+        {servers.map(s => {
+          const statusUpdate = statusMap[s.id];
+          const status = statusUpdate?.status ?? 'unknown';
+          return (
+            <SectionListRow
               key={s.id}
-              className="flex items-start gap-3 px-4 py-2.5 border-b border-border last:border-b-0"
-            >
-              <Checkbox
-                checked={s.enabled}
-                onCheckedChange={() => toggle(s.id)}
-                aria-label={`${s.enabled ? 'Disable' : 'Enable'} ${s.name}`}
-                // Centered against the name + status lines at the default IDE font size.
-                // Kept as a fixed offset so an expanded error block below cannot drag it down.
-                className='mt-[11px]'
-              />
-              <div className="flex-1 min-w-0">
-                <div className="truncate">
-                  {s.name}
-                </div>
-                <McpStatusLine transport={s.transport} status={displayStatus} />
-                {displayStatus === 'error' && displayStatusMessage && (
-                  // Errors are shown in full: wrapped over as many lines as needed,
-                  // with scrolling only as a guard against unusually long output.
-                  <div className='mt-1 max-h-[160px] overflow-y-auto whitespace-pre-wrap break-words text-xs text-error'>
-                    {displayStatusMessage}
-                  </div>
-                )}
-              </div>
-
-              {/* Same fixed offset as the checkbox, so both edges sit on the
-                  centre line of the name + status lines. */}
-              <div className='mt-[8px] flex flex-shrink-0 items-center gap-2'>
-                <Tooltip variant="minimal" content="Edit">
-                  <button
-                    type="button"
-                    onClick={() => openEdit(s)}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                    aria-label={`Edit ${s.name}`}
-                  >
-                    <Pencil size={13} />
-                  </button>
-                </Tooltip>
-                <Tooltip variant="minimal" content="Delete">
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTarget(s)}
-                    className="rounded p-1 text-foreground-secondary transition-colors hover:text-error focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                    aria-label={`Delete ${s.name}`}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                </Tooltip>
-              </div>
-            </div>
+              name={s.name}
+              description={(
+                <StatusLine text={s.transport.toUpperCase()} status={status === 'unknown' ? undefined : status} />
+              )}
+              error={status === 'error' ? statusUpdate?.message : undefined}
+              enabled={s.enabled}
+              onToggle={() => toggle(s.id)}
+              actions={(
+                <SectionRowButton
+                  label={status === 'loading' ? 'Cancel check' : 'Test connection'}
+                  aria-label={status === 'loading' ? `Cancel check for ${s.name}` : `Test connection for ${s.name}`}
+                  onClick={() => {
+                    if (status !== 'loading') {
+                      ACPBridge.checkMcpStatus(s.id);
+                      return;
+                    }
+                    setStatusMap(prev => ({ ...prev, [s.id]: { ...prev[s.id], status: 'unknown', message: undefined } }));
+                    ACPBridge.cancelMcpStatus(s.id);
+                  }}
+                >
+                  {status === 'loading' ? <Loader2 size={13} className="animate-spin" /> : <PlugZap size={13} />}
+                </SectionRowButton>
+              )}
+              onEdit={() => openEdit(s)}
+              onDelete={() => setDeleteTarget(s)}
+            />
           );
         })}
-
-        </div>
-      </div>
+      </SectionPage>
 
       <FormDialog
         isOpen={form !== null}
@@ -296,8 +198,8 @@ export function McpServersView() {
         )}
       >
         {form ? (
-          <div className="flex flex-col gap-2">
-            <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2">
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
               <span className="text-foreground-secondary">Name <span className="text-error" aria-hidden="true">*</span></span>
               <input
                 data-autofocus="true"
@@ -308,7 +210,7 @@ export function McpServersView() {
               />
             </div>
 
-            <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2">
+            <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
               <span className="text-foreground-secondary">Transport</span>
               <DropdownSelect
                 value={form.transport}
@@ -325,7 +227,7 @@ export function McpServersView() {
 
             {form.transport === 'stdio' ? (
               <>
-                <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2">
+                <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
                   <span className="text-foreground-secondary">Command <span className="text-error" aria-hidden="true">*</span></span>
                   <input
                     value={form.command}
@@ -355,7 +257,7 @@ export function McpServersView() {
               </>
             ) : (
               <>
-                <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2">
+                <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
                   <span className="text-foreground-secondary">URL <span className="text-error" aria-hidden="true">*</span></span>
                   <input
                     value={form.url}

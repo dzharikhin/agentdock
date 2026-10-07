@@ -1,38 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent, MouseEvent } from 'react';
+import type { KeyboardEvent } from 'react';
 import { ACPBridge } from '../../utils/bridge';
+import { formatDate } from '../../utils/formatDate';
 import type { AgentOption, HistorySessionMeta } from '../../types/chat';
 
 function getItemAgents(item: HistorySessionMeta): string[] {
   return item.allAdapterNames && item.allAdapterNames.length > 0
     ? item.allAdapterNames
     : [item.adapterName];
-}
-
-function formatDate(ms: number) {
-  const d = new Date(ms);
-  const now = new Date();
-  const isToday = d.getDate() === now.getDate() &&
-    d.getMonth() === now.getMonth() &&
-    d.getFullYear() === now.getFullYear();
-
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  const isYesterday = d.getDate() === yesterday.getDate() &&
-    d.getMonth() === yesterday.getMonth() &&
-    d.getFullYear() === yesterday.getFullYear();
-
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  const timeStr = `${hours}:${minutes}`;
-
-  if (isToday) return `Today ${timeStr}`;
-  if (isYesterday) return `Yesterday ${timeStr}`;
-  
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  return `${day}.${month}.${year} ${timeStr}`;
 }
 
 function formatConversationLength(promptCount?: number) {
@@ -54,7 +29,6 @@ export function useHistoryPanelController(
   const [searchQuery, setSearchQuery] = useState('');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
   const filterButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -202,34 +176,6 @@ export function useHistoryPanelController(
     setDeleteProjectPath(deletableItems[0].projectPath);
   };
 
-  const startEditing = (item: HistorySessionMeta, e: MouseEvent) => {
-    e.stopPropagation();
-    setEditingId(item.conversationId);
-    setEditTitle(item.title);
-  };
-
-  const submitRename = (projectPath: string, conversationId: string) => {
-    if (!editTitle.trim()) {
-      setEditingId(null);
-      return;
-    }
-    
-    ACPBridge.renameHistoryConversation(projectPath, conversationId, editTitle.trim());
-    setEditingId(null);
-  };
-
-  const handleEditKeyDown = (e: KeyboardEvent<HTMLInputElement>, projectPath: string, conversationId: string) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      e.stopPropagation();
-      submitRename(projectPath, conversationId);
-    } else if (e.key === 'Escape') {
-      e.preventDefault();
-      e.stopPropagation();
-      setEditingId(null);
-    }
-  };
-
   const closeFilter = (restoreFocus = false) => {
     setIsFilterOpen(false);
     if (restoreFocus) {
@@ -300,7 +246,6 @@ export function useHistoryPanelController(
     searchQuery,
     isFilterOpen,
     editingId,
-    editTitle,
     isDeleting,
     deleteErrors,
     filterButtonRef,
@@ -317,16 +262,12 @@ export function useHistoryPanelController(
     setSelectedAgents,
     setSearchQuery,
     setIsFilterOpen,
-    setEditTitle,
     setEditingId,
     closeFilter,
     confirmDelete,
     refreshHistory,
     toggleSelectAllFiltered,
     openDeleteConfirmation,
-    startEditing,
-    submitRename,
-    handleEditKeyDown,
     handleFilterButtonKeyDown,
     handleFilterOptionKeyDown,
     toggleSelection,

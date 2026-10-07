@@ -12,8 +12,6 @@ import {
   safeParseJson,
   buildToolCallEntry,
   extractResultTexts,
-  appendToolOutput,
-  replaceToolOutput,
   extractToolCallDiffEntries,
   mergeToolCallDiffEntries,
 } from '../../utils/toolCallUtils';
@@ -360,12 +358,11 @@ function handleToolCallUpdate(blocks: RichContentBlock[], chunk: ContentChunk) {
       const currentKind = updatedBaseEntry.kind || b.entry.kind || json.kind;
       const resultText = extractResultTexts(json);
       if (resultText) {
-        const merged = isExecuteToolKind(currentKind)
-          ? replaceToolOutput(resultText, undefined, currentKind)
-          : appendToolOutput(updatedBaseEntry.result, resultText, undefined, currentKind);
-        updatedBaseEntry.result = merged.text;
+        updatedBaseEntry.result = isExecuteToolKind(currentKind) || !updatedBaseEntry.result
+          ? resultText
+          : `${updatedBaseEntry.result}\n\n${resultText}`;
       }
-      if (isExploringChunk({ ...chunk, toolKind: updatedBaseEntry.kind, toolTitle: updatedBaseEntry.title })) {
+      if (isExploringChunk({ ...chunk, toolKind: updatedBaseEntry.kind })) {
         blocks.splice(matchingIndexes[0], matchingIndexes.length, {
           type: 'exploring', isStreaming: !chunk.isReplay, isReplay: chunk.isReplay, entries: [updatedBaseEntry],
         });
@@ -415,12 +412,16 @@ function handleToolCallUpdate(blocks: RichContentBlock[], chunk: ContentChunk) {
         const currentKind = nextKind || e.kind || json.kind;
         const resultText = extractResultTexts(json);
         if (resultText) {
-          const merged = isExecuteToolKind(currentKind)
-            ? replaceToolOutput(resultText, undefined, currentKind)
-            : appendToolOutput(e.result, resultText, undefined, currentKind);
-          e.result = merged.text;
+          e.result = isExecuteToolKind(currentKind) || !e.result ? resultText : `${e.result}\n\n${resultText}`;
         }
         const newEntries = [...exp.entries];
+        // A tool call without kind starts in exploring; move it out once an update reveals an edit/subagent kind.
+        if (!isExploringChunk({ ...chunk, toolKind: e.kind })) {
+          newEntries.splice(idx, 1);
+          const remaining = newEntries.length > 0 ? [{ ...exp, isStreaming: false, entries: newEntries }] : [];
+          blocks.splice(i, 1, ...remaining, ...createToolCallBlocks(e, chunk.isReplay));
+          return;
+        }
         newEntries[idx] = e;
         blocks[i] = { ...exp, entries: newEntries };
         return;
@@ -435,11 +436,6 @@ function handleToolCallUpdate(blocks: RichContentBlock[], chunk: ContentChunk) {
   const diffEntries = extractToolCallDiffEntries(json);
   if (diffEntries.length > 0) {
     entry.content = diffEntries;
-  }
-  const resultText = extractResultTexts(json);
-  if (resultText) {
-    const merged = replaceToolOutput(resultText, undefined, entry.kind || json.kind);
-    entry.result = merged.text;
   }
   if (entry.kind === 'edit'&& (!Array.isArray(entry.content) || entry.content.length === 0) && !entry.result) {
     return;

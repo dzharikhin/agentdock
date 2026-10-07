@@ -1,5 +1,7 @@
-import { ReactNode, useEffect, useId, useRef } from 'react';
+import { ReactNode, useContext, useEffect, useId, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { ModalContainerContext } from '../ConfirmationModal';
 
 interface FormDialogProps {
   isOpen: boolean;
@@ -19,6 +21,7 @@ export function FormDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousFocusedElementRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
+  const container = useContext(ModalContainerContext);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -40,11 +43,16 @@ export function FormDialog({
     };
   }, [isOpen]);
 
-  if (!isOpen) return null;
+  if (!isOpen || !container) return null;
 
-  return (
+  // In flow inside the section popup modal layer, so the popup grows to fit the dialog. A press beside the dialog closes
+  // it; a press, unlike a click, does not count a text selection dragged out of a field.
+  return createPortal(
     <div
-      className="absolute inset-0 z-[100] flex items-start justify-center bg-black/50 px-3 pb-3 pt-24 animate-in fade-in duration-150"
+      className="flex min-h-0 min-w-0 flex-1 items-center justify-center px-4 py-10"
+      onPointerDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
       <div
         ref={dialogRef}
@@ -52,9 +60,8 @@ export function FormDialog({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className={`relative flex w-full max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border
-         mx-4 bg-background text-foreground animate-in zoom-in-95 duration-150`}
-        onClick={(event) => event.stopPropagation()}
+        className="relative flex max-h-full w-full min-w-0 max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border
+          bg-background text-foreground shadow-popup"
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.preventDefault();
@@ -64,7 +71,7 @@ export function FormDialog({
       >
         <div className="flex items-center justify-between px-3 py-2.5">
 
-          <div id={titleId} className="truncate text-foreground">{title}</div>
+          <div id={titleId} className="min-w-0 truncate text-foreground">{title}</div>
 
           <button
             type="button"
@@ -76,7 +83,7 @@ export function FormDialog({
           </button>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto px-3 py-2">
+        <div className="min-h-0 overflow-y-auto px-3 py-2">
           {children}
         </div>
 
@@ -86,6 +93,7 @@ export function FormDialog({
           </div>
         ) : null}
       </div>
-    </div>
+    </div>,
+    container
   );
 }

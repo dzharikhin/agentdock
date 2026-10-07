@@ -1,6 +1,13 @@
 import { useState, useRef, useEffect } from 'react';
-import { History, Menu, Plus } from 'lucide-react';
-import { AgentOption, ChatTab, GlobalSettings, SectionType, TabUiFlags, isAgentRunnable } from '../types/chat';
+import { Menu, SquarePen } from 'lucide-react';
+import {
+  AgentOption,
+  ChatTab,
+  GlobalSettings,
+  HistorySessionMeta,
+  TabUiFlags,
+  isAgentRunnable,
+} from '../types/chat';
 import { UseSidebarButton } from './LayoutControls';
 import { TabItem } from './tabbar/TabItem';
 import { NavigationMenu } from './tabbar/NavigationMenu';
@@ -8,22 +15,29 @@ import { focusMenuItem } from './tabbar/menuFocus';
 import { useTabReordering } from './tabbar/useTabReordering';
 import { Tooltip } from './chat/shared/Tooltip';
 
+/** New chat and menu buttons; the focus ring is drawn outside, so the buttons need a gap between them. */
+const controlClassName = (keyboardFocused: boolean) => `flex h-[24px] w-[24px] items-center justify-center rounded
+  bg-background hover:bg-hover hover:text-foreground transition-colors focus:outline-none
+  ${keyboardFocused ? 'shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]' : ''}`;
+
 export interface TabBarProps {
   isIslandsTheme: boolean;
+  /** Open chats and closed pinned ones; `tabs` are the open ones. */
+  chats: ChatTab[];
   tabs: ChatTab[];
+  historyList: HistorySessionMeta[];
   activeTabId: string;
-  activeSection: SectionType | null;
-  systemInstructionsEnabled: boolean;
   tabUi?: Record<string, TabUiFlags>;
   onSelectTab: (id: string) => void;
   onReorderTabs: (draggedId: string, targetId: string, position: 'before' | 'after') => void;
   onCloseTab: (id: string) => void;
   onCloseAllChats: () => void;
-  onCloseActiveSection: () => void;
   onNewTab: () => void;
   onNewTabWithAgent: (agentId: string) => void;
   onRenameTab: (tabId: string, newTitle: string) => void;
   agents: AgentOption[];
+  /** The agents are known and none can start a chat, so the new chat controls are hidden. */
+  noRunnableAgents: boolean;
   onOpenHistory: () => void;
   onOpenManagement: () => void;
   onOpenDesignSystem: () => void;
@@ -38,33 +52,27 @@ export interface TabBarProps {
 
 export default function TabBar({
   isIslandsTheme,
+  chats,
   tabs,
+  historyList,
   activeTabId,
-  activeSection,
-  systemInstructionsEnabled,
   tabUi = {},
   onSelectTab,
   onReorderTabs,
   onCloseTab,
   onCloseAllChats,
-  onCloseActiveSection,
   onNewTab,
   onNewTabWithAgent,
   onRenameTab,
   agents,
+  noRunnableAgents,
   onOpenHistory,
   onOpenManagement,
-  onOpenDesignSystem,
-  onOpenMcp,
-  onOpenCustomAcp,
-  onOpenPromptLibrary,
-  onOpenSystemInstructions,
-  onOpenSettings,
   sidebarPosition = 'left',
   onUseSidebar,
 }: TabBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [tabFocusedControl, setTabFocusedControl] = useState<'new' | 'history' | 'menu' | null>(null);
+  const [tabFocusedControl, setTabFocusedControl] = useState<'new' | 'menu' | null>(null);
   const [focusedTabId, setFocusedTabId] = useState<string | null>(null);
   const [renamingTabId, setRenamingTabId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -134,6 +142,7 @@ export default function TabBar({
           const hasWarning = flags?.warning;
           const hasUnread = flags?.unread;
           const hasProcessing = flags?.processing;
+          const hasQueued = flags?.queued && !hasProcessing;
           return (
             <div key={tab.id} className="flex min-w-[70px] flex-1 max-w-max">
               <TabItem
@@ -144,6 +153,7 @@ export default function TabBar({
                 hasWarning={hasWarning}
                 hasUnread={hasUnread}
                 hasProcessing={hasProcessing}
+                hasQueued={hasQueued}
                 isIslandsTheme={isIslandsTheme}
                 onSelectTab={onSelectTab}
                 onPointerDown={handleTabPointerDown}
@@ -163,39 +173,21 @@ export default function TabBar({
       </div>
 
       {/* Controls: new chat and navigation */}
-      <div className="flex shrink-0 items-center bg-background pl-1 pr-2 gap-0.5 z-10 shadow-[-10px_0_10px_-5px_var(--background)]">
-        {/* New Tab (+ matches default agent) */}
-        <Tooltip variant="minimal" placement="bottom" content="New chat" className="flex">
-          <button
-            onClick={onNewTab}
-            onFocus={() => setTabFocusedControl(lastInteractionWasTabRef.current ? 'new' : null)}
-            onBlur={() => setTabFocusedControl((current) => current === 'new' ? null : current)}
-            className={`flex items-center justify-center w-[28px] h-[24px] rounded bg-background hover:text-foreground
-              hover:bg-hover transition-[filter,color] focus:outline-none
-              ${tabFocusedControl === 'new' ? 'shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]' : ''}`}
-            aria-label="New chat"
-          >
-            <Plus size={14} strokeWidth={2.5} aria-hidden="true" />
-          </button>
-        </Tooltip>
-
-        <Tooltip variant="minimal" placement="bottom" content="History" className="flex">
-          <button
-            type="button"
-            onClick={() => {
-              setMenuOpen(false);
-              onOpenHistory();
-            }}
-            onFocus={() => setTabFocusedControl(lastInteractionWasTabRef.current ? 'history' : null)}
-            onBlur={() => setTabFocusedControl((current) => current === 'history' ? null : current)}
-            className={`flex h-[24px] w-[28px] items-center justify-center rounded bg-background
-              transition-colors hover:bg-hover hover:text-foreground focus:outline-none
-              ${tabFocusedControl === 'history' ? 'shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]' : ''}`}
-            aria-label="History"
-          >
-            <History size={15} aria-hidden="true" />
-          </button>
-        </Tooltip>
+      <div className="flex shrink-0 items-center bg-background pl-1 pr-2 gap-1 z-10 shadow-[-10px_0_10px_-5px_var(--background)]">
+        {/* New Tab (matches default agent) */}
+        {!noRunnableAgents ? (
+          <Tooltip variant="minimal" placement="bottom" content="New chat" className="flex">
+            <button
+              onClick={onNewTab}
+              onFocus={() => setTabFocusedControl(lastInteractionWasTabRef.current ? 'new' : null)}
+              onBlur={() => setTabFocusedControl((current) => current === 'new' ? null : current)}
+              className={controlClassName(tabFocusedControl === 'new')}
+              aria-label="New chat"
+            >
+              <SquarePen size={15} aria-hidden="true" />
+            </button>
+          </Tooltip>
+        ) : null}
 
         {/* Navigation menu */}
         <div className="relative" ref={menuRef}>
@@ -214,10 +206,7 @@ export default function TabBar({
                 setMenuOpen(true);
               }
             }}
-            className={`flex items-center justify-center w-[28px] h-[24px] rounded bg-background
-              hover:text-foreground hover:bg-hover transition-colors focus:outline-none
-              ${menuOpen ? 'bg-hover text-foreground' : ''}
-              ${tabFocusedControl === 'menu' ? 'shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]' : ''}`}
+            className={`${controlClassName(tabFocusedControl === 'menu')} ${menuOpen ? 'bg-hover text-foreground' : ''}`}
             aria-label="Navigation menu"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
@@ -229,29 +218,21 @@ export default function TabBar({
             <NavigationMenu
               menuListRef={menuListRef}
               menuButtonRef={menuButtonRef}
-              tabs={tabs}
+              chats={chats}
+              historyList={historyList}
               tabUi={tabUi}
               activeTabId={activeTabId}
-              activeSection={activeSection}
-              systemInstructionsEnabled={systemInstructionsEnabled}
               agents={agents}
               runnableAgents={runnableAgents}
               onSelectTab={onSelectTab}
               onReorderTabs={onReorderTabs}
               onCloseTab={onCloseTab}
               onCloseAllChats={onCloseAllChats}
-              onCloseActiveSection={onCloseActiveSection}
               onNewTabWithAgent={onNewTabWithAgent}
               onRenameTab={onRenameTab}
               onCloseMenu={() => setMenuOpen(false)}
               onOpenHistory={onOpenHistory}
               onOpenManagement={onOpenManagement}
-              onOpenDesignSystem={onOpenDesignSystem}
-              onOpenMcp={onOpenMcp}
-              onOpenCustomAcp={onOpenCustomAcp}
-              onOpenPromptLibrary={onOpenPromptLibrary}
-              onOpenSystemInstructions={onOpenSystemInstructions}
-              onOpenSettings={onOpenSettings}
             />
           )}
         </div>

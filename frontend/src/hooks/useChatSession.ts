@@ -118,7 +118,8 @@ export function useChatSession({
     }
   }, [conversationId]);
 
-  const pendingPromptRef = useRef<any[] | null>(null);
+  const pendingPromptRef = useRef<QueuePromptDraft | null>(null);
+  const isQueuedPromptRef = useRef(false);
   const pendingHandoffRef = useRef<PendingHandoffContext | null>(null);
   const consumedHandoffIdRef = useRef<string | null>(null);
   const resetSessionAfterInitialCancelRef = useRef(false);
@@ -206,6 +207,7 @@ export function useChatSession({
     additionalConfigOptions,
     configValues,
     selectedConfigOptions,
+    restoreConfigValues,
     modelIdForStart,
     handleSessionConfigOptions,
     handleModelChange,
@@ -222,7 +224,7 @@ export function useChatSession({
 
   useEffect(() => ACPBridge.onSessionConfigOptions((event) => {
     if (event.detail.payload.chatId === conversationId) {
-      handleSessionConfigOptions(event.detail.payload);
+      handleSessionConfigOptions(event.detail.payload, isQueuedPromptRef.current);
     }
   }), [conversationId, handleSessionConfigOptions]);
 
@@ -395,7 +397,7 @@ export function useChatSession({
       ACPBridge.startAgent(
         conversationId,
         selectedAgentId,
-        configValues
+        pendingPromptRef.current?.configValues ?? configValues
       ).catch((error) => {
         console.warn('[useChatSession] Failed to start agent:', error);
         const message = error instanceof Error ? error.message : String(error);
@@ -487,7 +489,7 @@ export function useChatSession({
       }
 
       if (s === 'ready' && pendingPromptRef.current) {
-        const blocksToSend = pendingPromptRef.current;
+        const prompt = pendingPromptRef.current;
         pendingPromptRef.current = null;
 
         setIsSending(true);
@@ -496,10 +498,10 @@ export function useChatSession({
         const forkBaseToPersist = forkBaseRef.current;
         ACPBridge.sendPrompt(
           conversationId,
-          JSON.stringify(blocksToSend),
+          JSON.stringify(prompt.blocks),
           forkBaseToPersist,
-          selectedAgentId,
-          configValues
+          prompt.agentId,
+          prompt.configValues
         ).then(() => {
           forkBaseRef.current = undefined;
           consumeHandoff();
@@ -522,7 +524,7 @@ export function useChatSession({
     const unsubMode = ACPBridge.onMode((e) => {
       if (e.detail.chatId !== conversationId) return;
       startedModeIdRef.current = e.detail.modeId;
-      handleReportedModeChange(e.detail.modeId);
+      if (!isQueuedPromptRef.current) handleReportedModeChange(e.detail.modeId);
     });
 
     // Permission request - filter by chatId when available
@@ -559,11 +561,6 @@ export function useChatSession({
     finishActivePromptAfterError,
     requestRuntimeRecovery,
     resetSessionToNotStarted,
-    configValues,
-    selectedAgentId,
-    selectedModelId,
-    selectedModeId,
-    selectedReasoningEffortId,
     handleReportedModeChange,
   ]);
 
@@ -657,10 +654,14 @@ export function useChatSession({
   }, [conversationId, status, acpSessionId, selectedAgentId, messages, metadataTitleOverride, inheritedAdapterNames]);
 
   const sendPreparedPrompt = useCallback((
-    displayBlocks: RichContentBlock[],
-    outgoingBlocks: RichContentBlock[],
-    displayText: string
+    prompt: QueuePromptDraft,
+    outgoingBlocks: RichContentBlock[]
   ) => {
+    isQueuedPromptRef.current = 'id' in prompt;
+    if (isQueuedPromptRef.current) {
+      // Pin composer defaults before the queued configuration is reported by the agent.
+      restoreConfigValues(configValues);
+    }
     allowMetadataUpdateRef.current = true;
     touchUpdatedAtRef.current = true;
     onUserMessageSent?.();
@@ -668,8 +669,8 @@ export function useChatSession({
     const userMessage: Message = {
       id: nextMessageId('user'),
       role: 'user',
-      content: displayText,
-      blocks: displayBlocks,
+      content: prompt.text,
+      blocks: prompt.blocks,
       timestamp: Date.now(),
     };
     setLiveMessages((prev) => [...prev, userMessage]);
@@ -681,9 +682,9 @@ export function useChatSession({
       content: '',
       contentBlocks: [],
       timestamp: Date.now(),
-      agentId: selectedAgentId,
-      agentName: adapterDisplayName,
-      configOptions: selectedConfigOptions,
+      agentId: prompt.agentId,
+      agentName: prompt.agentName,
+      configOptions: prompt.configOptions,
       promptStartedAtMillis: promptStartedAt,
       metaComplete: false,
     };
@@ -691,7 +692,7 @@ export function useChatSession({
 
     if (status !== 'ready') {
       // Defer the active prompt until the agent finishes starting.
-      pendingPromptRef.current = outgoingBlocks;
+      pendingPromptRef.current = { ...prompt, blocks: outgoingBlocks };
       if (status === 'not started' || status === 'error') {
         if (!restartSessionForPendingPrompt()) {
           failActivePromptLocally('The agent is not available and the session could not be restarted, so the message was not sent.');
@@ -707,8 +708,8 @@ export function useChatSession({
       conversationId,
       JSON.stringify(outgoingBlocks),
       forkBaseToPersist,
-      selectedAgentId,
-      configValues
+      prompt.agentId,
+      prompt.configValues
     ).then(() => {
       forkBaseRef.current = undefined;
       consumeHandoff();
@@ -721,10 +722,10 @@ export function useChatSession({
     });
   // Refs (pendingHandoffRef, allowMetadataUpdateRef, touchUpdatedAtRef, startTimeRef)
   // are intentionally excluded — their identity is stable across renders.
-  }, [status, conversationId, selectedAgentId,
-      adapterDisplayName, selectedModelId, selectedModeId, selectedReasoningEffortId, configValues, selectedConfigOptions, armPendingPromptWatchdog, restartSessionForPendingPrompt, consumeHandoff, failActivePromptLocally, requestRuntimeRecovery, onUserMessageSent]);
+  }, [status, conversationId, configValues, restoreConfigValues, armPendingPromptWatchdog, restartSessionForPendingPrompt, consumeHandoff, failActivePromptLocally, requestRuntimeRecovery, onUserMessageSent]);
 
-  const canDrainQueuedPrompts = (status === 'ready' || (status === 'not started' && !!selectedAgent?.downloaded))
+  const canDrainQueuedPrompts = (status === 'ready'
+    || ((status === 'not started' || status === 'error') && !!selectedAgent?.downloaded))
     && !isSending
     && !isHistoryReplaying
     && !pendingPromptRef.current;
@@ -738,7 +739,7 @@ export function useChatSession({
     const outgoingBlocks = pendingHandoffRef.current
       ? prependHandoffContext(prompt.blocks, pendingHandoffRef.current.text, pendingHandoffRef.current.sourceConversationTitle)
       : prompt.blocks;
-    sendPreparedPrompt(prompt.blocks, outgoingBlocks, prompt.text);
+    sendPreparedPrompt(prompt, outgoingBlocks);
   }, [sendPreparedPrompt]);
 
   const preemptActivePromptForQueue = useCallback(() => {
@@ -774,11 +775,12 @@ export function useChatSession({
     if (!prompt) return;
     setInputValue(prompt.composerText);
     setAttachments([...prompt.attachments]);
+    restoreConfigValues(prompt.configValues);
     setScheduleEnabled(prompt.scheduledAt !== undefined);
     setScheduledAt(prompt.scheduledAt);
     setQueueError('');
     setComposerLoadRevision((revision) => revision + 1);
-  }, [takeQueuedPrompt]);
+  }, [restoreConfigValues, takeQueuedPrompt]);
 
   const setScheduleMode = useCallback((enabled: boolean) => {
     setScheduleEnabled(enabled);
@@ -792,7 +794,11 @@ export function useChatSession({
 
     const normalizedBlocks = normalizeOutgoingBlocks(buildPromptBlocks(inputValue, attachments));
     if (normalizedBlocks.length === 0) return;
-    const draft = {
+    const draft: QueuePromptDraft = {
+      agentId: selectedAgentId,
+      agentName: adapterDisplayName,
+      configValues: { ...configValues },
+      configOptions: selectedConfigOptions.map((option) => ({ ...option })),
       text: plainTextFromBlocks(normalizedBlocks),
       composerText: inputValue,
       blocks: normalizedBlocks,
@@ -812,7 +818,7 @@ export function useChatSession({
     setAttachments([]);
     setScheduledAt(scheduleEnabled ? new Date().setSeconds(0, 0) : undefined);
     if (scheduleEnabled) setScheduleDraftRevision((revision) => revision + 1);
-  }, [attachments, enqueuePrompt, handleDrainQueuedPrompt, inputValue, isSending, scheduleEnabled, scheduledAt, status]);
+  }, [adapterDisplayName, attachments, configValues, enqueuePrompt, handleDrainQueuedPrompt, inputValue, isSending, scheduleEnabled, scheduledAt, selectedAgentId, selectedConfigOptions, status]);
 
   const handleStop = () => {
     clearQueue();

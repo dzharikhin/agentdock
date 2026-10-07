@@ -15,9 +15,11 @@ interface MenuButtonProps {
   items: MenuButtonItem[];
   disabled?: boolean;
   variant?: ButtonProps['variant'];
+  /** Extra classes for the menu, which opens leftward from the button's right edge. */
+  menuClassName?: string;
 }
 
-export function MenuButton({ label, items, disabled = false, variant = 'outline' }: MenuButtonProps) {
+export function MenuButton({ label, items, disabled = false, variant = 'outline', menuClassName = '' }: MenuButtonProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
@@ -58,8 +60,8 @@ export function MenuButton({ label, items, disabled = false, variant = 'outline'
       {open ? (
         <div
           role="menu"
-          className="absolute right-0 top-[calc(100%+0.35em)] z-20 w-max min-w-full rounded-[4px]
-            border border-[var(--ide-Button-startBorderColor)] bg-background p-1"
+          className={`absolute right-0 top-[calc(100%+0.35em)] z-20 w-max min-w-full rounded-[4px]
+            border border-border bg-background p-1 ${menuClassName}`}
         >
           {items.map((item, index) => (
             <button

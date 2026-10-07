@@ -26,7 +26,7 @@ export function UsageIcon({
             hover:text-foreground focus-visible:bg-hover focus-visible:text-foreground">
           <div className="flex min-w-0 items-center">
             <QuotaGauge percent={percent} />
-            <span className="relative top-px ml-1 min-w-0 truncate chat-max-600:hidden">{displayLabel}</span>
+            <span className="ml-1 min-w-0 truncate chat-max-600:hidden">{displayLabel}</span>
             <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
           </div>
         </button>

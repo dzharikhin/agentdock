@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
+import { History } from 'lucide-react';
 import { isAgentRunnable } from '../types/chat';
-import type { GlobalSettings, HistorySessionMeta, SidebarSectionId } from '../types/chat';
+import type { GlobalSettings } from '../types/chat';
 import { clampSidebarWidth, MIN_SIDEBAR_WIDTH } from '../hooks/app/useAppLayout';
 import { TabBarProps } from './TabBar';
-import { SidebarLayoutControls } from './LayoutControls';
-import { TabNavigationContent } from './tabbar/NavigationMenu';
+import { SidebarLayoutMenu, SidebarManageButton, SidebarVisibilityButton } from './LayoutControls';
+import { rowButtonClassName, sidebarRowClassName } from './tabbar/rows';
+import { NewChatSplitButton } from './tabbar/NewChatSplitButton';
+import { OpenChatList } from './tabbar/OpenChatList';
 
 type SidebarProps = Omit<TabBarProps, 'isIslandsTheme' | 'onUseSidebar' | 'sidebarPosition'> & {
   position: GlobalSettings['sidebarPosition'];
@@ -14,10 +17,7 @@ type SidebarProps = Omit<TabBarProps, 'isIslandsTheme' | 'onUseSidebar' | 'sideb
   overlay: boolean;
   preferredWidth: number;
   viewportWidth: number;
-  historyList: HistorySessionMeta[];
-  expandedSections: SidebarSectionId[];
-  onSectionExpandedChange: (section: SidebarSectionId, expanded: boolean) => void;
-  onOpenRecentConversation: (session: HistorySessionMeta) => void;
+  newTabAgentId?: string;
   onWidthChange: (width: number) => void;
   onHide: () => void;
   onUseTabBar: () => void;
@@ -33,10 +33,7 @@ export function Sidebar({
   overlay,
   preferredWidth,
   viewportWidth,
-  historyList,
-  expandedSections,
-  onSectionExpandedChange,
-  onOpenRecentConversation,
+  newTabAgentId,
   onWidthChange,
   onHide,
   onUseTabBar,
@@ -44,8 +41,11 @@ export function Sidebar({
   onToggleOpenInEditor,
   onTogglePosition,
   onNewTab,
+  onNewTabWithAgent,
+  noRunnableAgents,
   ...navigationProps
 }: SidebarProps) {
+  const { agents } = navigationProps;
   const containerRef = useRef<HTMLElement>(null);
   const stopResizingRef = useRef<(() => void) | null>(null);
   const [isResizing, setIsResizing] = useState(false);
@@ -122,31 +122,50 @@ export function Sidebar({
             : `right-0 border-l border-border ${hidden ? 'translate-x-full' : 'translate-x-0'}`
         }`}
       >
-        <div className={`flex h-9 shrink-0 items-center overflow-hidden px-2.5 ${position === 'right' ? 'justify-end' : ''}`}>
-          <SidebarLayoutControls
-            position={position}
-            hidden={false}
-            onToggleVisibility={onHide}
-            onUseTabBar={onUseTabBar}
-            openInEditor={openInEditor}
-            onToggleOpenInEditor={onToggleOpenInEditor}
-            onTogglePosition={onTogglePosition}
-          />
+        <div className="flex shrink-0 flex-col gap-1 px-2 pb-2 text-ide-small">
+          {/* Hide sits at the outer edge, where Show appears once the sidebar is hidden. */}
+          <div className={`flex h-10 items-center ${position === 'right' ? 'flex-row-reverse' : ''}`}>
+            <SidebarVisibilityButton position={position} hidden={false} onClick={onHide} />
+            <SidebarLayoutMenu
+              position={position}
+              onTogglePosition={onTogglePosition}
+              onUseTabBar={onUseTabBar}
+              openInEditor={openInEditor}
+              onToggleOpenInEditor={onToggleOpenInEditor}
+            />
+            <SidebarManageButton
+              onClick={navigationProps.onOpenManagement}
+              className={position === 'right' ? 'mr-auto' : 'ml-auto'}
+            />
+          </div>
+          {!noRunnableAgents ? (
+            <NewChatSplitButton
+              agents={agents}
+              runnableAgents={agents.filter(isAgentRunnable)}
+              defaultAgentId={newTabAgentId}
+              onNewTab={onNewTab}
+              onNewTabWithAgent={onNewTabWithAgent}
+            />
+          ) : null}
+          <div className={`${sidebarRowClassName(false)} h-8`}>
+            <button
+              type="button"
+              data-section-opener
+              onClick={navigationProps.onOpenHistory}
+              className={rowButtonClassName}
+            >
+              <History size={14} aria-hidden="true" className="shrink-0" />
+              <span className="truncate">Chat History</span>
+            </button>
+          </div>
         </div>
         <nav
-          aria-label="Agent Dock navigation"
-          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pb-1.5 text-ide-small"
+          aria-label="Open chats"
+          className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden pt-1.5 text-ide-small"
         >
-          <TabNavigationContent
+          <OpenChatList
             {...navigationProps}
             tabUi={navigationProps.tabUi ?? {}}
-            runnableAgents={navigationProps.agents.filter(isAgentRunnable)}
-            onNewTab={onNewTab}
-            historyList={historyList}
-            sidebarExpandedSections={expandedSections}
-            onSidebarSectionExpandedChange={onSectionExpandedChange}
-            onOpenRecentConversation={onOpenRecentConversation}
-            pinActionsToBottom
           />
         </nav>
         <div

@@ -22,7 +22,7 @@ object QuotaSnapshot {
         val crossedThreshold = updated.any { (adapterId, quota) ->
             quota.percentages.any { (key, percent) ->
                 val oldPercent = previous[adapterId]?.percentages?.get(key)
-                oldPercent != null && oldPercent <= 90 && percent > 90
+                oldPercent != null && oldPercent < 90 && percent >= 90
             }
         }
         _quotas.value = updated

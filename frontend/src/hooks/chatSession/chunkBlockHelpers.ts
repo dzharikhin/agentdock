@@ -2,40 +2,9 @@ import { ContentChunk, ExploringBlock, Message, RichContentBlock } from '../../t
 import { safeParseJson } from '../../utils/toolCallUtils';
 
 export function isExploringChunk(chunk: ContentChunk): boolean {
-  // Stored tool_call_update events carry kind/title only inside the raw payload.
-  const raw: Record<string, unknown> = (chunk.toolKind && chunk.toolTitle)
-    ? {}
-    : safeParseJson(chunk.toolRawJson);
-  const rawKind: string = typeof raw.kind === 'string' ? raw.kind : '';
-  const rawTitle: string = typeof raw.title === 'string' ? raw.title : '';
-
-  const kind = chunk.toolKind || rawKind;
-  if (kind === 'read' || kind === 'fetch' || kind === 'search') return true;
-  if (kind === 'execute') {
-    const cmd = (chunk.toolTitle || rawTitle).toLowerCase().trim();
-    if (!cmd) return true;
-
-    const IMPACTFUL_KEYWORDS = [
-      'rm', 'mv', 'cp', 'mkdir', 'touch', 'chmod', 'chown', 'run', 'compile',
-      'del', 'erase', 'rd', 'rmdir', 'move', 'copy', 'ren', 'rename',
-      'new-item', 'remove-item', 'move-item', 'copy-item', 'update',
-      'curl', 'wget', 'scp', 'rsync', 'ssh', 'ftp', 'uninstall', 'publish',
-      'add', 'commit', 'push', 'revert', 'restore', 'build', 'install',
-      'insert', 'mysql', 'pgsql', 'postgres', 'delete', 'drush', 'rm'
-    ];
-
-    const isImpactful = cmd.split(/&&|\|\||[|;]/).some(segment => {
-      const head: string[] = [];
-      for (const token of segment.trim().split(/\s+/)) {
-        if (!token || token.startsWith('-')) continue;
-        head.push(token);
-        if (head.length >= 3) break;
-      }
-      return IMPACTFUL_KEYWORDS.some(kw => head.includes(kw));
-    });
-    return !isImpactful;
-  }
-  return false;
+  // Stored tool_call_update events carry kind only inside the raw payload.
+  const kind = chunk.toolKind || safeParseJson(chunk.toolRawJson).kind;
+  return !['edit', 'delete', 'move', 'think', 'task'].includes(kind);
 }
 
 export function stripTransferredContextForDisplay(

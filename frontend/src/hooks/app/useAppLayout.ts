@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 
-export const MIN_SIDEBAR_WIDTH = 125;
-export const MIN_CONTENT_WIDTH = 400;
+export const MIN_SIDEBAR_WIDTH = 100;
+export const MIN_CONTENT_WIDTH = 300;
 export const SIDEBAR_BREAKPOINT = MIN_SIDEBAR_WIDTH + MIN_CONTENT_WIDTH;
 
 export function clampSidebarWidth(preferredWidth: number, viewportWidth: number) {

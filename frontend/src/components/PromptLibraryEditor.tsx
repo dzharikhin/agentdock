@@ -22,7 +22,7 @@ export function PromptLibraryEditor({
   const editorContainerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div className="relative flex h-[206px] flex-col rounded-[4px] border border-[var(--ide-Button-startBorderColor)] bg-background-secondary focus-within:border-[var(--ide-Button-default-focusColor)]">
+    <div className="relative flex h-[206px] flex-col rounded-[4px] border border-border bg-background-secondary focus-within:border-[var(--ide-Button-default-focusColor)]">
       <AttachmentBar
         attachments={attachments}
         onRemove={(id) => onAttachmentsChange(attachments.filter((attachment) => attachment.id !== id))}

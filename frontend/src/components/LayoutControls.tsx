@@ -1,7 +1,6 @@
 import {
-  ArrowLeft,
-  ArrowRight,
-  FoldHorizontal,
+  AppWindow,
+  EllipsisVertical,
   PanelLeft,
   PanelLeftClose,
   PanelLeftOpen,
@@ -9,96 +8,104 @@ import {
   PanelRightClose,
   PanelRightOpen,
   PanelTop,
-  UnfoldHorizontal,
+  Settings,
+  SquareArrowDownLeft,
 } from 'lucide-react';
 import type { GlobalSettings } from '../types/chat';
 import { Tooltip } from './chat/shared/Tooltip';
+import { PopupMenu, popupMenuActions } from './ui/PopupMenu';
+import { rowFocusClassName } from './tabbar/rows';
 
-const buttonClassName = `flex h-7 w-7 items-center justify-center rounded-[4px] text-foreground-secondary
-  hover:bg-hover hover:text-foreground focus:outline-none
-  focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-[-1px]`;
+export const iconButtonClassName = `flex h-7 w-7 items-center justify-center rounded-[4px] text-foreground-secondary
+  hover:bg-hover hover:text-foreground ${rowFocusClassName}`;
 
-interface SidebarLayoutControlsProps {
+interface SidebarVisibilityButtonProps {
   position: GlobalSettings['sidebarPosition'];
   hidden: boolean;
-  onToggleVisibility: () => void;
-  onUseTabBar: () => void;
-  openInEditor: boolean;
-  onToggleOpenInEditor: () => void;
-  onTogglePosition: () => void;
-  floating?: boolean;
+  onClick: () => void;
 }
 
-export function SidebarLayoutControls({
-  position,
-  hidden,
-  onToggleVisibility,
-  onUseTabBar,
-  openInEditor,
-  onToggleOpenInEditor,
-  onTogglePosition,
-  floating = false,
-}: SidebarLayoutControlsProps) {
-  const editorLabel = openInEditor ? 'Open in tool window' : 'Open in editor tab';
-  const positionLabel = position === 'left' ? 'Move sidebar to right' : 'Move sidebar to left';
-  const visibilityIcon = position === 'left'
+/**
+ * Shown: sits in the sidebar's top row (`h-10`, `px-2`). The edge margin puts the 16px icon 1rem from the sidebar
+ * edge, in line with the icons below it. Hidden: floats at the same spot, so the toggle stays under the pointer.
+ */
+export function SidebarVisibilityButton({ position, hidden, onClick }: SidebarVisibilityButtonProps) {
+  const label = hidden ? 'Show sidebar' : 'Hide sidebar';
+  const icon = position === 'left'
     ? hidden ? <PanelLeftOpen size={16} aria-hidden="true" /> : <PanelLeftClose size={16} aria-hidden="true" />
     : hidden ? <PanelRightOpen size={16} aria-hidden="true" /> : <PanelRightClose size={16} aria-hidden="true" />;
 
   return (
-    <div className={`flex items-center gap-0.5 ${position === 'right' ? 'flex-row-reverse' : ''} ${floating
-      ? `fixed top-px z-40 rounded-[5px] border border-border bg-background p-0.5 ${position === 'left' ? 'left-1.5' : 'right-1.5'}`
-      : ''}`}
+    <div className={`${hidden ? `fixed top-1.5 z-40 ${position === 'left' ? 'left-2' : 'right-2'}` : 'flex shrink-0'} ${
+      position === 'left' ? 'ml-0.5' : 'mr-0.5'
+    }`}
     >
-      <Tooltip variant="minimal" placement="bottom" content={hidden ? 'Show sidebar' : 'Hide sidebar'}>
+      <Tooltip variant="minimal" placement="bottom" content={label}>
         <button
           type="button"
-          onClick={onToggleVisibility}
-          className={buttonClassName}
-          aria-label={hidden ? 'Show sidebar' : 'Hide sidebar'}
+          onClick={onClick}
+          className={`${iconButtonClassName} ${hidden ? 'border border-border bg-background' : ''}`}
+          aria-label={label}
         >
-          {visibilityIcon}
+          {icon}
         </button>
       </Tooltip>
-      {!hidden && (
-        <>
-          <Tooltip variant="minimal" placement="bottom" content={positionLabel}>
-            <button
-              type="button"
-              onClick={onTogglePosition}
-              className={buttonClassName}
-              aria-label={positionLabel}
-            >
-              {position === 'left'
-                ? <ArrowRight size={16} aria-hidden="true" />
-                : <ArrowLeft size={16} aria-hidden="true" />}
-            </button>
-          </Tooltip>
-          <Tooltip variant="minimal" placement="bottom" content="Use tab bar">
-            <button
-              type="button"
-              onClick={onUseTabBar}
-              className={buttonClassName}
-              aria-label="Use tab bar"
-            >
-              <PanelTop size={16} aria-hidden="true" />
-            </button>
-          </Tooltip>
-          <Tooltip variant="minimal" placement="bottom" content={editorLabel}>
-            <button
-              type="button"
-              onClick={onToggleOpenInEditor}
-              className={buttonClassName}
-              aria-label={editorLabel}
-            >
-              {openInEditor
-                ? <FoldHorizontal size={16} aria-hidden="true" />
-                : <UnfoldHorizontal size={16} aria-hidden="true" />}
-            </button>
-          </Tooltip>
-        </>
-      )}
     </div>
+  );
+}
+
+interface SidebarLayoutMenuProps {
+  position: GlobalSettings['sidebarPosition'];
+  onTogglePosition: () => void;
+  onUseTabBar: () => void;
+  openInEditor: boolean;
+  onToggleOpenInEditor: () => void;
+}
+
+export function SidebarLayoutMenu({
+  position,
+  onTogglePosition,
+  onUseTabBar,
+  openInEditor,
+  onToggleOpenInEditor,
+}: SidebarLayoutMenuProps) {
+  const items = [
+    {
+      label: position === 'left' ? 'Move sidebar to right' : 'Move sidebar to left',
+      icon: position === 'left' ? <PanelRight size={14} aria-hidden="true" /> : <PanelLeft size={14} aria-hidden="true" />,
+      onClick: onTogglePosition,
+    },
+    { label: 'Use tab bar', icon: <PanelTop size={14} aria-hidden="true" />, onClick: onUseTabBar },
+    {
+      label: openInEditor ? 'Open in tool window' : 'Open in editor tab',
+      icon: openInEditor ? <SquareArrowDownLeft size={14} aria-hidden="true" /> : <AppWindow size={14} aria-hidden="true" />,
+      onClick: onToggleOpenInEditor,
+    },
+  ];
+
+  return (
+    <PopupMenu
+      renderTrigger={(triggerProps) => (
+        <Tooltip variant="minimal" placement="bottom" content="Layout">
+          <button type="button" {...triggerProps} className={iconButtonClassName} aria-label="Layout">
+            <EllipsisVertical size={16} aria-hidden="true" />
+          </button>
+        </Tooltip>
+      )}
+    >
+      {popupMenuActions(items)}
+    </PopupMenu>
+  );
+}
+
+/** Opens the section popup at Service Providers. */
+export function SidebarManageButton({ onClick, className }: { onClick: () => void; className: string }) {
+  return (
+    <Tooltip variant="minimal" placement="bottom" content="Manage" className={`flex ${className}`}>
+      <button type="button" data-section-opener onClick={onClick} className={iconButtonClassName} aria-label="Manage">
+        <Settings size={16} aria-hidden="true" />
+      </button>
+    </Tooltip>
   );
 }
 
@@ -113,7 +120,7 @@ export function UseSidebarButton({ position, onClick }: UseSidebarButtonProps) {
       <button
         type="button"
         onClick={onClick}
-        className={buttonClassName}
+        className={iconButtonClassName}
         aria-label="Use sidebar"
       >
         {position === 'left'

@@ -107,6 +107,10 @@ internal fun AcpBridge.installServiceCallbacks() {
                 var json = try { Json.encodeToString(update) } catch (_: Exception) { update.toString() }
                 json = convertBrokenOtherPatchToolCallJson(json)
                 val todoToolCallKey = todoToolCallKey(chatId, sessionId, update.toolCallId.value)
+                if (hasFullOutputToolKind(json)) {
+                    fullOutputToolCallKeys.add(todoToolCallKey)
+                    json = dropOversizedToolCallPayload(json)
+                }
                 val todoPlanEntries = extractTodoPlanEntriesFromToolRawJson(json)
                 val isTodoWrite = todoPlanEntries != null || isTodoWriteToolCallJson(json)
                 if (isTodoWrite) {
@@ -134,6 +138,9 @@ internal fun AcpBridge.installServiceCallbacks() {
                 var json = try { Json.encodeToString(update) } catch (_: Exception) { update.toString() }
                 json = convertBrokenOtherPatchToolCallJson(json)
                 val todoToolCallKey = todoToolCallKey(chatId, sessionId, update.toolCallId.value)
+                if (hasFullOutputToolKind(json)) fullOutputToolCallKeys.add(todoToolCallKey)
+                val fullOutput = fullOutputToolCallKeys.contains(todoToolCallKey)
+                if (fullOutput) json = dropOversizedToolCallPayload(json)
                 val todoPlanEntries = extractTodoPlanEntriesFromToolRawJson(json)
                 val isTodoWrite = todoPlanEntries != null || todoToolCallKeys.contains(todoToolCallKey) || isTodoWriteToolCallJson(json)
                 if (isTodoWrite) {
@@ -143,7 +150,7 @@ internal fun AcpBridge.installServiceCallbacks() {
                 if (shouldEmitTodoPlan) {
                     recordStoredEvent(chatId, sessionId, adapterName, buildStoredPlanChunk(todoPlanEntries), isReplay)
                 } else if (!isTodoWrite) {
-                    recordStoredEvent(chatId, sessionId, adapterName, buildStoredToolCallUpdateChunk(update.toolCallId.value, json), isReplay)
+                    recordStoredEvent(chatId, sessionId, adapterName, buildStoredToolCallUpdateChunk(update.toolCallId.value, json, fullOutput), isReplay)
                 }
                 if (!isReplay) {
                     if (!isTodoWrite || shouldEmitTodoPlan) {
@@ -152,7 +159,7 @@ internal fun AcpBridge.installServiceCallbacks() {
                     if (shouldEmitTodoPlan) {
                         pushPlanChunk(chatId, todoPlanEntries)
                     } else if (!isTodoWrite) {
-                        pushToolCallUpdateChunk(chatId, update.toolCallId.value, json)
+                        pushToolCallUpdateChunk(chatId, update.toolCallId.value, json, fullOutput)
                     }
                 }
             }
@@ -336,7 +343,7 @@ internal fun AcpBridge.installAdapterQueries() {
                 try {
                     downloadStatuses[adapterId] = "Starting download..."
                     resetDownloadProbeState(adapterId)
-                    pushAdapters(includeRuntimeChecks = true, adapterIdToRefresh = adapterId)
+                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
 
                     service.stopSharedProcess(adapterId)
                     AcpConfigOptionsCache.remove(adapterId)
@@ -364,7 +371,7 @@ internal fun AcpBridge.installAdapterQueries() {
                         setDownloadProbeState(adapterId, target, downloaded = true, installedVersion = installedVersion)
                         service.initializeAdapterInBackground(adapterId)
                         refreshAdapterLoginStatus(adapterId)
-                        pushAdapters(includeRuntimeChecks = true, adapterIdToRefresh = adapterId)
+                        pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
                     } else {
                         downloadStatuses.compute(adapterId) { _, previous ->
                             previous?.takeIf { it.startsWith("Error:") }
@@ -382,7 +389,8 @@ internal fun AcpBridge.installAdapterQueries() {
                 } finally {
                     adapterInstallJobs.remove(adapterId)
                     adapterInstallCancellations.remove(adapterId)
-                    pushAdapters()
+                    // Checks the files again, as a cancellation leaves the installed state unknown.
+                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
                 }
             }
             adapterInstallJobs[adapterId] = job
@@ -417,7 +425,7 @@ internal fun AcpBridge.installAdapterQueries() {
                 } else {
                     downloadStatuses[adapterId] = "Error: Unable to remove adapter files"
                 }
-                pushAdapters(includeRuntimeChecks = true, adapterIdToRefresh = adapterId)
+                pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
             }
         }
     }
@@ -454,7 +462,7 @@ internal fun AcpBridge.installAdapterQueries() {
 
                     downloadStatuses[adapterId] = "Updating to $latestVersion..."
                     resetDownloadProbeState(adapterId)
-                    pushAdapters(includeRuntimeChecks = true, adapterIdToRefresh = adapterId)
+                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
 
                     service.stopSharedProcess(adapterId)
                     AcpConfigOptionsCache.remove(adapterId)
@@ -485,7 +493,7 @@ internal fun AcpBridge.installAdapterQueries() {
                         setDownloadProbeState(adapterId, target, downloaded = true, installedVersion = latestVersion)
                         service.initializeAdapterInBackground(adapterId)
                         refreshAdapterLoginStatus(adapterId)
-                        pushAdapters(includeRuntimeChecks = true, adapterIdToRefresh = adapterId)
+                        pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
                     } else {
                         downloadStatuses.compute(adapterId) { _, previous ->
                             previous?.takeIf { it.startsWith("Error:") }
@@ -502,7 +510,8 @@ internal fun AcpBridge.installAdapterQueries() {
                 } finally {
                     adapterInstallJobs.remove(adapterId)
                     adapterInstallCancellations.remove(adapterId)
-                    pushAdapters()
+                    // Checks the files again, as a cancellation leaves the installed state unknown.
+                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
                 }
             }
             adapterInstallJobs[adapterId] = job

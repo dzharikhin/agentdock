@@ -11,10 +11,6 @@ export default {
           DEFAULT: 'var(--ide-Panel-background)',
           secondary: 'var(--ide-background-secondary)'
         },
-        surface: {
-          hover: 'var(--ide-surface-hover)',
-          active: 'var(--ide-surface-active)'
-        },
         foreground: {
           DEFAULT: 'var(--ide-Label-foreground)',
           secondary: 'color-mix(in srgb, var(--ide-Label-foreground), transparent 40%)'
@@ -24,17 +20,13 @@ export default {
           foreground: 'var(--ide-Button-default-foreground)',
           border: 'var(--ide-Button-default-borderColor)',
         },
-        secondary: {
-          DEFAULT: 'var(--ide-Button-startBackground)',
-          foreground: 'var(--ide-Button-foreground)',
-          border: 'var(--ide-Button-borderColor)',
-        },
+        secondary: 'var(--ide-Button-startBackground)',
         accent: {
           DEFAULT: 'var(--ide-List-selectionBackground)',
           foreground: 'var(--ide-List-selectionForeground)',
         },
         border: 'var(--ide-Borders-color)',
-        input: 'var(--ide-TextField-background)',
+        input: 'var(--ide-background-secondary)',
         editor: {
           bg: 'var(--ide-editor-bg)',
           fg: 'var(--ide-editor-fg)',
@@ -79,8 +71,11 @@ export default {
       borderRadius: {
         'ide': '6px',
       },
+      boxShadow: {
+        popup: '0 6px 24px rgba(0, 0, 0, 0.35)',
+      },
       maxWidth: {
-        'app-content': '800px',
+        'app-content': 'var(--app-content-max-width, 760px)',
       },
       spacing: {
         'ide-paragraph': 'var(--ide-paragraph-spacing)',
@@ -95,10 +90,21 @@ export default {
     function({ addUtilities, addVariant }) {
       addVariant('chat-max-400', '@container chat-input (max-width: 400px)');
       addVariant('chat-max-600', '@container chat-input (max-width: 600px)');
+      // A section popup content too narrow for the buttons beside the text, and then for the agent icons.
+      addVariant('section-medium', '@container section (max-width: 450px)');
+      addVariant('section-narrow', '@container section (max-width: 300px)');
+      addVariant('app-wide', '#app-content[data-wide] &');
+      // A row is revealed while hovered, while it holds focus, and while one of its popup menus is open.
+      const revealed = [':hover', ':focus-within', ':has([aria-haspopup][aria-expanded=true])'];
+      addVariant('reveal', revealed.map((state) => `&${state}`));
+      addVariant('group-reveal', revealed.map((state) => `.group${state} &`));
+      // Tint over the element's own background, leaving its content untouched: lighter in dark themes, darker in light.
+      const tint = (percent) => ({
+        'background-image': `linear-gradient(color-mix(in srgb, var(--ide-Label-foreground) ${percent}, transparent) 0 0)`,
+      });
       addUtilities({
-        '.bg-hover': {
-          'filter': 'var(--ide-surface-hover-filter)',
-        },
+        '.bg-hover': tint('var(--ide-surface-hover-tint)'),
+        '.bg-active': tint('var(--ide-surface-active-tint)'),
       })
     },
   ],

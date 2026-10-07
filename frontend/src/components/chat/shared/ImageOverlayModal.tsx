@@ -86,7 +86,7 @@ export const ImageOverlayModal: React.FC<ImageOverlayModalProps> = ({ src, onClo
       aria-label="Image preview"
       tabIndex={-1}
       className="absolute inset-0 z-[100] bg-black bg-opacity-50 flex items-center
-        justify-center p-8 animate-in fade-in duration-200 cursor-zoom-out outline-none"
+        justify-center p-8 cursor-zoom-out outline-none"
       onClick={onClose}
     >
       <div
@@ -114,8 +114,7 @@ export const ImageOverlayModal: React.FC<ImageOverlayModalProps> = ({ src, onClo
         src={src}
         draggable={false}
         alt=""
-        className="max-h-full max-w-full min-h-0 min-w-0 object-contain rounded-lg
-          animate-in zoom-in-95 duration-200"
+        className="max-h-full max-w-full min-h-0 min-w-0 object-contain rounded-lg"
       />
     </div>
   );

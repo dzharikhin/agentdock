@@ -72,19 +72,17 @@ class AgentDockUiHost(
     private var bridge: FrontendBridge? = null
     private var liveContent: JComponent? = loadingPanel
     private var dropTarget: DropTarget? = null
-    private var openInEditor = FrontendSettings.current.openInEditor
+    /** Unknown until the saved settings arrive, so the startup defaults do not move the UI. */
+    private var openInEditor: Boolean? = null
 
     private val settingsListener: (GlobalSettings, GlobalSettings) -> Unit = { previous, settings ->
         ApplicationManager.getApplication().invokeLater({
             if (project.isDisposed) return@invokeLater
-            if (previous.openInEditor != settings.openInEditor) {
-                applyOpenInEditor(settings.openInEditor)
-            }
+            applyOpenInEditor(settings.openInEditor)
             if (previous.uiZoomPercent != settings.uiZoomPercent) {
                 applyUiZoom(settings.uiZoomPercent)
             }
-            if (previous.uiFontSizeOffsetPx != settings.uiFontSizeOffsetPx ||
-                previous.userMessageBackgroundStyle != settings.userMessageBackgroundStyle ||
+            if (previous.userMessageBackgroundStyle != settings.userMessageBackgroundStyle ||
                 previous.userMessageCustomColor != settings.userMessageCustomColor
             ) {
                 bridge?.eval(IdeTheme.generateCssUpdateScript())
@@ -95,11 +93,13 @@ class AgentDockUiHost(
     init {
         homePanel.add(loadingPanel, BorderLayout.CENTER)
         FrontendSettings.addListener(settingsListener)
+        // The settings may have arrived before this service was created.
+        if (FrontendSettings.received) settingsListener(FrontendSettings.current, FrontendSettings.current)
         project.messageBus.connect(this).subscribe(
             ToolWindowManagerListener.TOPIC,
             object : ToolWindowManagerListener {
                 override fun toolWindowShown(shown: ToolWindow) {
-                    if (shown.id != TOOL_WINDOW_ID || !openInEditor) return
+                    if (shown.id != TOOL_WINDOW_ID || openInEditor != true) return
                     if (isEditorTabOpen()) {
                         shown.hide(null)
                         closeEditorTab()
@@ -126,7 +126,7 @@ class AgentDockUiHost(
                 afterShow?.invoke()
                 return
             }
-        if (openInEditor && toolWindow != null) {
+        if (openInEditor == true && toolWindow != null) {
             redirectToEditor(window, afterShow)
             return
         }
@@ -142,7 +142,7 @@ class AgentDockUiHost(
     private fun redirectToEditor(window: ToolWindow, afterShow: (() -> Unit)? = null) {
         ApplicationManager.getApplication().invokeLater({
             if (project.isDisposed) return@invokeLater
-            if (openInEditor) {
+            if (openInEditor == true) {
                 window.hide(null)
                 openEditorTab()
             }
@@ -168,19 +168,16 @@ class AgentDockUiHost(
 
     private fun applyOpenInEditor(enabled: Boolean) {
         if (enabled == openInEditor) return
-        val showing = isShowing()
         openInEditor = enabled
-        val window = toolWindow
-        if (window == null || !showing) return
+        val window = toolWindow ?: return
+        // Moves only a UI that is showing in the other place; one restored in the right place stays put.
         if (enabled) {
-            redirectToEditor(window)
-        } else {
+            if (window.isVisible) redirectToEditor(window)
+        } else if (isEditorTabOpen()) {
             closeEditorTab()
             window.activate(null, true)
         }
     }
-
-    private fun isShowing(): Boolean = isEditorTabOpen() || toolWindow?.isVisible == true
 
     private fun isEditorTabOpen(): Boolean =
         FileEditorManager.getInstance(project).isFileOpen(virtualFile)

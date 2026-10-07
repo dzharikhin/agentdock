@@ -53,14 +53,11 @@
 
     <change-notes><![CDATA[
         <ul>
-            <li>Added support for scheduling prompts to send at a specific time.</li>
-            <li>Added support for copying responses and prompts with structured rich content.</li>
-            <li>Improved the display of edit diff blocks and fixed issues with reverting diffs.</li>
-            <li>Added prompt navigation to the left side of chats.</li>
-            <li>Restored GitHub Copilot integration.</li>
-            <li>Added support for saving prompts with rich content in the prompt library.</li>
-            <li>Added an option to show or hide the system instructions section.</li>
-            <li>Refined the UI and fixed minor bugs.</li>
+            <li>Added chat pinning.</li>
+            <li>Improved the display of agent tool calls.</li>
+            <li>Plugin management sections now open in pop-up windows.</li>
+            <li>Redesigned the sidebar.</li>
+            <li>Minor bug fixes and UI refinements.</li>
         </ul>
     ]]></change-notes>
 

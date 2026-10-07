@@ -3,6 +3,7 @@ import { Check, Undo2, FileDiff, ChevronRight } from 'lucide-react';
 import { FileChangeSummary } from '../../types/chat';
 import { Tooltip } from './shared/Tooltip';
 import { FileIcon } from './shared/FileIcon';
+import { LineChanges } from './shared/LineChanges';
 import { chatFocusClassName, chatInsetFocusClassName } from './shared/focusStyles';
 
 interface FileChangesPanelProps {
@@ -62,10 +63,7 @@ const FileChangesPanel = memo(({
               <FileDiff size={14} />
               <div className="flex items-center gap-2 min-w-0">
                 <span className="relative top-[1px]">{fileChanges.length} {fileChanges.length === 1 ? 'file' : 'files'} changed</span>
-                <div className="flex items-center gap-1.5">
-                  {totalAdditions > 0 && <span className="font-bold text-added leading-none">+{totalAdditions}</span>}
-                  {totalDeletions > 0 && <span className="font-bold text-deleted leading-none">-{totalDeletions}</span>}
-                </div>
+                <LineChanges additions={totalAdditions} deletions={totalDeletions} />
               </div>
             </div>
 
@@ -145,10 +143,7 @@ const FileChangesPanel = memo(({
                           </button>
                         </Tooltip>
                       </div>
-                      <div className="flex items-center gap-1 flex-shrink-0 ml-1">
-                        {fc.additions > 0 && <span className="text-sm font-bold text-added leading-none relative top-[1px]">+{fc.additions}</span>}
-                        {fc.deletions > 0 && <span className="text-sm font-bold text-deleted leading-none relative top-[1px]">-{fc.deletions}</span>}
-                      </div>
+                      <LineChanges additions={fc.additions} deletions={fc.deletions} className="ml-1 relative top-[1px]" />
                     </div>
 
                     <div className="flex items-center gap-1 flex-shrink-0 ml-2 relative top-[1px]">

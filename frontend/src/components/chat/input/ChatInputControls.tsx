@@ -123,7 +123,7 @@ export function ChatInputControls({
   ];
 
   return (
-    <div className="flex flex-wrap items-stretch gap-y-1 px-1 py-1 text-foreground">
+    <div className="flex flex-wrap items-stretch gap-y-1 px-1 pt-[5px] pb-[3px] text-foreground">
       <div className="flex min-w-0 flex-1 items-stretch">
         <ChatDropdown
           containerRef={containerRef}
@@ -209,7 +209,7 @@ export function ChatInputControls({
               className={`flex shrink-0 items-center rounded border-0 bg-background-secondary px-1.5 outline-none
                 focus-visible:relative focus-visible:z-10
                 hover:bg-hover focus-visible:bg-hover focus-visible:outline focus-visible:outline-1 focus-visible:outline-offset-0 focus-visible:outline-[var(--ide-Button-default-focusColor)]
-                disabled:cursor-not-allowed ${fastModeEnabled ? 'text-primary' : 'text-foreground'}`}
+                disabled:cursor-not-allowed ${fastModeEnabled ? 'text-link' : 'text-foreground'}`}
             >
               <Zap size={15} fill={fastModeEnabled ? 'currentColor' : 'none'} aria-hidden="true" />
             </button>
@@ -304,9 +304,9 @@ export function ChatInputControls({
           }}
           className="shrink-0"
         />
+      </div>
 
-        <div className="w-[4px]"></div>
-
+      <div className="ml-auto flex shrink-0 items-stretch">
         {selectedAgentId && (
           <AdapterUsageLifecycleProvider value={{ mode: 'chat', enabled: true, isSending, sessionKey: status === 'ready' ? usageSessionKey : undefined }}>
             <ChatUsageIndicator agentId={selectedAgentId} modelId={selectedModelId} />
@@ -314,9 +314,7 @@ export function ChatInputControls({
         )}
 
         <ContextUsageIndicator used={contextTokensUsed} size={contextWindowSize} />
-      </div>
 
-      <div className="ml-auto flex shrink-0 items-stretch">
         {voiceInputButton}
 
         {isSending ? (

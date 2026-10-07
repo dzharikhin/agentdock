@@ -3,6 +3,7 @@ package agentdock.acp
 import com.agentclientprotocol.protocol.Protocol
 import com.agentclientprotocol.rpc.MethodName
 import java.time.Instant
+import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -144,7 +145,13 @@ internal suspend fun Protocol.collectConfigOptionsCatalog(
         val metadata = if (model.value == initialMetadata.currentModelId) {
             initialMetadata
         } else {
-            val response = setSessionConfigOptionRaw(sessionId, modelOption!!.id, model.value)
+            val response = try {
+                setSessionConfigOptionRaw(sessionId, modelOption!!.id, model.value)
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                return@forEach
+            }
             onConfigMutated?.invoke()
             runtimeMetadataFromSetConfigOptionResponseJson(response, adapterInfo)
         }

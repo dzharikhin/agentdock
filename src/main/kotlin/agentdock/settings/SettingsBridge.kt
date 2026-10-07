@@ -24,7 +24,8 @@ class SettingsBridge(
     fun install() {
         host.register("loadGlobalSettings") {
             scope.launch(Dispatchers.IO) {
-                pushGlobalSettings(GlobalSettingsStore.load())
+                // The defaults on a failure, as the UI waits for the settings before it shows anything.
+                pushGlobalSettings(runCatching { GlobalSettingsStore.load() }.getOrDefault(GlobalSettings()))
             }
         }
 

@@ -20,7 +20,6 @@ import { PromptLibraryItem } from '../types/promptLibrary';
 import { SystemInstruction } from '../types/systemInstructions';
 import {
   AdapterDeletedEvent,
-  AdapterRefreshStateEvent,
   AdaptersEvent,
   AssistantActivityEvent,
   AudioRecordingStateEvent,
@@ -201,10 +200,6 @@ export const ACPBridge = {
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.ADAPTERS, { detail: { adapters } }));
     };
 
-    window.__onAdapterRefreshState = (refreshing) => {
-      window.dispatchEvent(new CustomEvent(EVENT_NAMES.ADAPTER_REFRESH_STATE, { detail: { refreshing } }));
-    };
-
     window.__onAvailableCommands = (adapterId, commands) => {
       availableCommandsByAdapter.set(adapterId, commands);
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.AVAILABLE_COMMANDS, { detail: { adapterId, commands } }));
@@ -374,9 +369,6 @@ export const ACPBridge = {
 
   onAdapters: (callback: (e: CustomEvent<AdaptersEvent>) => void) => onBridgeEvent(EVENT_NAMES.ADAPTERS, callback),
 
-  onAdapterRefreshState: (callback: (e: CustomEvent<AdapterRefreshStateEvent>) => void) =>
-    onBridgeEvent(EVENT_NAMES.ADAPTER_REFRESH_STATE, callback),
-
   onAvailableCommands: (callback: (e: CustomEvent<AvailableCommandsEvent>) => void) => onBridgeEvent(EVENT_NAMES.AVAILABLE_COMMANDS, callback),
 
   getAvailableCommands: (adapterId: string) => {
@@ -385,8 +377,9 @@ export const ACPBridge = {
 
   onPermissionRequest: (callback: (e: CustomEvent<PermissionRequestEvent>) => void) => onBridgeEvent(EVENT_NAMES.PERMISSION, callback),
 
-  requestAdapters: (forceRefresh = false) => {
-    window.__requestAdapters?.(forceRefresh);
+  /** Lists the adapters; with an id, restarts that adapter's status checks. */
+  requestAdapters: (adapterIdToRefresh?: string) => {
+    window.__requestAdapters?.(adapterIdToRefresh);
   },
 
   rememberAgentConfigOption: (adapterId: string, configId: string, value: string) => {
@@ -479,8 +472,13 @@ export const ACPBridge = {
     window.__deleteHistoryConversations?.({ projectPath, conversationIds });
   },
 
-  renameHistoryConversation: (projectPath: string, conversationId: string, newTitle: string) => {
-    window.__renameHistoryConversation?.({ projectPath, conversationId, newTitle });
+  /** Sets the user's title and/or the pinned flag of a conversation in the history index. */
+  updateHistoryConversation: (
+    projectPath: string,
+    conversationId: string,
+    changes: { newTitle?: string; pinned?: boolean }
+  ) => {
+    window.__updateHistoryConversation?.({ projectPath, conversationId, ...changes });
   },
 
   updateSessionMetadata: (payload: SessionMetadataUpdatePayload) => {
@@ -666,11 +664,19 @@ export const ACPBridge = {
     window.__testCustomAcpConnection?.(JSON.stringify({ id, requestId }));
   },
 
+  cancelCustomAcpConnectionTest: (id: string) => {
+    window.__cancelCustomAcpConnectionTest?.(id);
+  },
+
   onCustomAcpStatus: (callback: (e: CustomEvent<CustomAcpStatusEvent>) => void) =>
     onBridgeEvent(EVENT_NAMES.CUSTOM_ACP_STATUS, callback),
 
-  checkMcpStatus: () => {
-    window.__checkMcpStatus?.();
+  checkMcpStatus: (id: string) => {
+    window.__checkMcpStatus?.(id);
+  },
+
+  cancelMcpStatus: (id: string) => {
+    window.__cancelMcpStatus?.(id);
   },
 
   onMcpStatus: (callback: (e: CustomEvent<McpStatusEvent>) => void) => onBridgeEvent(EVENT_NAMES.MCP_STATUS, callback),

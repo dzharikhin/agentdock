@@ -1,8 +1,12 @@
-import { Bot, Check, Pencil, Terminal, Trash2, X } from 'lucide-react';
+import { Bot, EllipsisVertical, Pencil, Pin, SquareTerminal, Trash2 } from 'lucide-react';
 import { ACPBridge } from '../../utils/bridge';
 import type { AgentOption, HistorySessionMeta } from '../../types/chat';
 import { Checkbox } from '../ui/Checkbox';
+import { PopupMenu, popupMenuActions } from '../ui/PopupMenu';
+import { PinIcon } from '../tabbar/OpenChatList';
 import { Tooltip } from '../chat/shared/Tooltip';
+import { SectionRowButton, sectionRowButtonClassName } from '../ui/SectionList';
+import { TabTitleInput } from '../tabbar/TabTitleInput';
 
 function getItemAgents(item: HistorySessionMeta): string[] {
   return item.allAdapterNames && item.allAdapterNames.length > 0
@@ -25,17 +29,14 @@ interface HistoryListItemProps {
   item: HistorySessionMeta;
   adapterDisplay: Map<string, AgentOption>;
   isSelected: boolean;
+  /** Open as a chat; resuming in the terminal suits only closed chats. */
+  isOpen: boolean;
   conversationLength: string | null;
   deleteError?: string;
-  editingId: string | null;
-  editTitle: string;
+  isEditing: boolean;
   formatDate: (ms: number) => string;
   onOpenSession: (session: HistorySessionMeta) => void;
-  onEditTitleChange: (title: string) => void;
-  onEditKeyDown: (event: React.KeyboardEvent<HTMLInputElement>, projectPath: string, conversationId: string) => void;
-  onSubmitRename: (projectPath: string, conversationId: string) => void;
-  onCancelEdit: () => void;
-  onStartEditing: (item: HistorySessionMeta, event: React.MouseEvent) => void;
+  onEditingChange: (editing: boolean) => void;
   onOpenDeleteConfirmation: (items: HistorySessionMeta[]) => void;
   onToggleSelection: (conversationId: string) => void;
 }
@@ -44,17 +45,13 @@ export function HistoryListItem({
   item,
   adapterDisplay,
   isSelected,
+  isOpen,
   conversationLength,
   deleteError,
-  editingId,
-  editTitle,
+  isEditing,
   formatDate,
   onOpenSession,
-  onEditTitleChange,
-  onEditKeyDown,
-  onSubmitRename,
-  onCancelEdit,
-  onStartEditing,
+  onEditingChange,
   onOpenDeleteConfirmation,
   onToggleSelection,
 }: HistoryListItemProps) {
@@ -63,13 +60,12 @@ export function HistoryListItem({
   const otherAgents = itemAgents.filter(a => a !== item.adapterName);
   const mainAgent = adapterDisplay.get(item.adapterName);
   const mainLabel = mainAgent?.name || item.adapterName;
-  const canOpenCli = !!mainAgent?.cliResumeAvailable;
+  const canOpenCli = !isOpen && !!mainAgent?.cliResumeAvailable;
   const canDelete = item.deletable !== false;
-  const isEditing = editingId === conversationId;
 
   return (
     <div className="group relative border-b border-border last:border-b-0">
-      <div className="min-h-[56px] flex items-center gap-3 max-[400px]:gap-2 py-1 px-4">
+      <div className="min-h-[56px] flex items-center gap-3 max-[400px]:gap-2 py-1">
         <div
           role="button"
           tabIndex={isEditing ? -1 : 0}
@@ -78,7 +74,7 @@ export function HistoryListItem({
           onClick={() => { if (!isEditing) onOpenSession(item); }}
           onKeyDown={(event) => handleHistoryRowKeyDown(event, isEditing, () => onOpenSession(item))}
         >
-          <div className="flex flex-col items-center shrink-0 gap-0.5 pt-0.5 mx-0.5 max-[350px]:hidden">
+          <div className="flex flex-col items-center shrink-0 gap-0.5 pt-0.5 mx-0.5 section-narrow:hidden">
             {mainAgent?.custom ? (
               <Bot className="h-7 w-7 text-foreground-secondary opacity-75" strokeWidth={1.5} />
             ) : mainAgent?.iconPath ? (
@@ -113,32 +109,14 @@ export function HistoryListItem({
 
           <div className="min-w-0 flex-1 flex flex-col justify-center py-0.5">
             {isEditing ? (
-              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                <input
-                  type="text"
-                  spellCheck={false}
-                  autoFocus
-                  value={editTitle}
-                  onChange={(e) => onEditTitleChange(e.target.value)}
-                  onKeyDown={(e) => onEditKeyDown(e, item.projectPath, conversationId)}
-                  className="-ml-1 h-auto min-w-0 flex-1 border-none bg-background px-1 py-0.5 text-ide-small focus:border-none focus:shadow-none border-none"
+              <div className="flex">
+                <TabTitleInput
+                  initialTitle={item.title}
+                  onCommit={(title) =>
+                    ACPBridge.updateHistoryConversation(item.projectPath, conversationId, { newTitle: title })}
+                  onClose={() => onEditingChange(false)}
+                  className="-ml-1 rounded-[3px] bg-background px-1 py-0.5 font-semibold"
                 />
-                <button
-                  onClick={(e) => { e.stopPropagation(); onSubmitRename(item.projectPath, conversationId); }}
-                  className="rounded border border-[var(--ide-Button-startBorderColor)] bg-background p-1
-                    text-foreground-secondary transition-colors hover:text-primary
-                    focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
-                >
-                  <Check size={14} />
-                </button>
-                <button
-                  onClick={(e) => { e.stopPropagation(); onCancelEdit(); }}
-                  className="rounded border border-[var(--ide-Button-startBorderColor)] bg-background p-1
-                    text-foreground-secondary transition-colors hover:text-error
-                    focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
-                >
-                  <X size={14} />
-                </button>
               </div>
             ) : (
               <div className="py-0.5 text-ide-small font-semibold truncate">{item.title}</div>
@@ -153,56 +131,57 @@ export function HistoryListItem({
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center self-stretch gap-1 relative z-10 ml-2" onClick={(e) => e.stopPropagation()}>
-          <Tooltip variant="minimal" content="Rename chat">
-            <button
-              onClick={(e) => onStartEditing(item, e)}
-              className="m-0.5 rounded-[4px] p-0.5 text-foreground-secondary opacity-0 transition-opacity
-                hover:text-primary group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100
-                focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
+        <div className="flex shrink-0 items-center self-stretch relative z-10 ml-2" onClick={(e) => e.stopPropagation()}>
+          <PopupMenu
+            renderTrigger={(trigger) => (
+              <Tooltip variant="minimal" content="More actions">
+                <button
+                  type="button"
+                  aria-label={`More actions for ${item.title}`}
+                  {...trigger}
+                  className={sectionRowButtonClassName}
+                >
+                  <EllipsisVertical className="h-4 w-4" />
+                </button>
+              </Tooltip>
+            )}
+          >
+            {popupMenuActions([
+              { label: 'Rename', icon: <Pencil size={12} aria-hidden="true" />, onClick: () => onEditingChange(true) },
+              ...(canOpenCli ? [{
+                label: 'Open in terminal',
+                icon: <SquareTerminal size={12} aria-hidden="true" />,
+                onClick: () => ACPBridge.openHistoryConversationCli(item.projectPath, conversationId),
+              }] : []),
+              ...(canDelete ? [{
+                label: 'Delete',
+                icon: <Trash2 size={12} aria-hidden="true" />,
+                onClick: () => onOpenDeleteConfirmation([item]),
+              }] : []),
+              ...(item.pinned ? [] : [{
+                label: 'Pin',
+                icon: <PinIcon pinned={false} />,
+                onClick: () => ACPBridge.updateHistoryConversation(item.projectPath, conversationId, { pinned: true }),
+              }]),
+            ], true)}
+          </PopupMenu>
+
+          {item.pinned ? (
+            <SectionRowButton
+              label="Unpin chat"
+              onClick={() => ACPBridge.updateHistoryConversation(item.projectPath, conversationId, { pinned: false })}
+              className="mr-1"
             >
-              <Pencil className="w-4 h-4" />
-            </button>
-          </Tooltip>
-
-          {canDelete ? (
-            <Tooltip variant="minimal" content="Delete chat">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onOpenDeleteConfirmation([item]);
-                }}
-                className="m-0.5 rounded-[4px] p-0.5 text-foreground-secondary opacity-0 transition-opacity
-                  hover:text-error group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100
-                  focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </Tooltip>
+              <Pin className="h-3.5 w-3.5 rotate-45" fill="currentColor" />
+            </SectionRowButton>
           ) : null}
-
-          {canOpenCli && (
-            <Tooltip variant="minimal" content="Open chat in terminal">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  ACPBridge.openHistoryConversationCli(item.projectPath, conversationId);
-                }}
-                className="m-0.5 rounded-[4px] p-0.5 text-foreground-secondary opacity-0 transition-opacity
-                  hover:text-primary group-hover:opacity-100 group-focus-within:opacity-100 focus-visible:opacity-100
-                  focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
-              >
-                <Terminal className="w-5 h-5" />
-              </button>
-            </Tooltip>
-          )}
 
           <Checkbox
             checked={isSelected}
             disabled={!canDelete}
             onCheckedChange={() => onToggleSelection(conversationId)}
             onClick={(e) => e.stopPropagation()}
-            className="shrink-0 ml-2 mt-[-2px] disabled:opacity-50"
+            className="!top-0 ml-1 disabled:opacity-50"
             aria-label={`Select ${item.title}`}
           />
         </div>

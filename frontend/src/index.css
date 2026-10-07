@@ -14,14 +14,9 @@
   html, body {
     background-color: var(--ide-Panel-background);
     color: var(--ide-Panel-foreground);
-    font-size: calc(var(--ide-font-size) + var(--ui-font-size-offset, 0px));
+    font-size: var(--ide-font-size);
     font-family: var(--ide-font-family);
     letter-spacing: -0.1px;
-  }
-
-  :root {
-    --user-message-bg: var(--ide-user-message-default-bg, #25324d);
-    --ui-font-size-offset: 0px;
   }
 
   h1 {
@@ -54,10 +49,10 @@
 
   input, select, textarea {
     color: var(--ide-TextField-foreground);
-    border: 1px solid var(--ide-Button-startBorderColor);
+    border: 1px solid var(--ide-Borders-color);
     border-radius: 4px;
     box-sizing: border-box;
-    padding: 0.3rem 0.5rem;
+    padding: calc(0.3rem - 2px) 0.5rem;
   }
 
   input:focus, select:focus, textarea:focus {
@@ -65,16 +60,12 @@
     outline: none;
   }
 
-  input, select {
-    background: var(--ide-TextField-background);
+  input, select, textarea {
+    background: var(--ide-background-secondary);
   }
 
-  textarea {
-    background: var(--ide-editor-bg);
-  }
-
-  textarea::placeholder {
-    opacity: 0.5;
+  input::placeholder, textarea::placeholder {
+    color: theme('colors.foreground.secondary');
   }
 
   input::selection, textarea::selection {
@@ -82,7 +73,7 @@
     color: var(--ide-TextField-selectionForeground);
   }
   table td, table th {
-    border: 1px solid var(--ide-Table-gridColor);
+    border: 1px solid var(--ide-Borders-color);
     padding: 0.5rem;
   }
 
@@ -160,6 +151,10 @@ html.ide-theme-islands *::-webkit-scrollbar-thumb {
   border-radius: 999px;
 }
 
+html.ide-theme-islands *::-webkit-scrollbar-track:vertical {
+  margin-bottom: 2px;
+}
+
 @keyframes tooltip-in {
   from {
     opacity: 0;
@@ -169,25 +164,4 @@ html.ide-theme-islands *::-webkit-scrollbar-thumb {
     opacity: 1;
     translate: 0 0;
   }
-}
-
-@keyframes tab-shimmer-sweep {
-  from { background-position: 100% 50%; }
-  to   { background-position:   0% 50%; }
-}
-
-.tab-shimmer-text {
-  background: linear-gradient(
-          90deg,
-          var(--ide-Label-foreground) 0%,
-          var(--ide-Label-foreground) 46%,
-          color-mix(in srgb, var(--ide-Label-foreground), var(--ide-shimmer-highlight-color) 95%) 50%,
-          var(--ide-Label-foreground) 54%,
-          var(--ide-Label-foreground) 100%
-  );
-  background-size: 300% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: tab-shimmer-sweep 2.5s linear infinite;
 }

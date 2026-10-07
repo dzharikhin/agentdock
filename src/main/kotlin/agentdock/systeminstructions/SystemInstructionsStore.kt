@@ -5,7 +5,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import agentdock.acp.AcpAdapterPaths
-import agentdock.settings.GlobalSettingsStore
 import agentdock.utils.atomicWriteText
 import java.io.File
 
@@ -44,7 +43,6 @@ object SystemInstructionsStore {
     }
 
     fun buildInitialPromptBlock(): ContentBlock.Text? {
-        if (!GlobalSettingsStore.isSystemInstructionsEnabled()) return null
         val enabled = loadEnabled()
         if (enabled.isEmpty()) return null
 

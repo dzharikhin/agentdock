@@ -26,7 +26,7 @@ private val replayIgnoredUserCommandRegexes = replayIgnoredUserCommandTags.map {
 
 private val replayImageMimeTypeRegex = Regex("^image/[A-Za-z0-9.+-]+$", RegexOption.IGNORE_CASE)
 
-private const val MAX_TOOL_OUTPUT_LINES = 300
+private const val MAX_TOOL_OUTPUT_LINES = 100
 private const val MAX_TOOL_OUTPUT_CHARS = 5000
 
 internal fun AcpBridge.recordContentBlock(
@@ -167,7 +167,7 @@ private fun AcpBridge.mergeStoredToolEvent(events: List<JsonObject>, event: Json
         "edit" -> mergeEditDiffContent(existingRaw, incomingRaw, mergedRaw)
         else -> mergeStoredToolOutput(existingRaw, incomingRaw, mergedRaw)
     }
-    val mergedRawJson = storedToolRawJson(mergedRawFinal.toString())
+    val mergedRawJson = storedToolRawJson(mergedRawFinal.toString(), mergedKind in FULL_OUTPUT_TOOL_KINDS)
 
     val mergedTitle = event["toolTitle"]?.jsonPrimitive?.contentOrNull
         ?: incomingRaw["title"]?.jsonPrimitive?.contentOrNull
@@ -554,18 +554,18 @@ internal fun AcpBridge.buildStoredToolCallChunk(rawJson: String): JsonObject {
     }
 }
 
-internal fun AcpBridge.buildStoredToolCallUpdateChunk(toolCallId: String, rawJson: String): JsonObject {
+internal fun AcpBridge.buildStoredToolCallUpdateChunk(toolCallId: String, rawJson: String, fullOutput: Boolean): JsonObject {
     return buildJsonObject {
         put("role", "assistant")
         put("type", "tool_call_update")
         put("toolCallId", toolCallId)
-        put("toolRawJson", storedToolRawJson(rawJson))
+        put("toolRawJson", storedToolRawJson(rawJson, fullOutput))
     }
 }
 
-internal fun AcpBridge.storedToolRawJson(rawJson: String): String {
+internal fun AcpBridge.storedToolRawJson(rawJson: String, fullOutput: Boolean = false): String {
     val parsed = runCatching { Json.parseToJsonElement(rawJson).jsonObject }.getOrNull()
-    val compacted = parsed?.let(::compactToolRawJson) ?: return rawJson
+    val compacted = parsed?.let { compactToolRawJson(it, fullOutput) } ?: return rawJson
     val compactedRawJson = compacted.toString()
     return if (shouldPreserveToolRawJson(compacted)) {
         HistoryDiffCompactor.compactStoredToolRawJson(compactedRawJson, Json)
@@ -574,9 +574,9 @@ internal fun AcpBridge.storedToolRawJson(rawJson: String): String {
     }
 }
 
-internal fun compactToolRawJsonForDisplay(rawJson: String): String {
+internal fun compactToolRawJsonForDisplay(rawJson: String, fullOutput: Boolean = false): String {
     val parsed = runCatching { Json.parseToJsonElement(rawJson).jsonObject }.getOrNull()
-    return parsed?.let(::compactToolRawJson)?.toString() ?: rawJson
+    return parsed?.let { compactToolRawJson(it, fullOutput) }?.toString() ?: rawJson
 }
 
 private fun shouldPreserveToolRawJson(parsed: JsonObject?): Boolean {
@@ -593,52 +593,51 @@ private fun shouldPreserveToolRawJson(parsed: JsonObject?): Boolean {
     return false
 }
 
-private fun compactToolRawJson(parsed: JsonObject): JsonObject {
-    if (parsed["kind"]?.jsonPrimitive?.contentOrNull == "edit") return parsed
-    val oversizedText = findOversizedToolOutputText(parsed) ?: return parsed
+// Edits need full diffs for undo, and subagent reports are read in full.
+private val FULL_OUTPUT_TOOL_KINDS = setOf("edit", "think", "task")
 
-    val removedNotice = buildToolOutputRemovedNotice(oversizedText.length)
-    return buildJsonObject {
-        parsed.forEach { (key, value) ->
-            when (key) {
-                "content" -> put(key, buildToolOutputRemovedContent(removedNotice))
-                "rawOutput" -> put(key, buildToolOutputRemovedRawOutput(value as? JsonObject, removedNotice))
-                else -> put(key, value)
-            }
-        }
-        if (parsed["content"] == null) {
-            put("content", buildToolOutputRemovedContent(removedNotice))
-        }
-    }
+// Full output is not truncated, so a gigantic payload, such as an edit of a huge or minified file,
+// would freeze JCEF. Such a payload is reduced to the tool call identity and is not shown.
+private const val MAX_FULL_OUTPUT_TOOL_CALL_CHARS = 1_000_000
+private val TOOL_CALL_IDENTITY_KEYS = setOf("toolCallId", "kind", "title", "status", "locations")
+
+internal fun dropOversizedToolCallPayload(rawJson: String): String {
+    if (rawJson.length <= MAX_FULL_OUTPUT_TOOL_CALL_CHARS) return rawJson
+    val parsed = runCatching { Json.parseToJsonElement(rawJson).jsonObject }.getOrNull() ?: return rawJson
+    return JsonObject(parsed.filterKeys { it in TOOL_CALL_IDENTITY_KEYS } + ("content" to JsonArray(emptyList()))).toString()
 }
 
-private fun buildToolOutputRemovedContent(removedNotice: String): JsonArray = buildJsonArray {
-    add(
-        buildJsonObject {
-            put("type", "content")
-            put(
-                "content",
-                buildJsonObject {
-                    put("type", "text")
-                    put("text", removedNotice)
-                }
-            )
-        }
-    )
+internal fun hasFullOutputToolKind(rawJson: String): Boolean =
+    runCatching { Json.parseToJsonElement(rawJson).jsonObject["kind"] as? JsonPrimitive }.getOrNull()
+        ?.contentOrNull in FULL_OUTPUT_TOOL_KINDS
+
+// Long tool output is truncated before it reaches the UI or history, wherever the adapter puts it.
+// Tool input, diffs and inline images stay intact: diffs are needed for undo, and images are shown.
+private fun compactToolRawJson(parsed: JsonObject, fullOutput: Boolean): JsonObject {
+    if (fullOutput || (parsed["kind"] as? JsonPrimitive)?.contentOrNull in FULL_OUTPUT_TOOL_KINDS) return parsed
+    return JsonObject(parsed.mapValues { (key, value) -> if (key == "rawInput") value else limitToolOutputStrings(value) })
 }
 
-private fun buildToolOutputRemovedRawOutput(rawOutput: JsonObject?, removedNotice: String): JsonObject = buildJsonObject {
-    rawOutput?.get("parsed_cmd")?.let { put("parsed_cmd", it) }
-    put("formatted_output", removedNotice)
-    put("aggregated_output", removedNotice)
-    put("message", removedNotice)
-    put("content", removedNotice)
-    put("stdout", "")
-    put("stderr", "")
+private val INLINE_IMAGE_PREFIXES = listOf("data:image/", "iVBORw", "/9j/")
+
+private fun limitToolOutputStrings(element: JsonElement): JsonElement = when {
+    isDiffLikePayload(element) -> element
+    element is JsonObject && (element["type"] as? JsonPrimitive)?.contentOrNull == "image" -> element
+    element is JsonObject -> JsonObject(element.mapValues { (_, value) -> limitToolOutputStrings(value) })
+    element is JsonArray -> JsonArray(element.map(::limitToolOutputStrings))
+    element is JsonPrimitive && element.isString && INLINE_IMAGE_PREFIXES.none { element.content.trimStart().startsWith(it) } ->
+        limitToolOutputText(element.content).let { if (it === element.content) element else JsonPrimitive(it) }
+    else -> element
 }
 
-private fun buildToolOutputRemovedNotice(removedCharacters: Int): String =
-    "[Output removed: $removedCharacters characters]"
+// The result, notice included, stays within the limits, so compacting it again changes nothing.
+private fun limitToolOutputText(text: String): String {
+    val lines = text.split(Regex("\\r\\n|\\n|\\r"))
+    if (lines.size <= MAX_TOOL_OUTPUT_LINES && text.length <= MAX_TOOL_OUTPUT_CHARS) return text
+    val kept = lines.take(MAX_TOOL_OUTPUT_LINES - 1).joinToString("\n").take(MAX_TOOL_OUTPUT_CHARS - 100)
+    val omittedLines = lines.size - kept.lines().size
+    return "$kept\n… " + if (omittedLines > 0) "$omittedLines more lines" else "${text.length - kept.length} more characters"
+}
 
 private fun extractToolContentText(item: JsonElement): String? {
     val obj = item as? JsonObject ?: return null
@@ -649,35 +648,9 @@ private fun extractToolContentText(item: JsonElement): String? {
         ?: obj["text"]?.jsonPrimitive?.contentOrNull
 }
 
-private fun findOversizedToolOutputText(parsed: JsonObject): String? {
-    val content = parsed["content"] as? JsonArray
-    if (content != null) {
-        content.forEach { item ->
-            val text = extractToolContentText(item)
-            if (text != null && toolOutputTextExceedsLimit(text)) {
-                return text
-            }
-        }
-    }
-
-    val text = (parsed["text"] as? JsonPrimitive)?.contentOrNull
-    if (text != null && toolOutputTextExceedsLimit(text)) return text
-
-    val rawOutput = parsed["rawOutput"] as? JsonObject
-    return listOf("formatted_output", "aggregated_output", "stdout", "stderr", "message", "content")
-        .asSequence()
-        .mapNotNull { key -> (rawOutput?.get(key) as? JsonPrimitive)?.contentOrNull }
-        .firstOrNull(::toolOutputTextExceedsLimit)
-}
-
-private fun toolOutputTextExceedsLimit(text: String): Boolean =
-    countLines(text) > MAX_TOOL_OUTPUT_LINES || text.length > MAX_TOOL_OUTPUT_CHARS
-
-private fun countLines(text: String): Int = text.split(Regex("\\r\\n|\\n|\\r")).size
-
 private fun isDiffLikePayload(element: JsonElement): Boolean {
     val obj = element as? JsonObject ?: return false
-    val type = obj["type"]?.jsonPrimitive?.contentOrNull
+    val type = (obj["type"] as? JsonPrimitive)?.contentOrNull
     if (type == "diff") return true
     return obj["path"] != null && obj["newText"] != null
 }

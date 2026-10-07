@@ -57,34 +57,10 @@ private fun parsePermissionDecisionPayload(payload: String): PermissionDecisionP
 }
 
 internal fun AcpBridge.startInitialAdapterRefresh() {
-    if (!initialAdapterRefreshStarted.compareAndSet(false, true)) {
-        pushAdapterRefreshState(fullAdapterRefreshInProgress.get())
-        scope.launch(Dispatchers.IO) { pushAdapters(includeRuntimeChecks = false) }
-        return
-    }
-    startFullAdapterRefresh()
-}
-
-private fun AcpBridge.startFullAdapterRefresh() {
-    if (!fullAdapterRefreshInProgress.compareAndSet(false, true)) {
-        pushAdapterRefreshState(true)
-        scope.launch(Dispatchers.IO) {
-            pushAdapters(includeRuntimeChecks = false)
-        }
-        return
-    }
-
-    pushAdapterRefreshState(true)
-    fullAdapterRefreshDispatching.set(true)
-    scope.launch(Dispatchers.IO) {
-        try {
-            resetAdapterRefreshState()
-            pushAdapters(includeRuntimeChecks = false)
-            pushAdapters(includeRuntimeChecks = true)
-        } finally {
-            fullAdapterRefreshDispatching.set(false)
-            finishFullAdapterRefreshIfIdle()
-        }
+    if (initialAdapterRefreshStarted.compareAndSet(false, true)) {
+        refreshAdapters(AcpAdapterConfig.getAllAdapters().values.map { it.id })
+    } else {
+        scope.launch(Dispatchers.IO) { pushAdapters() }
     }
 }
 
@@ -148,13 +124,8 @@ internal fun AcpBridge.installConversationQueries() {
         }
     }
 
-    host.register("listAdapters") { payload ->
-        if (payload == "refresh") {
-            initialAdapterRefreshStarted.set(true)
-            startFullAdapterRefresh()
-        } else {
-            startInitialAdapterRefresh()
-        }
+    host.register("listAdapters") { adapterIdToRefresh ->
+        if (adapterIdToRefresh.isBlank()) startInitialAdapterRefresh() else refreshAdapters(listOf(adapterIdToRefresh))
     }
 
     host.register("sendPrompt") { payload ->
@@ -196,8 +167,8 @@ internal fun AcpBridge.installConversationQueries() {
                             )
                         }
                     }
-                    // Prompt dispatch is the final configuration barrier: anything shown as
-                    // selected in the UI must be applied before the agent receives the prompt.
+                    // Prompt dispatch is the final configuration barrier: the configuration
+                    // captured at submission must be applied before the agent receives the prompt.
                     // Bounded like every other start, so a stuck agent fails the prompt
                     // instead of leaving the user waiting on a prompt that never runs.
                     val started = withTimeoutOrNull(AcpBridge.START_AGENT_TIMEOUT_MS) {

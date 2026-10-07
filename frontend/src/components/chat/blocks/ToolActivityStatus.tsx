@@ -4,5 +4,5 @@ export function ToolActivityStatus({ status, isActivePrompt }: { status?: string
   const { isPending, isError } = parseToolStatus(status);
   const showPending = isPending && isActivePrompt;
   if (!showPending && !isError) return null;
-  return <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${showPending ? 'bg-warning animate-pulse' : 'bg-error'}`} />;
+  return <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 ${showPending ? 'bg-warning animate-pulse' : 'bg-error'}`} />;
 }

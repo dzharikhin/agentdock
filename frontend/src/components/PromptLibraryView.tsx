@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Bookmark, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Bookmark } from 'lucide-react';
 import { ACPBridge } from '../utils/bridge';
 import { PromptLibraryItem } from '../types/promptLibrary';
 import type { ChatAttachment } from '../types/chat';
 import { Button } from './ui/Button';
-import { Tooltip } from './chat/shared/Tooltip';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionEmptyState, SectionListRow } from './ui/SectionList';
+import { SectionPage } from './ui/SectionPage';
 import ConfirmationModal from './ConfirmationModal';
 import { FormDialog } from './ui/FormDialog';
 import { PromptLibraryEditor } from './PromptLibraryEditor';
@@ -19,6 +19,10 @@ interface FormState {
 
 function emptyForm(): FormState {
   return { name: '', prompt: '', attachments: [] };
+}
+
+function truncatePreview(text: string): string {
+  return text.length > 100 ? `${text.slice(0, 100).trimEnd()}…` : text;
 }
 
 function nextId(): string {
@@ -105,72 +109,24 @@ export function PromptLibraryView() {
   };
 
   return (
-    <div className="h-full overflow-hidden bg-background text-foreground text-ide-small">
-      <div className="h-full w-full overflow-y-auto">
-        <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-      <SectionTitle actions={(
-        <Button
-          onClick={openAdd}
-          variant="primary"
-          leftIcon={<Plus size={14} />}
-          className="max-h-8"
-        >
-          <span>Add</span>
-        </Button>
-      )}>
-        Prompt Library
-      </SectionTitle>
-
-        {prompts.length === 0 && !form && (
-          <div className="flex-1 flex flex-col mt-12 items-center gap-2 text-foreground-secondary">
-            <Bookmark size={28} strokeWidth={1.5} />
-            <span>Prompt library is empty</span>
-            <p className="max-w-[400px] text-center mt-2">
-              Saved prompts can be used to quickly prefill chat input.
-            </p>
-          </div>
+    <div className="flex min-h-0 flex-col bg-background text-foreground text-ide-small">
+      <SectionPage onAdd={openAdd}>
+        {prompts.length === 0 && (
+          <SectionEmptyState icon={Bookmark} title="No saved prompts">
+            Saved prompts can be used to quickly prefill chat input.
+          </SectionEmptyState>
         )}
 
         {prompts.map((prompt) => (
-          <div
+          <SectionListRow
             key={prompt.id}
-            className="flex items-start gap-3 px-4 py-2.5 border-b border-border last:border-b-0"
-          >
-
-            <div className="flex-1 min-w-0">
-              <div className="truncate text-foreground">{prompt.name}</div>
-              <div className="mt-1 text-xs text-foreground-secondary truncate">
-                {prompt.prompt.replace(/\[image-[a-z0-9-]+]/g, '[image]').replace(/\[code-ref-[a-z0-9-]+]/g, '[file]') || prompt.attachments?.[0]?.name}
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1">
-              <Tooltip variant="minimal" content="Edit">
-                <button
-                  type="button"
-                  onClick={() => openEdit(prompt)}
-                  className="rounded p-1 text-foreground-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                  aria-label={`Edit ${prompt.name}`}
-                >
-                  <Pencil size={13} />
-                </button>
-              </Tooltip>
-              <Tooltip variant="minimal" content="Delete">
-                <button
-                  type="button"
-                  onClick={() => setDeleteTarget(prompt)}
-                  className="rounded p-1 text-foreground-secondary transition-colors hover:text-error focus-visible:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                  aria-label={`Delete ${prompt.name}`}
-                >
-                  <Trash2 size={13} />
-                </button>
-              </Tooltip>
-            </div>
-          </div>
+            name={prompt.name}
+            description={truncatePreview(prompt.prompt.replace(/\[image-[a-z0-9-]+]/g, '[image]').replace(/\[code-ref-[a-z0-9-]+]/g, '[file]')) || prompt.attachments?.[0]?.name}
+            onEdit={() => openEdit(prompt)}
+            onDelete={() => setDeleteTarget(prompt)}
+          />
         ))}
-
-        </div>
-      </div>
+      </SectionPage>
 
       <FormDialog
         isOpen={form !== null}
@@ -190,14 +146,13 @@ export function PromptLibraryView() {
         )}
       >
         {form ? (
-          <div className="flex flex-col gap-2">
-            <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2">
+          <div className="flex flex-col gap-3">
+            <div className="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2 section-medium:grid-cols-1 section-medium:gap-1">
               <span className="text-foreground-secondary">Name <span className="text-error" aria-hidden="true">*</span></span>
               <input
                 data-autofocus="true"
                 value={form.name}
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
-                className="w-full rounded-[4px] px-2 py-1"
                 required
                 aria-required="true"
               />

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Clock, X } from 'lucide-react';
+import { Clock, Info, X } from 'lucide-react';
 import { Tooltip } from '../shared/Tooltip';
 import { parseScheduledTime, scheduledTimeParts } from './scheduledTime';
 
@@ -57,13 +57,7 @@ export function ScheduleBar({ scheduledAt, onScheduledAtChange, onClose }: Sched
     <div className="py-1">
       <div className="flex h-9 w-full min-w-0 items-center gap-2 rounded-[6px] border border-border bg-background-secondary px-3 text-ide-small text-foreground-secondary">
         <Clock size={14} className="shrink-0" aria-hidden="true" />
-        <Tooltip
-          content="Scheduled prompts are sent once their time arrives and they reach the front of the queue. Queued prompts are kept only while this chat is open in the plugin."
-          className="shrink-0"
-          contentClassName="!max-w-[min(320px,calc(100vw-16px))] !text-xs"
-        >
-          <span className="block w-fit max-w-full truncate whitespace-nowrap">Send at</span>
-        </Tooltip>
+        <span className="shrink-0 whitespace-nowrap">Send at</span>
         <div
           role="group"
           aria-label="Scheduled date and time (DD.MM.YYYY HH:mm, local time)"
@@ -118,13 +112,27 @@ export function ScheduleBar({ scheduledAt, onScheduledAtChange, onClose }: Sched
                     focusSegment(index + 1);
                   }
                 }}
-                className={`${segment.width} h-5 min-w-0 appearance-none rounded-none border-0 bg-transparent p-0 text-center tabular-nums text-foreground placeholder:text-foreground-secondary outline-none focus:bg-accent focus:text-accent-foreground focus:shadow-none`}
+                className={`${segment.width} h-5 min-w-0 appearance-none rounded-none border-0 bg-transparent p-0 text-center tabular-nums text-foreground outline-none focus:bg-accent focus:text-accent-foreground focus:shadow-none`}
               />
             </span>
           ))}
         </div>
+        <Tooltip
+          content={<>
+            Scheduled prompts are sent once their time arrives and they reach the front of the queue. Queued prompts are kept only while this chat is open in the plugin.
+            <br /><br />
+            Each queued prompt uses the model and other configuration options selected when it was added to the queue.
+          </>}
+          className="ml-auto shrink-0"
+          contentClassName="!max-w-[min(320px,calc(100vw-16px))] !text-xs"
+        >
+          <span tabIndex={0} aria-label="About scheduled prompts"
+            className="flex h-6 w-6 cursor-default items-center justify-center rounded focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)]">
+            <Info size={14} aria-hidden="true" />
+          </span>
+        </Tooltip>
         <button type="button" onClick={onClose} aria-label="Turn off schedule send"
-          className="ml-auto flex h-6 w-6 shrink-0 items-center justify-center rounded border-0 bg-transparent p-0 text-foreground-secondary hover:bg-hover hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)]">
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded border-0 bg-transparent p-0 text-foreground-secondary hover:bg-hover hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)]">
           <X size={14} aria-hidden="true" />
         </button>
       </div>

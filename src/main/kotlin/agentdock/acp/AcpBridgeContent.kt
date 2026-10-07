@@ -85,8 +85,8 @@ internal fun AcpBridge.pushToolCallChunk(chatId: String, rawJson: String) {
     dispatchContentChunkJson(json)
 }
 
-internal fun AcpBridge.pushToolCallUpdateChunk(chatId: String, toolCallId: String, rawJson: String) {
-    val displayRawJson = compactToolRawJsonForDisplay(rawJson)
+internal fun AcpBridge.pushToolCallUpdateChunk(chatId: String, toolCallId: String, rawJson: String, fullOutput: Boolean) {
+    val displayRawJson = compactToolRawJsonForDisplay(rawJson, fullOutput)
     val parsed = try { Json.parseToJsonElement(displayRawJson).jsonObject } catch (e: Exception) {
         LOG.debug("Failed to parse tool call update JSON", e)
         null

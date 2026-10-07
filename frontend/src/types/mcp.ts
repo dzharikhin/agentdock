@@ -29,7 +29,7 @@ export interface McpServerConfig {
  * (src/main/kotlin/agentdock/mcp/McpStatus.kt). Transient - not persisted, reflects the
  * latest reachability/health probe pushed from McpBridge.
  */
-export type McpStatus = 'unknown' | 'loading' | 'connected' | 'error' | 'disabled';
+export type McpStatus = 'unknown' | 'loading' | 'connected' | 'error';
 
 export interface McpStatusUpdate {
   id: string;

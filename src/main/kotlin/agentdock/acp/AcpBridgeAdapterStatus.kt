@@ -36,7 +36,7 @@ private fun <K> AcpBridge.launchRuntimeCheck(
     val job = scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) { check() }
     job.invokeOnCompletion {
         jobs.remove(key, job)
-        finishFullAdapterRefreshIfIdle()
+        finishAdapterRefreshesIfIdle()
     }
     val selected = jobs.compute(key) { _, current ->
         current?.takeUnless { it.isCompleted } ?: job
@@ -232,6 +232,7 @@ private fun AcpBridge.buildAdapterPayload(
         updateChecking = updateChecking,
         updateKnown = updateKnown,
         updateAvailable = updateAvailable,
+        refreshing = refreshingAdapters.containsKey(info.id),
         downloading = isDownloading,
         downloadStatus = dlStatus,
         disabledModels = info.disabledModels,
@@ -277,7 +278,7 @@ private fun AcpBridge.ensureDownloadProbeStarted(
         }
         pushAdapters(
             includeRuntimeChecks = succeeded,
-            adapterIdToRefresh = info.id.takeIf { succeeded }
+            adapterIdsToRefresh = setOf(info.id).takeIf { succeeded }
         )
     }
 }
@@ -288,8 +289,8 @@ private fun AcpBridge.ensureLoginStatusCheckStarted(
     force: Boolean = false
 ) {
     if (info.loginStatusMethod == null) return
-    val stageForFullRefresh = fullAdapterRefreshInProgress.get()
-    if (stageForFullRefresh && completedLoginStatusRefreshes.contains(info.id)) return
+    val stageForRefresh = refreshingAdapters.containsKey(info.id)
+    if (stageForRefresh && completedLoginStatusRefreshes.contains(info.id)) return
     if (!force && service.loginStatusStates.containsKey(info.id)) return
 
     launchRuntimeCheck(loginStatusJobs, info.id) {
@@ -320,7 +321,7 @@ private fun AcpBridge.ensureLoginStatusCheckStarted(
                 false
             }
         }
-        if (stageForFullRefresh) completedLoginStatusRefreshes.add(info.id)
+        if (stageForRefresh) completedLoginStatusRefreshes.add(info.id)
         pushAdapters()
     }
 }
@@ -340,7 +341,7 @@ internal fun AcpBridge.refreshAdapterLoginStatus(adapterId: String) {
 
 internal fun AcpBridge.pushAdapters(
     includeRuntimeChecks: Boolean = false,
-    adapterIdToRefresh: String? = null
+    adapterIdsToRefresh: Collection<String>? = null
 ) {
     try {
         val unique = linkedMapOf<String, AcpAdapterConfig.AdapterInfo>()
@@ -349,7 +350,7 @@ internal fun AcpBridge.pushAdapters(
 
         if (includeRuntimeChecks) {
             unique.values.forEach { info ->
-                if (adapterIdToRefresh != null && info.id != adapterIdToRefresh) return@forEach
+                if (adapterIdsToRefresh?.contains(info.id) == false) return@forEach
                 ensureDownloadProbeStarted(info, target)
             }
         }
@@ -370,19 +371,19 @@ internal fun AcpBridge.pushAdapters(
 
         unique.values.forEach { info ->
             if (!includeRuntimeChecks) return@forEach
-            if (adapterIdToRefresh != null && info.id != adapterIdToRefresh) return@forEach
+            if (adapterIdsToRefresh?.contains(info.id) == false) return@forEach
             if (info.loginStatusMethod == null) return@forEach
             if (adapters.firstOrNull { it.id == info.id }?.downloaded != true) return@forEach
             ensureLoginStatusCheckStarted(
                 info = info,
                 target = target,
-                force = fullAdapterRefreshInProgress.get()
+                force = refreshingAdapters.containsKey(info.id)
             )
         }
 
         unique.values.forEach { info ->
             if (!includeRuntimeChecks) return@forEach
-            if (adapterIdToRefresh != null && info.id != adapterIdToRefresh) return@forEach
+            if (adapterIdsToRefresh?.contains(info.id) == false) return@forEach
             val key = "${target.name}:${info.id}"
             if (updateCheckJobs[key]?.isActive == true) return@forEach
             val downloaded = adapters.firstOrNull { it.id == info.id }?.downloaded == true
@@ -416,7 +417,7 @@ internal fun AcpBridge.pushAdapters(
 
         unique.values.forEach { info ->
             if (!includeRuntimeChecks) return@forEach
-            if (adapterIdToRefresh != null && info.id != adapterIdToRefresh) return@forEach
+            if (adapterIdsToRefresh?.contains(info.id) == false) return@forEach
             if (info.agentVersionConfig == null) return@forEach
             if (agentVersionJobs[info.id]?.isActive == true) return@forEach
             val adapterPayload = adapters.firstOrNull { it.id == info.id }
@@ -477,50 +478,58 @@ internal fun AcpBridge.pushAdapters(
         }
     } catch (_: Exception) {
     } finally {
-        if (includeRuntimeChecks) finishFullAdapterRefreshIfIdle()
+        if (includeRuntimeChecks) finishAdapterRefreshesIfIdle()
     }
 }
 
-internal fun AcpBridge.pushAdapterRefreshState(refreshing: Boolean) {
-    host.eval("if(window.__onAdapterRefreshState) window.__onAdapterRefreshState($refreshing);")
-}
-
-internal fun AcpBridge.finishFullAdapterRefreshIfIdle() {
-    if (!fullAdapterRefreshInProgress.get()) return
-    if (fullAdapterRefreshDispatching.get()) return
-    val hasActiveChecks =
-        downloadProbeJobs.values.any { !it.isCompleted } ||
-            loginStatusJobs.values.any { !it.isCompleted } ||
-            updateCheckJobs.values.any { !it.isCompleted } ||
-            agentVersionJobs.values.any { !it.isCompleted }
-    if (!hasActiveChecks) {
-        if (fullAdapterRefreshInProgress.compareAndSet(true, false)) {
-            completedLoginStatusRefreshes.clear()
+/** Restarts the runtime checks of the given adapters; each shows as refreshing until its checks finish. */
+internal fun AcpBridge.refreshAdapters(adapterIds: Collection<String>) {
+    val started = adapterIds.filter { refreshingAdapters.putIfAbsent(it, true) == null }
+    if (started.isEmpty()) return
+    scope.launch(Dispatchers.IO) {
+        try {
+            started.forEach { resetAdapterRefreshState(it) }
             pushAdapters()
-            pushAdapterRefreshState(false)
+            pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = started)
+        } finally {
+            started.forEach { refreshingAdapters[it] = false }
+            finishAdapterRefreshesIfIdle()
         }
     }
 }
 
-internal fun AcpBridge.resetAdapterRefreshState() {
-    authErrors.clear()
-    downloadStatuses.forEach { (adapterId, status) ->
-        if (status.startsWith("Error:")) {
-            downloadStatuses.remove(adapterId, status)
-        }
+internal fun AcpBridge.finishAdapterRefreshesIfIdle() {
+    val target = AcpAdapterPaths.getExecutionTarget()
+    val finished = refreshingAdapters.keys.filter { adapterId ->
+        val targetKey = downloadProbeKey(target, adapterId)
+        val checks = listOf(
+            downloadProbeJobs[targetKey],
+            loginStatusJobs[adapterId],
+            updateCheckJobs[targetKey],
+            agentVersionJobs[adapterId]
+        )
+        checks.none { it?.isCompleted == false } && refreshingAdapters.remove(adapterId, false)
     }
-    downloadProbeJobs.values.forEach { it.cancel() }
-    downloadProbeJobs.clear()
-    downloadProbeStates.clear()
-    loginStatusJobs.values.forEach { it.cancel() }
-    loginStatusJobs.clear()
-    completedLoginStatusRefreshes.clear()
-    updateCheckJobs.values.forEach { it.cancel() }
-    updateCheckJobs.clear()
-    latestVersionStates.clear()
-    agentVersionJobs.values.forEach { it.cancel() }
-    agentVersionJobs.clear()
-    agentVersionStates.clear()
+    if (finished.isEmpty()) return
+    completedLoginStatusRefreshes.removeAll(finished.toSet())
+    // One push once no refresh is left, as the startup refresh of all adapters would otherwise push per adapter.
+    if (refreshingAdapters.isEmpty()) pushAdapters()
+}
+
+private fun AcpBridge.resetAdapterRefreshState(adapterId: String) {
+    authErrors.remove(adapterId)
+    downloadStatuses.computeIfPresent(adapterId) { _, status -> status.takeUnless { it.startsWith("Error:") } }
+    AcpExecutionTarget.entries.forEach { target ->
+        val key = downloadProbeKey(target, adapterId)
+        downloadProbeJobs.remove(key)?.cancel()
+        downloadProbeStates.remove(key)
+        updateCheckJobs.remove(key)?.cancel()
+    }
+    loginStatusJobs.remove(adapterId)?.cancel()
+    completedLoginStatusRefreshes.remove(adapterId)
+    latestVersionStates.remove(adapterId)
+    agentVersionJobs.remove(adapterId)?.cancel()
+    agentVersionStates.remove(adapterId)
 }
 
 internal fun AcpBridge.resetDownloadProbeState(adapterId: String? = null) {

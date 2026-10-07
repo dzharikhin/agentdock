@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, memo } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, memo } from 'react';
 import { Message, RichContentBlock, TextBlock, ImageBlock, FileBlock, CodeReferenceBlock } from '../../types/chat';
 import { Check, ChevronDown, ChevronUp, Copy } from 'lucide-react';
 import { AttachmentItem } from './shared/AttachmentItem';
@@ -53,7 +53,8 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
   const [copied, setCopied] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  // Measure before paint so a long prompt is already collapsed when the message list measures its height.
+  useLayoutEffect(() => {
     const el = contentRef.current;
     if (!el) return;
 
@@ -188,7 +189,7 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
   };
 
   return (
-    <div ref={(element) => onElementChange?.(message.id, element)} className="flex flex-col mb-8 animate-in fade-in slide-in-from-bottom-2">
+    <div ref={(element) => onElementChange?.(message.id, element)} className="flex flex-col mb-8">
       <div className="flex justify-end relative">
         <div className="user-message-bubble bg-accent rounded-[6px] group max-w-[80%] px-4 pt-3 pb-2 text-foreground"
           style={{backgroundColor: 'var(--user-message-bg)',}}

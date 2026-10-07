@@ -1,37 +1,29 @@
-import { useEffect, useRef, useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import TabBar, { TabBarProps } from './components/TabBar';
 import { Sidebar } from './components/Sidebar';
 import { AppTabContent } from './components/AppTabContent';
 import { AppSectionContent } from './components/AppSectionContent';
 import { EmptyStateView } from './components/EmptyStateView';
-import { SidebarLayoutControls } from './components/LayoutControls';
+import { SidebarVisibilityButton } from './components/LayoutControls';
+import { SectionPopup } from './components/SectionPopup';
+import { getNavigationActions } from './components/tabbar/NavigationActions';
 import ConfirmationModal from './components/ConfirmationModal';
 import { useAppController } from './hooks/app/useAppController';
 import { useAppLayout } from './hooks/app/useAppLayout';
 import { ACPBridge } from './utils/bridge';
-import {
-  DEFAULT_SIDEBAR_EXPANDED_SECTIONS,
-  type GlobalSettings,
-  type SidebarSectionId,
-} from './types/chat';
+import { conversationKeyOf } from './types/chat';
+import type { GlobalSettings } from './types/chat';
 
 const SIDEBAR_ANIMATION_MS = 200;
-
-function normalizeSidebarExpandedSections(value: unknown): SidebarSectionId[] {
-  if (!Array.isArray(value)) return [...DEFAULT_SIDEBAR_EXPANDED_SECTIONS];
-  return [...new Set(value.filter((section): section is SidebarSectionId => (
-    section === 'new-chat' || section === 'recent-chats' || section === 'sections'
-  )))];
-}
+/** From this content width `app-wide:` widens side padding and the chat prompt navigation. */
+const WIDE_CONTENT_MIN_WIDTH_PX = 720;
 
 function App() {
   const { isWide, isIslandsTheme, viewportWidth } = useAppLayout();
+  /** Narrower windows leave no room for the section names in the section popup. */
+  const compactSections = viewportWidth < 700;
   const [openInEditor, setOpenInEditor] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.openInEditor ?? true
-  );
-  const [systemInstructionsEnabled, setSystemInstructionsEnabled] = useState(
-    () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.systemInstructionsEnabled ?? false
   );
   const [promptNavigationHoverOnly, setPromptNavigationHoverOnly] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.promptNavigationHoverOnly ?? true
@@ -42,13 +34,11 @@ function App() {
   const [sidebarPosition, setSidebarPosition] = useState<GlobalSettings['sidebarPosition']>(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.sidebarPosition === 'right' ? 'right' : 'left'
   );
-  const [sidebarWidth, setSidebarWidth] = useState(260);
-  const [sidebarExpandedSections, setSidebarExpandedSections] = useState<SidebarSectionId[]>(
-    () => normalizeSidebarExpandedSections(
-      ACPBridge.getGlobalSettingsSnapshot()?.settings?.sidebarExpandedSections
-    )
-  );
-  const [sidebarHidden, setSidebarHidden] = useState(false);
+  // Nothing is shown until the saved settings arrive, so the layout does not jump from the defaults on load.
+  const [settingsLoaded, setSettingsLoaded] = useState(() => ACPBridge.getGlobalSettingsSnapshot() !== undefined);
+  const [sidebarWidth, setSidebarWidth] = useState(240);
+  // A narrow window starts with the sidebar hidden, so it does not cover the content.
+  const [sidebarHidden, setSidebarHidden] = useState(!isWide);
   const [sidebarVisibilityAnimating, setSidebarVisibilityAnimating] = useState(false);
   const sidebarAnimationTimerRef = useRef<number>();
 
@@ -64,35 +54,32 @@ function App() {
 
   useEffect(() => () => window.clearTimeout(sidebarAnimationTimerRef.current), []);
 
+  // Narrowing the window past the breakpoint hides the sidebar instead of laying it over the content.
   useEffect(() => {
-    const userMessageBgMap: Record<string, string> = {
-      'default': 'var(--ide-user-message-default-bg)',
-      'blue-highlight': 'var(--ide-user-message-blue-highlight-bg)',
-      'blue': 'var(--ide-user-message-blue-bg)',
-      'background-secondary': 'var(--ide-background-secondary)',
-      'accent': 'var(--ide-List-selectionBackground)',
-      'custom': 'var(--ide-user-message-custom-bg)',
-    };
+    if (!isWide) setSidebarVisibility(true);
+  }, [isWide]);
 
+  const appContentRef = useRef<HTMLDivElement>(null);
+  const [contentWide, setContentWide] = useState(false);
+  useLayoutEffect(() => {
+    const el = appContentRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => setContentWide(el.clientWidth >= WIDE_CONTENT_MIN_WIDTH_PX));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [settingsLoaded]);
+
+  useEffect(() => {
     const applyGlobalSettings = (payload: { settings?: Partial<GlobalSettings> } | undefined) => {
       setOpenInEditor(payload?.settings?.openInEditor ?? true);
-      setSystemInstructionsEnabled(payload?.settings?.systemInstructionsEnabled ?? false);
       setPromptNavigationHoverOnly(payload?.settings?.promptNavigationHoverOnly ?? true);
       const nextSidebarEnabled = payload?.settings?.sidebarEnabled ?? true;
       setSidebarEnabled(nextSidebarEnabled);
       if (!nextSidebarEnabled) setSidebarHidden(false);
       setSidebarPosition(payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left');
-      setSidebarExpandedSections(normalizeSidebarExpandedSections(payload?.settings?.sidebarExpandedSections));
-      const offset = payload?.settings?.uiFontSizeOffsetPx ?? 0;
-      document.documentElement.style.setProperty('--ui-font-size-offset', `${offset}px`);
-
-      const styleId = payload?.settings?.userMessageBackgroundStyle ?? 'default';
-      const customColor = payload?.settings?.userMessageCustomColor ?? '#193d70';
-      document.documentElement.style.setProperty(
-        '--ide-user-message-custom-bg', /^#[0-9a-fA-F]{6}$/.test(customColor) ? customColor : '#193d70'
-      );
-      const bg = userMessageBgMap[styleId] ?? userMessageBgMap['default'];
-      document.documentElement.style.setProperty('--user-message-bg', bg);
+      const contentMaxWidthPx = payload?.settings?.contentMaxWidthPx ?? 760;
+      document.documentElement.style.setProperty('--app-content-max-width', contentMaxWidthPx ? `${contentMaxWidthPx}px` : 'none');
+      setSettingsLoaded(true);
     };
 
     const cleanup = ACPBridge.onGlobalSettings((e) => {
@@ -114,6 +101,7 @@ function App() {
   }, []);
 
   const {
+    chats,
     tabs,
     activeTabId,
     activeSection,
@@ -126,6 +114,9 @@ function App() {
     historyList,
     historyLoaded,
     pendingAgentSwitch,
+    pendingCloseTabIds,
+    handleConfirmCloseTabs,
+    handleCancelCloseTabs,
     pendingAgentName,
     pendingHandoffsByTab,
     handleSelectTab,
@@ -134,6 +125,7 @@ function App() {
     handleCloseAllChats,
     hasOpenConversationsForAdapter,
     handleUpdateAgent,
+    defaultNewTabAgentId,
     handleNewTab,
     handleOpenHistory,
     openSection,
@@ -154,26 +146,22 @@ function App() {
     handleCancelAgentSwitch,
   } = useAppController();
 
-  useEffect(() => {
-    if (!systemInstructionsEnabled && activeSection === 'system-instructions') closeActiveSection();
-  }, [systemInstructionsEnabled, activeSection, closeActiveSection]);
-
   const navigationProps: TabBarProps = {
     isIslandsTheme,
+    chats,
     tabs,
+    historyList,
     activeTabId,
-    activeSection,
-    systemInstructionsEnabled,
     tabUi,
     onSelectTab: handleSelectTab,
     onReorderTabs: handleReorderTabs,
     onCloseTab: handleCloseTab,
     onCloseAllChats: handleCloseAllChats,
-    onCloseActiveSection: closeActiveSection,
     onNewTab: () => handleNewTab(),
     onNewTabWithAgent: (agentId) => handleNewTab(agentId),
     onRenameTab: handleRenameTab,
     agents: availableAgents,
+    noRunnableAgents: agentAvailabilityResolved && runnableAgents.length === 0,
     onOpenHistory: () => openSection('history'),
     onOpenManagement: () => openSection('management'),
     onOpenDesignSystem: () => openSection('design'),
@@ -212,21 +200,11 @@ function App() {
     }
   };
 
-  const setSidebarSectionExpanded = (section: SidebarSectionId, expanded: boolean) => {
-    const next = expanded
-      ? [...new Set([...sidebarExpandedSections, section])]
-      : sidebarExpandedSections.filter((item) => item !== section);
-    setSidebarExpandedSections(next);
-    const settings = ACPBridge.getGlobalSettingsSnapshot()?.settings;
-    if (settings) {
-      ACPBridge.saveGlobalSettings({ ...settings, sidebarExpandedSections: next });
-    }
-  };
+  if (!settingsLoaded) return <div className="h-full bg-background" />;
 
   return (
     <div
-      style={{ '--content-top-inset': sidebarEnabled && isWide ? '1rem' : '0px' } as CSSProperties}
-      className={`relative h-full min-w-[300px] bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'}`}
+      className={`relative h-full min-w-[320px] bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'} ${!sidebarEnabled || isWide ? '[--content-top-inset:1rem]' : ''}`}
     >
       {sidebarEnabled ? (
         <Sidebar
@@ -237,10 +215,7 @@ function App() {
           overlay={!isWide}
           preferredWidth={sidebarWidth}
           viewportWidth={viewportWidth}
-          historyList={historyList}
-          expandedSections={sidebarExpandedSections}
-          onSectionExpandedChange={setSidebarSectionExpanded}
-          onOpenRecentConversation={(session) => handleOpenHistory(session, true)}
+          newTabAgentId={defaultNewTabAgentId}
           onWidthChange={setSidebarWidth}
           onHide={() => setSidebarVisibility(true)}
           onUseTabBar={() => setSidebarLayoutEnabled(false)}
@@ -259,19 +234,14 @@ function App() {
       ) : null}
 
       {sidebarEnabled && sidebarHidden ? (
-        <SidebarLayoutControls
+        <SidebarVisibilityButton
           position={sidebarPosition}
           hidden
-          onToggleVisibility={() => setSidebarVisibility(false)}
-          onUseTabBar={() => setSidebarLayoutEnabled(false)}
-          openInEditor={openInEditor}
-          onToggleOpenInEditor={toggleOpenInEditor}
-          onTogglePosition={toggleSidebarPosition}
-          floating
+          onClick={() => setSidebarVisibility(false)}
         />
       ) : null}
 
-      <div id="app-content" className="flex-1 relative min-h-0 min-w-0">
+      <div id="app-content" ref={appContentRef} data-wide={contentWide || undefined} className="flex-1 relative min-h-0 min-w-0">
         {/* Chat tabs stay mounted so their sessions and UI state are preserved. */}
         {tabs.map((tab) => {
           const isTabActive = tab.id === activeTabId;
@@ -282,7 +252,7 @@ function App() {
               tab={tab}
               isActive={isTabActive}
               runnableAgents={runnableAgents}
-              promptNavigationHoverOnly={promptNavigationHoverOnly}
+              promptNavigationHoverOnly={promptNavigationHoverOnly || !contentWide}
               pendingHandoff={pendingHandoffsByTab[tab.id]}
               onUserMessageSent={() => handleUserMessageSent(tab.id)}
               onAssistantActivity={() => handleAssistantActivity(tab.id)}
@@ -299,7 +269,32 @@ function App() {
           );
         })}
 
-        {/* Sections mount on first use and remain cached without becoming tabs. */}
+        {/* Empty state */}
+        {!activeTabId && (
+          <EmptyStateView
+            runnableAgents={runnableAgents}
+            loaded={agentAvailabilityResolved && historyLoaded}
+            onStartWithAgent={handleNewTab}
+            onOpenManagement={() => openSection('management')}
+            agents={availableAgents}
+            // In the history order, pinned ones first; open chats are left out.
+            recentChats={historyList
+              .filter((item) => !tabs.some((tab) => conversationKeyOf(tab) === item.conversationId))
+              .slice(0, 5)}
+            historyCount={historyList.length}
+            onOpenChat={handleOpenHistory}
+            onOpenHistory={() => openSection('history')}
+          />
+        )}
+      </div>
+
+      {/* Sections mount on first use and remain cached without becoming tabs. */}
+      <SectionPopup
+        sections={getNavigationActions(navigationProps)}
+        activeSection={activeSection}
+        compact={compactSections}
+        onClose={closeActiveSection}
+      >
         {mountedSections.map((section) => (
           <AppSectionContent
             key={section}
@@ -314,17 +309,19 @@ function App() {
             onOpenHistory={handleOpenHistory}
           />
         ))}
+      </SectionPopup>
 
-        {/* Empty state */}
-        {!activeTabId && !activeSection && (
-          <EmptyStateView
-            runnableAgents={runnableAgents}
-            adaptersResolved={agentAvailabilityResolved}
-            onStartWithAgent={handleNewTab}
-            onOpenManagement={() => openSection('management')}
-          />
-        )}
-      </div>
+      <ConfirmationModal
+        isOpen={pendingCloseTabIds !== null}
+        title={pendingCloseTabIds && pendingCloseTabIds.length > 1 ? 'Close Chats' : 'Close Chat'}
+        message={pendingCloseTabIds && pendingCloseTabIds.length > 1
+          ? 'Some chats have unfinished prompts. Closing these chats will stop active prompts and discard all queued prompts.'
+          : 'This chat has unfinished prompts. Closing it will stop any active prompt and discard all queued prompts.'}
+        confirmLabel={pendingCloseTabIds && pendingCloseTabIds.length > 1 ? 'Close Chats' : 'Close Chat'}
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmCloseTabs}
+        onCancel={handleCancelCloseTabs}
+      />
 
       <ConfirmationModal
         isOpen={pendingAgentSwitch !== null}

@@ -1,7 +1,8 @@
 import { memo, useCallback, useEffect, useState, type MouseEvent } from 'react';
-import type { ExploringBlock, Message, RichContentBlock, TextBlock } from '../../types/chat';
+import type { ExploringBlock, Message, RichContentBlock, TextBlock, ToolCallBlock } from '../../types/chat';
 import { MarkdownMessage } from './MarkdownMessage';
 import { ContentBlockRenderer } from './blocks/ContentBlockRenderer';
+import { WorkingBlock } from './blocks/WorkingBlock';
 import { Tooltip } from './shared/Tooltip';
 import { Check, Copy, GitFork } from 'lucide-react';
 
@@ -41,28 +42,29 @@ function formatContextUsage(used?: number, size?: number): string | null {
   return size!.toLocaleString();
 }
 
-function isThoughtExploringBlock(block: RichContentBlock): block is ExploringBlock {
-  return block.type === 'exploring' && block.entries.length > 0 && block.entries.every((entry) => entry.kind === 'thinking');
-}
-
 function isTextBlock(block: RichContentBlock): block is TextBlock {
   return block.type === 'text';
 }
 
+function isWorkBlock(block: RichContentBlock | undefined): block is ExploringBlock | ToolCallBlock {
+  return block?.type === 'exploring'
+    || (block?.type === 'tool_call' && ['edit', 'delete', 'move'].includes(block.entry.kind ?? ''));
+}
+
 function groupAssistantBlocks(blocks: RichContentBlock[]) {
-  const groups: Array<{ key: string; blocks: RichContentBlock[] }> = [];
+  const groups: Array<{ key: string; block: RichContentBlock; work?: Array<ExploringBlock | ToolCallBlock> }> = [];
 
   for (let i = 0; i < blocks.length; i++) {
     const current = blocks[i];
-    const next = blocks[i + 1];
 
-    if (isThoughtExploringBlock(current) && next && isTextBlock(next)) {
-      groups.push({ key: `thought-${i}`, blocks: [current, next] });
-      i++;
+    if (isWorkBlock(current)) {
+      const work = [current];
+      while (isWorkBlock(blocks[i + 1])) work.push(blocks[++i] as ExploringBlock | ToolCallBlock);
+      groups.push({ key: `work-${i - work.length + 1}`, block: current, work });
       continue;
     }
 
-    groups.push({ key: `block-${i}`, blocks: [current] });
+    groups.push({ key: `block-${i}`, block: current });
   }
 
   return groups;
@@ -95,12 +97,11 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
       const groupedBlocks = groupAssistantBlocks(message.contentBlocks);
       return (
         <div className="flex flex-col gap-2 [&>.markdown-body]:my-0">
-          {groupedBlocks.map((group) => (
-            <div key={group.key} className={`flex flex-col [&>.markdown-body]:my-0 ${group.blocks.length > 1 ? 'gap-1' : ''}`}>
-              {group.blocks.map((block, idx) => (
-                <ContentBlockRenderer key={`${group.key}-${idx}`} block={block} isActivePrompt={isActivePrompt} onImageClick={onImageClick} />
-              ))}
-            </div>
+          {groupedBlocks.map((group, groupIdx) => group.work ? (
+            <WorkingBlock key={group.key} blocks={group.work} isOpen={isActivePrompt && groupIdx === groupedBlocks.length - 1}
+              isActivePrompt={isActivePrompt} onImageClick={onImageClick} />
+          ) : (
+            <ContentBlockRenderer key={group.key} block={group.block} onImageClick={onImageClick} />
           ))}
         </div>
       );
@@ -115,7 +116,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
               return (
                 <div key={idx}>
                   <img src={src} alt=""
-                    className="max-w-full rounded-md shadow-sm cursor-zoom-in hover:opacity-90 transition-opacity"
+                    className="block mx-auto max-w-full rounded-lg cursor-zoom-in hover:opacity-90 transition-opacity"
                     style={{ maxHeight: '300px' }}
                     onClick={() => onImageClick(src)}
                   />
@@ -162,22 +163,22 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
   const hasMetaTooltip = tooltipRows.length > 0;
 
   const agentBadge = agentIconPath ? (
-    <img src={agentIconPath} alt={message.agentName || 'Agent'} className="w-4 h-4 opacity-60"/>
+    <img src={agentIconPath} alt={message.agentName || 'Agent'} className="w-4 h-4 opacity-60 hover:opacity-80"/>
   ) : (
     <div className="w-4 h-4 rounded bg-background-secondary border border-border flex items-center justify-center
-      text-[9px] font-semibold uppercase opacity-80">
+      text-[9px] font-semibold uppercase opacity-60 hover:opacity-80">
       {(message.agentName || '?').slice(0, 1)}
     </div>
   );
 
   return (
-    <div className={`animate-in fade-in slide-in-from-bottom-2 duration-300 ${hasFollowingMessage ? 'mb-4' : ''}`}>
+    <div className={hasFollowingMessage ? 'mb-8' : ''}>
       <div className="break-words text-foreground" onClick={handleReplyImageClick}>
         {renderContent()}
       </div>
 
       {showMeta && (
-        <div className="ml-0.5 mt-2 flex items-center gap-2 text-foreground-secondary">
+        <div className="ml-0.5 mt-4 flex items-center gap-2 text-foreground-secondary">
           <Tooltip
             content={hasMetaTooltip ? (
                 <div className="min-w-[190px] space-y-1.5">

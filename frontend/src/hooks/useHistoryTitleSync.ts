@@ -1,4 +1,5 @@
 import { Dispatch, SetStateAction, useEffect } from 'react';
+import { conversationKeyOf } from '../types/chat';
 import type { ChatTab, HistorySessionMeta } from '../types/chat';
 
 export function useHistoryTitleSync(
@@ -15,8 +16,7 @@ export function useHistoryTitleSync(
     setTabs((prev) => {
       let changed = false;
       const next = prev.map((tab) => {
-        const conversationKey = tab.historySession?.conversationId || tab.conversationId;
-        const historyItem = historyByConversationId.get(conversationKey);
+        const historyItem = historyByConversationId.get(conversationKeyOf(tab));
         const nextTitle = historyItem?.title?.trim();
         if (!nextTitle || nextTitle === tab.title) {
           if (!historyItem || !tab.historySession) return tab;

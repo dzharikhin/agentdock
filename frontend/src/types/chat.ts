@@ -181,6 +181,8 @@ export interface AgentOption {
   updateChecking?: boolean;
   updateKnown?: boolean;
   updateAvailable?: boolean;
+  /** Its status checks (installation, login, versions) are being rerun. */
+  refreshing?: boolean;
   cliAvailable?: boolean;
   cliResumeAvailable?: boolean;
   custom?: boolean;
@@ -233,7 +235,12 @@ export interface ChatTab {
   pendingTitle?: string;
   inheritedAdapterNames?: string[];
   forkBase?: ForkConversationBase;
+  /** A pinned conversation listed among the chats without being open. */
+  closed?: boolean;
 }
+
+/** The conversation a chat continues, the key of its history entry. */
+export const conversationKeyOf = (tab: ChatTab) => tab.historySession?.conversationId || tab.conversationId;
 
 export interface HistoryDeleteFailure {
   conversationId: string;
@@ -262,6 +269,7 @@ export interface HistorySessionMeta {
   createdAt: number;
   updatedAt: number;
   deletable?: boolean;
+  pinned?: boolean;
 }
 
 export interface ContentChunk {
@@ -506,28 +514,19 @@ export interface GitCommitGenerationSettings {
   instructions: string;
 }
 
-export type SidebarSectionId = 'new-chat' | 'recent-chats' | 'sections';
-
-export const DEFAULT_SIDEBAR_EXPANDED_SECTIONS: SidebarSectionId[] = [
-  'recent-chats',
-  'sections',
-];
-
 export interface GlobalSettings {
   audioNotificationsEnabled: boolean;
-  uiFontSizeOffsetPx: number;
   uiZoomPercent: number;
+  contentMaxWidthPx: number;
   userMessageBackgroundStyle: 'default' | 'blue-highlight' | 'blue' | 'background-secondary' | 'accent' | 'custom';
   userMessageCustomColor: string;
   audioTranscription: AudioTranscriptionSettings;
   gitCommitGeneration: GitCommitGenerationSettings;
-  systemInstructionsEnabled: boolean;
   quotaWidgetEnabled: boolean;
   openInEditor: boolean;
   promptNavigationHoverOnly: boolean;
   sidebarEnabled: boolean;
   sidebarPosition: 'left' | 'right';
-  sidebarExpandedSections: SidebarSectionId[];
 }
 
 export interface GlobalSettingsPayload {
@@ -551,7 +550,7 @@ declare global {
       adapterId?: string,
       configValues?: Record<string, string>
     ) => void;
-    __requestAdapters?: (forceRefresh?: boolean) => void;
+    __requestAdapters?: (adapterIdToRefresh?: string) => void;
     __rememberAgentConfigOption?: (adapterId: string, configId: string, value: string) => void;
     __notifyReady?: () => void;
     __respondPermission?: (requestId: string, decision: string) => void;
@@ -564,7 +563,12 @@ declare global {
     __requestHistoryList?: (projectPath?: string) => void;
     __syncHistoryList?: (projectPath?: string) => void;
     __deleteHistoryConversations?: (payload: { projectPath: string; conversationIds: string[] }) => void;
-    __renameHistoryConversation?: (payload: { projectPath: string; conversationId: string; newTitle: string }) => void;
+    __updateHistoryConversation?: (payload: {
+      projectPath: string;
+      conversationId: string;
+      newTitle?: string;
+      pinned?: boolean;
+    }) => void;
     __loadHistoryConversation?: (conversationId: string, projectPath: string, historyConversationId: string) => void;
     __recoverRuntime?: (reason?: string, requestId?: string) => void;
     __loginAgent?: (adapterId: string, methodId: string) => void;
@@ -595,7 +599,6 @@ declare global {
     __onAssistantActivity?: (chatId: string) => void;
     __onSessionId?: (chatId: string, id: string) => void;
     __onAdapters?: (adapters: AgentOption[]) => void;
-    __onAdapterRefreshState?: (refreshing: boolean) => void;
     __onAvailableCommands?: (adapterId: string, commands: AvailableCommand[]) => void;
     __onMode?: (chatId: string, modeId: string) => void;
     __onSessionConfigOptions?: (payload: SessionConfigOptionsPayload) => void;
@@ -625,10 +628,12 @@ declare global {
     __onThemeChanged?: () => void;
     __loadMcpServers?: () => void;
     __saveMcpServers?: (json: string) => void;
-    __checkMcpStatus?: () => void;
+    __checkMcpStatus?: (id: string) => void;
+    __cancelMcpStatus?: (id: string) => void;
     __loadCustomAcpConfigs?: () => void;
     __saveCustomAcpConfigs?: (json: string) => void;
     __testCustomAcpConnection?: (json: string) => void;
+    __cancelCustomAcpConnectionTest?: (id: string) => void;
     __onPromptLibrary?: (items: unknown) => void;
     __loadPromptLibrary?: () => void;
     __savePromptLibrary?: (json: string) => void;

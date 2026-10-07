@@ -5,7 +5,7 @@ import { Checkbox } from './ui/Checkbox';
 import { DropdownSelect } from './ui/DropdownSelect';
 import { MenuButton } from './ui/MenuButton';
 import { SplitButton } from './ui/SplitButton';
-import { SectionTitle } from './ui/SectionTitle';
+import { SectionPage } from './ui/SectionPage';
 
 export function DesignSystemView() {
     const [reloadInBrowser, setReloadInBrowser] = useState('on-save');
@@ -19,9 +19,7 @@ export function DesignSystemView() {
     ];
 
     return (
-        <div className="h-full overflow-y-auto bg-background text-foreground">
-            <div className="mx-auto flex min-h-full w-full max-w-app-content flex-col">
-            <SectionTitle>Design System</SectionTitle>
+        <SectionPage padding="pb-12 pt-5">
             <div className="space-y-8 p-6">
             {/* Colors */}
             <section className="space-y-4">
@@ -31,31 +29,23 @@ export function DesignSystemView() {
                     <ColorTile tw="bg-background-secondary" var="--ide-background-secondary" />
                     <ColorTile tw="bg-primary" var="--ide-Button-default-startBackground" />
                     <ColorTile tw="bg-secondary" var="--ide-Button-startBackground" />
-                    <ColorTile tw="bg-[...default-end]" var="--ide-Button-default-endBackground" />
-                    <ColorTile tw="bg-[...secondary-end]" var="--ide-Button-endBackground" />
                     <ColorTile tw="bg-accent" var="--ide-List-selectionBackground" />
-                    <ColorTile tw="bg-input" var="--ide-TextField-background" />
                     <ColorTile tw="bg-editor-bg" var="--ide-editor-bg" />
 
                     <ColorTile tw="text-foreground" var="--ide-Label-foreground" isText />
                     <ColorTile tw="text-foreground-secondary" var="--ide-Label-disabledForeground" isText />
                     <ColorTile tw="text-primary-foreground" var="--ide-Button-default-foreground" isText />
-                    <ColorTile tw="text-secondary-foreground" var="--ide-Button-foreground" isText />
                     <ColorTile tw="text-accent-foreground" var="--ide-List-selectionForeground" isText />
                     <ColorTile tw="text-editor-fg" var="--ide-editor-fg" isText />
                     <ColorTile tw="text-success" var="#57965c" isText />
                     <ColorTile tw="text-error" var="#db5c5c" isText />
                     <ColorTile tw="text-warning" var="#ba9752" isText />
                     <ColorTile tw="text-link" var="--ide-Hyperlink-linkColor" isText />
-                    <ColorTile tw="text-added" var="--ide-vcs-added" isText />
-                    <ColorTile tw="text-deleted" var="--ide-vcs-deleted" isText />
 
                     <ColorTile tw="border-border" var="--ide-Borders-color" />
                     <ColorTile tw="border-[...contrast]" var="--ide-Borders-ContrastBorderColor" />
                     <ColorTile tw="border-primary-border" var="--ide-Button-default-borderColor" />
-                    <ColorTile tw="border-secondary-border" var="--ide-Button-borderColor" />
                     <ColorTile tw="border-focus" var="--ide-Button-focusedBorderColor" />
-                    <ColorTile tw="border-default-focus" var="--ide-Button-default-focusedBorderColor" />
                     <ColorTile tw="text-default-focus" var="--ide-Button-default-focusColor" isText />
                 </div>
             </section>
@@ -168,8 +158,7 @@ export function DesignSystemView() {
                 </div>
             </section>
             </div>
-            </div>
-        </div>
+        </SectionPage>
     );
 }
 
