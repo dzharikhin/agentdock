@@ -43,6 +43,7 @@ internal class FrontendBridge(
     private val query = JBCefJSQuery.create(browser as JBCefBrowserBase)
     private val audio = AcpAudioPlayer(scope)
     private val audioInput = AudioInputBridge(commands, ::eval, scope)
+    private val audioOutput = AudioOutputBridge(commands, ::eval, scope)
     private val terminal = project.ideTerminalBridge()
     private val connection = BridgeConnection(project, scope, ::apply) {
         ApplicationManager.getApplication().invokeLater({
@@ -53,6 +54,7 @@ internal class FrontendBridge(
     fun install() {
         installLocalCommands()
         audioInput.install()
+        audioOutput.install()
 
         query.addHandler { raw ->
             dispatch(raw)
@@ -183,6 +185,7 @@ internal class FrontendBridge(
 
     override fun dispose() {
         audioInput.dispose()
+        audioOutput.dispose()
         Disposer.dispose(connection)
         Disposer.dispose(query)
     }

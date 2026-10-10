@@ -54,6 +54,37 @@ data class AudioTranscriptionSettings(
     val providers: Map<String, AudioTranscriptionProviderSettings> = emptyMap()
 )
 
+object AudioOutputProviders {
+    const val NONE = "none"
+    const val SYSTEM = "system"
+    const val GPT_SPEECH = "gpt-speech"
+    const val GEMINI_SPEECH = "gemini-speech"
+}
+
+@Serializable
+data class AudioOutputProviderSettings(
+    val apiKey: String = "",
+    val voice: String = ""
+)
+
+@Serializable
+data class AudioOutputSettings(
+    val provider: String = AudioOutputProviders.SYSTEM,
+    val providers: Map<String, AudioOutputProviderSettings> = emptyMap()
+)
+
+@Serializable
+data class SpeechRequest(
+    val requestId: String,
+    val chunks: List<String> = emptyList()
+)
+
+@Serializable
+data class SpeechResultPayload(
+    val requestId: String,
+    val error: String? = null
+)
+
 @Serializable
 data class GitCommitGenerationSettings(
     val enabled: Boolean = false,
@@ -71,6 +102,7 @@ data class GlobalSettings(
     val userMessageBackgroundStyle: String = "default",
     val userMessageCustomColor: String = "#193d70",
     val audioTranscription: AudioTranscriptionSettings = AudioTranscriptionSettings(),
+    val audioOutput: AudioOutputSettings = AudioOutputSettings(),
     val gitCommitGeneration: GitCommitGenerationSettings = GitCommitGenerationSettings(),
     val quotaWidgetEnabled: Boolean = false,
     val openInEditor: Boolean = true,

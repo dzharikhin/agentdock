@@ -506,6 +506,21 @@ export interface AudioTranscriptionSettings {
   providers: Record<string, AudioTranscriptionProviderSettings>;
 }
 
+export interface AudioOutputProviderSettings {
+  apiKey: string;
+  voice: string;
+}
+
+export interface AudioOutputSettings {
+  provider: string;
+  providers: Record<string, AudioOutputProviderSettings>;
+}
+
+export interface SpeechResultPayload {
+  requestId: string;
+  error?: string | null;
+}
+
 export interface GitCommitGenerationSettings {
   enabled: boolean;
   adapterId: string;
@@ -521,6 +536,7 @@ export interface GlobalSettings {
   userMessageBackgroundStyle: 'default' | 'blue-highlight' | 'blue' | 'background-secondary' | 'accent' | 'custom';
   userMessageCustomColor: string;
   audioTranscription: AudioTranscriptionSettings;
+  audioOutput: AudioOutputSettings;
   gitCommitGeneration: GitCommitGenerationSettings;
   quotaWidgetEnabled: boolean;
   openInEditor: boolean;
@@ -650,6 +666,9 @@ declare global {
     __cancelAudioTranscription?: (payload: string) => void;
     __cancelAudioRecording?: (ownerId: string) => void;
     __onAudioRecordingState?: (payload: AudioRecordingStatePayload) => void;
+    __startSpeech?: (payload: string) => void;
+    __stopSpeech?: (requestId: string) => void;
+    __onSpeechResult?: (payload: SpeechResultPayload) => void;
     __loadGlobalSettings?: () => void;
     __saveGlobalSettings?: (payload: string) => void;
     __onGlobalSettings?: (payload: GlobalSettingsPayload) => void;

@@ -45,6 +45,7 @@ import {
   PromptLibraryEvent,
   SessionIdEvent,
   SessionConfigOptionsEvent,
+  SpeechResultEvent,
   StatusEvent,
   SystemInstructionsEvent,
   ToolCallBridgeEvent,
@@ -318,6 +319,10 @@ export const ACPBridge = {
 
     window.__onAudioRecordingState = (payload) => {
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.AUDIO_RECORDING_STATE, { detail: { payload } }));
+    };
+
+    window.__onSpeechResult = (payload) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.SPEECH_RESULT, { detail: { payload } }));
     };
 
     window.__onGlobalSettings = (payload) => {
@@ -769,6 +774,16 @@ export const ACPBridge = {
   },
 
   onAudioRecordingState: (callback: (e: CustomEvent<AudioRecordingStateEvent>) => void) => onBridgeEvent(EVENT_NAMES.AUDIO_RECORDING_STATE, callback),
+
+  startSpeech: (requestId: string, chunks: string[]) => {
+    window.__startSpeech?.(JSON.stringify({ requestId, chunks }));
+  },
+
+  stopSpeech: (requestId: string) => {
+    window.__stopSpeech?.(requestId);
+  },
+
+  onSpeechResult: (callback: (e: CustomEvent<SpeechResultEvent>) => void) => onBridgeEvent(EVENT_NAMES.SPEECH_RESULT, callback),
 
   loadGlobalSettings: () => {
     window.__loadGlobalSettings?.();

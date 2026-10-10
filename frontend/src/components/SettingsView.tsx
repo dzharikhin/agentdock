@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { Palette } from 'lucide-react';
 import {
   AgentOption,
-  AudioTranscriptionSettings,
   GitCommitGenerationSettings as GitCommitGenerationSettingsValue,
   GlobalSettingsPayload
 } from '../types/chat';
 import { ACPBridge } from '../utils/bridge';
 import { AudioTranscriptionSettingsView } from './audio/AudioTranscriptionSettingsView';
 import { normalizeAudioTranscriptionProvider } from './audio/audioTranscription';
+import { AudioOutputSettingsView } from './audio/AudioOutputSettingsView';
+import { normalizeAudioOutputSettings } from './audio/speechOutput';
 import { GitCommitGenerationSettings } from './settings/GitCommitGenerationSettings';
 import { SettingsCheckbox, SettingsField, SettingsSection } from './settings/SettingsLayout';
 import { Tooltip } from './chat/shared/Tooltip';
@@ -84,6 +85,7 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
         language: payload?.settings?.audioTranscription?.language ?? 'auto',
         providers: payload?.settings?.audioTranscription?.providers ?? {}
       },
+      audioOutput: normalizeAudioOutputSettings(payload?.settings?.audioOutput),
       gitCommitGeneration: normalizeGitCommitGenerationSettings(payload?.settings?.gitCommitGeneration),
       quotaWidgetEnabled: payload?.settings?.quotaWidgetEnabled ?? false,
       openInEditor: payload?.settings?.openInEditor ?? true,
@@ -202,17 +204,9 @@ export function SettingsView() {
     ACPBridge.saveGlobalSettings(next);
   };
 
-  const updateAudioSettings = (audioTranscription: AudioTranscriptionSettings) => {
-    setGlobalSettings((prev) => ({
-      ...prev,
-      settings: { ...prev.settings, audioTranscription }
-    }));
-  };
-
-  const saveAudioSettings = (audioTranscription: AudioTranscriptionSettings) => {
-    const next = { ...globalSettings.settings, audioTranscription };
-    setGlobalSettings((prev) => ({ ...prev, settings: next }));
-    ACPBridge.saveGlobalSettings(next);
+  /** Updates the form without saving, e.g. while an API key is being typed. */
+  const editGlobalSettings = (patch: Partial<GlobalSettingsPayload['settings']>) => {
+    setGlobalSettings((prev) => ({ ...prev, settings: { ...prev.settings, ...patch } }));
   };
 
   return (
@@ -352,8 +346,14 @@ export function SettingsView() {
 
           <AudioTranscriptionSettingsView
             settings={globalSettings.settings.audioTranscription}
-            onSettingsChange={updateAudioSettings}
-            onSettingsSave={saveAudioSettings}
+            onSettingsChange={(audioTranscription) => editGlobalSettings({ audioTranscription })}
+            onSettingsSave={(audioTranscription) => updateGlobalSettings({ audioTranscription })}
+          />
+
+          <AudioOutputSettingsView
+            settings={globalSettings.settings.audioOutput}
+            onSettingsChange={(audioOutput) => editGlobalSettings({ audioOutput })}
+            onSettingsSave={(audioOutput) => updateGlobalSettings({ audioOutput })}
           />
           </div>
       </SectionPage>

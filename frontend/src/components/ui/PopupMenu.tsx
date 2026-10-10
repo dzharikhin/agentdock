@@ -47,16 +47,17 @@ const PANEL_GAP_PX = 4;
 const WINDOW_EDGE_PX = 8;
 
 /**
- * The panel opens below the trigger at its natural width, from the trigger's left edge to the right, and is shifted left
- * where it would cross the plugin window's right edge. It is portaled to `document.body`, so containers that clip their
- * overflow (the sidebar) do not cut it off.
+ * The panel opens below the trigger (above it with `placement="top"`) at its natural width, from the trigger's left edge
+ * to the right, and is shifted left where it would cross the plugin window's right edge. It is portaled to
+ * `document.body`, so containers that clip their overflow (the sidebar) do not cut it off.
  */
 interface PopupMenuProps {
   renderTrigger: (props: PopupMenuTriggerProps) => ReactNode;
   children: (close: () => void) => ReactNode;
+  placement?: 'top' | 'bottom';
 }
 
-export function PopupMenu({ renderTrigger, children }: PopupMenuProps) {
+export function PopupMenu({ renderTrigger, children, placement = 'bottom' }: PopupMenuProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -74,10 +75,10 @@ export function PopupMenu({ renderTrigger, children }: PopupMenuProps) {
       return;
     }
     setPosition({
-      top: trigger.bottom + PANEL_GAP_PX,
+      top: placement === 'top' ? trigger.top - PANEL_GAP_PX - panel.offsetHeight : trigger.bottom + PANEL_GAP_PX,
       left: Math.max(0, Math.min(trigger.left, window.innerWidth - WINDOW_EDGE_PX - panel.offsetWidth)),
     });
-  }, [open]);
+  }, [open, placement]);
 
   useEffect(() => {
     if (!open) return;
@@ -155,7 +156,11 @@ export function PopupMenu({ renderTrigger, children }: PopupMenuProps) {
           style={position ?? { top: 0, left: 0, opacity: 0 }}
           className="fixed z-50 w-max rounded-md border border-border bg-background-secondary px-1 py-0.5 text-ide-small"
         >
-          {children(close)}
+          {/* The chosen item unmounts with the panel, so focus returns to the trigger instead of the page start. */}
+          {children(() => {
+            close();
+            triggerRef.current?.focus();
+          })}
         </div>,
         document.body,
       ) : null}

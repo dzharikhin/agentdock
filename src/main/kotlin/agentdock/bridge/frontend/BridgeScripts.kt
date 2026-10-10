@@ -34,7 +34,7 @@ internal object BridgeScripts {
                 '__onAssistantActivity',
                 '__onMcpServers', '__onMcpStatus', '__onPromptLibrary', '__onSystemInstructions',
                 '__onAudioTranscriptionFeature', '__onAudioTranscriptionResult',
-                '__onAudioRecordingState', '__onGlobalSettings'
+                '__onAudioRecordingState', '__onSpeechResult', '__onGlobalSettings'
             ];
             callbacks.forEach(function(name) {
                 window[name] = window[name] || function() {};
@@ -132,6 +132,8 @@ internal object BridgeScripts {
             window.__stopAudioRecording = function(payload) { invoke('stopAudioRecording', payload); };
             window.__cancelAudioTranscription = function(payload) { invoke('cancelAudioTranscription', payload); };
             window.__cancelAudioRecording = function(ownerId) { invoke('cancelAudioRecording', ownerId || ''); };
+            window.__startSpeech = function(payload) { invoke('startSpeech', payload); };
+            window.__stopSpeech = function(requestId) { invoke('stopSpeech', requestId || ''); };
             window.__agentDockPlaySound = function(sound) { invoke('playSound', sound); };
             window.__requestHostRepaint = function(reason) { invoke('repaint', reason || ''); };
 

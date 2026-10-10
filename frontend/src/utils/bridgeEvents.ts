@@ -15,6 +15,7 @@ import {
   HistorySessionMeta,
   PermissionRequest,
   SessionConfigOptionsPayload,
+  SpeechResultPayload,
   ToolCallEvent,
   UndoResultPayload,
 } from '../types/chat';
@@ -49,6 +50,7 @@ export interface SystemInstructionsEvent { instructions: SystemInstruction[]; }
 export interface AudioTranscriptionFeatureEvent { state: AudioTranscriptionFeatureState; }
 export interface AudioTranscriptionResultEvent { payload: AudioTranscriptionResultPayload; }
 export interface AudioRecordingStateEvent { payload: AudioRecordingStatePayload; }
+export interface SpeechResultEvent { payload: SpeechResultPayload; }
 export interface GlobalSettingsEvent { payload: GlobalSettingsPayload; }
 export interface AdapterDeletedEvent { adapterId: string; }
 
@@ -86,6 +88,7 @@ export const EVENT_NAMES = {
   AUDIO_TRANSCRIPTION_FEATURE: 'audio-transcription-feature',
   AUDIO_TRANSCRIPTION_RESULT: 'audio-transcription-result',
   AUDIO_RECORDING_STATE: 'audio-recording-state',
+  SPEECH_RESULT: 'speech-result',
   GLOBAL_SETTINGS: 'global-settings',
 } as const;
 
