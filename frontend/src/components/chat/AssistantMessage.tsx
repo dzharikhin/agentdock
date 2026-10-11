@@ -180,7 +180,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
   );
 
   return (
-    <div className={hasFollowingMessage ? 'mb-8' : ''}>
+    <div className={hasFollowingMessage ? 'mt-4 mb-8' : 'mt-4'}>
       <div className="break-words text-foreground" onClick={handleReplyImageClick}>
         {renderContent()}
       </div>

@@ -28,6 +28,9 @@ function App() {
   const [promptNavigationHoverOnly, setPromptNavigationHoverOnly] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.promptNavigationHoverOnly ?? true
   );
+  const [userMessageDetailsHoverOnly, setUserMessageDetailsHoverOnly] = useState(
+    () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.userMessageDetailsHoverOnly ?? false
+  );
   const [sidebarEnabled, setSidebarEnabled] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.sidebarEnabled ?? true
   );
@@ -73,6 +76,7 @@ function App() {
     const applyGlobalSettings = (payload: { settings?: Partial<GlobalSettings> } | undefined) => {
       setOpenInEditor(payload?.settings?.openInEditor ?? true);
       setPromptNavigationHoverOnly(payload?.settings?.promptNavigationHoverOnly ?? true);
+      setUserMessageDetailsHoverOnly(payload?.settings?.userMessageDetailsHoverOnly ?? false);
       const nextSidebarEnabled = payload?.settings?.sidebarEnabled ?? true;
       setSidebarEnabled(nextSidebarEnabled);
       if (!nextSidebarEnabled) setSidebarHidden(false);
@@ -204,7 +208,7 @@ function App() {
 
   return (
     <div
-      className={`relative h-full min-w-[320px] bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'} ${!sidebarEnabled || isWide ? '[--content-top-inset:1rem]' : ''}`}
+      className={`relative h-full min-w-[320px] bg-background text-foreground overflow-hidden flex ${sidebarEnabled ? 'flex-row' : 'flex-col'} ${!sidebarEnabled || isWide ? '[--content-top-inset:1rem]' : ''} ${userMessageDetailsHoverOnly ? '[--user-message-details-opacity:0]' : ''}`}
     >
       {sidebarEnabled ? (
         <Sidebar

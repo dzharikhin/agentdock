@@ -541,6 +541,7 @@ export interface GlobalSettings {
   quotaWidgetEnabled: boolean;
   openInEditor: boolean;
   promptNavigationHoverOnly: boolean;
+  userMessageDetailsHoverOnly: boolean;
   sidebarEnabled: boolean;
   sidebarPosition: 'left' | 'right';
 }

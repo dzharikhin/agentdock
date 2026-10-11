@@ -189,9 +189,9 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
   };
 
   return (
-    <div ref={(element) => onElementChange?.(message.id, element)} className="flex flex-col mb-8">
-      <div className="flex justify-end relative">
-        <div className="user-message-bubble bg-accent rounded-[6px] group max-w-[80%] px-4 pt-3 pb-2 text-foreground"
+    <div ref={(element) => onElementChange?.(message.id, element)} className="flex flex-col">
+      <div className="group relative ml-auto flex max-w-[80%] flex-col items-end">
+        <div className="user-message-bubble bg-accent rounded-[12px] group max-w-full px-4 pt-3 pb-4 text-foreground"
           style={{backgroundColor: 'var(--user-message-bg)',}}
         >
           <div>
@@ -216,8 +216,8 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
 
             {renderTrailingAttachments()}
 
-            <div className={`mt-2 flex items-center gap-3 ${showCollapseToggle ? 'justify-between' : 'justify-end'}`}>
-              {showCollapseToggle && (
+            {showCollapseToggle && (
+              <div className="mt-2 flex">
                 <button type="button" onClick={toggleExpanded}
                   className="inline-flex items-center gap-1 text-xs text-foreground hover:underline
                     focus-visible:rounded-[4px] focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
@@ -225,27 +225,31 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
                   {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   <span>{isExpanded ? 'Show less' : 'Show more'}</span>
                 </button>
-              )}
-
-              <div className="flex items-center gap-1.5 text-xs text-foreground opacity-80">
-                {promptNumber !== undefined && <span>{`#${promptNumber}`}</span>}
-                {promptNumber !== undefined && formattedTime && <span aria-hidden="true">•</span>}
-                {formattedTime && <span>{formattedTime}</span>}
-                {(promptNumber !== undefined || formattedTime) && <span aria-hidden="true">•</span>}
-                <Tooltip variant="minimal" content={copied ? 'Copied' : 'Copy prompt'}>
-                  <button
-                    type="button" onClick={handleCopy}
-                    aria-label={copied ? 'Prompt copied' : 'Copy prompt'}
-                    className="inline-flex items-center rounded-[4px] hover:text-foreground focus:outline-none
-                      focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)]
-                      focus-visible:outline-offset-2 relative top-px"
-                  >
-                    {copied ? <Check size={12} /> : <Copy size={12} />}
-                  </button>
-                </Tooltip>
               </div>
-            </div>
+            )}
           </div>
+        </div>
+
+        {/* The text is dimmed through its colour, not opacity, so the copy button can brighten to full foreground on hover. */}
+        {/* The App root sets --user-message-details-opacity to 0 when the details are shown only on hover. */}
+        <div className="flex items-center pr-2 pt-2 pb-2.5 gap-2 text-xs
+          text-[color-mix(in_srgb,var(--ide-Label-foreground),transparent_20%)]
+          opacity-[var(--user-message-details-opacity,1)] transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          {promptNumber !== undefined && <span>{`#${promptNumber}`}</span>}
+          {promptNumber !== undefined && formattedTime && <span aria-hidden="true">•</span>}
+          {formattedTime && <span>{formattedTime}</span>}
+          {(promptNumber !== undefined || formattedTime) && <span aria-hidden="true">•</span>}
+          <Tooltip variant="minimal" content={copied ? 'Copied' : 'Copy prompt'}>
+            <button
+              type="button" onClick={handleCopy}
+              aria-label={copied ? 'Prompt copied' : 'Copy prompt'}
+              className="inline-flex items-center rounded-[4px] hover:text-foreground focus:outline-none
+                focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)]
+                focus-visible:outline-offset-2 relative top-px"
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>

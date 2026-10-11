@@ -90,6 +90,7 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
       quotaWidgetEnabled: payload?.settings?.quotaWidgetEnabled ?? false,
       openInEditor: payload?.settings?.openInEditor ?? true,
       promptNavigationHoverOnly: payload?.settings?.promptNavigationHoverOnly ?? true,
+      userMessageDetailsHoverOnly: payload?.settings?.userMessageDetailsHoverOnly ?? false,
       sidebarEnabled: payload?.settings?.sidebarEnabled ?? true,
       sidebarPosition: payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left'
     }
@@ -235,6 +236,13 @@ export function SettingsView() {
               checked={globalSettings.settings.promptNavigationHoverOnly}
               onToggle={() => updateGlobalSettings({ promptNavigationHoverOnly: !globalSettings.settings.promptNavigationHoverOnly })}
               ariaLabel='Hide prompt navigation on the left side of the chat until hover'
+            />
+
+            <SettingsCheckbox
+              title='Hide prompt details below user messages until hover'
+              checked={globalSettings.settings.userMessageDetailsHoverOnly}
+              onToggle={() => updateGlobalSettings({ userMessageDetailsHoverOnly: !globalSettings.settings.userMessageDetailsHoverOnly })}
+              ariaLabel='Hide prompt details below user messages until hover'
             />
 
             <div className='my-1 grid grid-cols-[max-content_max-content] items-center gap-x-2 gap-y-3'>

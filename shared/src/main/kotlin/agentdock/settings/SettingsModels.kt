@@ -107,6 +107,7 @@ data class GlobalSettings(
     val quotaWidgetEnabled: Boolean = false,
     val openInEditor: Boolean = true,
     val promptNavigationHoverOnly: Boolean = true,
+    val userMessageDetailsHoverOnly: Boolean = false,
     val sidebarEnabled: Boolean = true,
     val sidebarPosition: String = "left"
 )

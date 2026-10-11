@@ -341,7 +341,7 @@ export function ChatInputControls({
                   focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
             >
               <div className="flex items-center">
-                <Square size={16} aria-hidden="true" />
+                <Square size={17} className="relative -top-px" aria-hidden="true" />
                 <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
               </div>
             </button>
@@ -357,7 +357,7 @@ export function ChatInputControls({
                 ${hasInput ? 'text-foreground-secondary' : 'text-[var(--ide-Label-disabledForeground)]'}`}
             >
               <div className="flex items-center">
-                <SendHorizontal width={16} height={18} className="block" strokeWidth={2} />
+                <SendHorizontal size={17} className="block" strokeWidth={2} />
                 <span className="invisible w-0" aria-hidden="true">&nbsp;</span>
               </div>
             </button>
