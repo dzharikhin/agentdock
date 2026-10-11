@@ -68,7 +68,6 @@ export function AudioOutputSettingsView({ settings, onSettingsChange, onSettings
             onBlur={() => save(withProviderSettings({ apiKey: providerSettings.apiKey.trim() }))}
             placeholder={activeProvider.apiKeyPlaceholder}
             autoComplete='off'
-            spellCheck={false}
             aria-label={activeProvider.apiKeyLabel}
             className='w-60 max-w-full rounded-[3px]'
           />

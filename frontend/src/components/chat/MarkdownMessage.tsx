@@ -27,6 +27,24 @@ marked.setOptions({
 interface MarkdownMessageProps {
   content: string;
   enableCodeCopy?: boolean;
+  // Marks the main message text that the chat search covers.
+  searchable?: boolean;
+}
+
+export function markdownHtml(content: string): string {
+  try {
+    let processed = content;
+    const codeBlockMatches = processed.match(/```/g);
+    if (codeBlockMatches && codeBlockMatches.length % 2 !== 0) {
+      processed += '\n```';
+    }
+    processed = rewriteWindowsMarkdownImageHrefs(processed);
+    const parsed = marked.parse(processed);
+    return sanitizeMarkdownHtml(typeof parsed === 'string' ? parsed : '');
+  } catch (e) {
+    console.error('[MarkdownMessage] Parse error:', e);
+    return sanitizeMarkdownHtml(content);
+  }
 }
 
 const codeBlockClassName = 'markdown-code-block';
@@ -36,28 +54,15 @@ const codeCopySlotClassName = 'absolute right-2 top-2 z-10 opacity-0 transition-
  * Minimalist Markdown rendering component for chat messages.
  * Adheres to IDE theme using Tailwind arbitrary variants and CSS variables.
  */
-export const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, enableCodeCopy = true }) => {
+export const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, enableCodeCopy = true, searchable = false }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const copiedResetTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [copySlots, setCopySlots] = useState<HTMLElement[]>([]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
 
   const html = useMemo(() => {
-    try {
-      let processed = content;
-      const codeBlockMatches = processed.match(/```/g);
-      if (codeBlockMatches && codeBlockMatches.length % 2 !== 0) {
-        processed += '\n```';
-      }
-      processed = rewriteWindowsMarkdownImageHrefs(processed);
-      const parsed = marked.parse(processed);
-      const sanitizedHtml = sanitizeMarkdownHtml(typeof parsed === 'string' ? parsed : '');
-      return enableCodeCopy ? decorateCodeBlocks(sanitizedHtml) : sanitizedHtml;
-    } catch (e) {
-      console.error('[MarkdownMessage] Parse error:', e);
-      const sanitizedHtml = sanitizeMarkdownHtml(content);
-      return enableCodeCopy ? decorateCodeBlocks(sanitizedHtml) : sanitizedHtml;
-    }
+    const sanitizedHtml = markdownHtml(content);
+    return enableCodeCopy ? decorateCodeBlocks(sanitizedHtml) : sanitizedHtml;
   }, [content, enableCodeCopy]);
 
   useEffect(() => {
@@ -126,6 +131,7 @@ export const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, enabl
       <div
         ref={containerRef}
         className="markdown-body"
+        data-search-text={searchable || undefined}
         onClick={handleClick}
         dangerouslySetInnerHTML={{ __html: html as string }}
       />

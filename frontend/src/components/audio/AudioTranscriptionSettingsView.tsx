@@ -143,7 +143,6 @@ export function AudioTranscriptionSettingsView({
                     onBlur={handleApiKeyBlur}
                     placeholder={activeProvider?.apiKeyPlaceholder}
                     autoComplete='off'
-                    spellCheck={false}
                     aria-label={apiKeyLabel}
                     className='w-60 max-w-full rounded-[3px]'
                   />

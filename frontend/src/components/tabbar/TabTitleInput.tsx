@@ -49,7 +49,6 @@ export function TabTitleInput({ initialTitle, onCommit, onClose, className, size
         ref={inputRef}
         type="text"
         size={1}
-        spellCheck={false}
         aria-label="Chat title"
         value={value}
         onChange={(event) => setValue(event.target.value)}

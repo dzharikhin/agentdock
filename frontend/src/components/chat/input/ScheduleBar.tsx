@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Clock, Info, X } from 'lucide-react';
+import { chatFocusClassName } from '../shared/focusStyles';
 import { Tooltip } from '../shared/Tooltip';
 import { parseScheduledTime, scheduledTimeParts } from './scheduledTime';
 
@@ -55,13 +56,14 @@ export function ScheduleBar({ scheduledAt, onScheduledAtChange, onClose }: Sched
 
   return (
     <div className="py-1">
-      <div className="flex h-9 w-full min-w-0 items-center gap-2 rounded-[6px] border border-border bg-background-secondary px-3 text-ide-small text-foreground-secondary">
+      <div className="flex h-[calc(theme(spacing.9)+2px)] w-full min-w-0 items-center gap-2 rounded-[6px] border border-border bg-background-secondary px-3 text-ide-small text-foreground-secondary">
         <Clock size={14} className="shrink-0" aria-hidden="true" />
         <span className="shrink-0 whitespace-nowrap">Send at</span>
         <div
           role="group"
           aria-label="Scheduled date and time (DD.MM.YYYY HH:mm, local time)"
-          className="flex h-7 shrink-0 items-center rounded border border-border bg-input px-1.5 font-mono text-foreground focus-within:border-primary-border"
+          className="flex h-7 shrink-0 items-center rounded-[6px] bg-background px-1.5 font-mono text-foreground
+            focus-within:shadow-[0_0_0_1px_color-mix(in_srgb,var(--ide-Button-default-focusColor)_70%,transparent)]"
           onPaste={(event) => {
             const match = /^(\d{1,2})\.(\d{1,2})\.(\d{4})\s+(\d{1,2}):(\d{2})$/.exec(event.clipboardData.getData('text').trim());
             if (!match) return;
@@ -117,24 +119,24 @@ export function ScheduleBar({ scheduledAt, onScheduledAtChange, onClose }: Sched
             </span>
           ))}
         </div>
-        <Tooltip
-          content={<>
-            Scheduled prompts are sent once their time arrives and they reach the front of the queue. Queued prompts are kept only while this chat is open in the plugin.
-            <br /><br />
-            Each queued prompt uses the model and other configuration options selected when it was added to the queue.
-          </>}
-          className="ml-auto shrink-0"
-          contentClassName="!max-w-[min(320px,calc(100vw-16px))] !text-xs"
-        >
-          <span tabIndex={0} aria-label="About scheduled prompts"
-            className="flex h-6 w-6 cursor-default items-center justify-center rounded focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)]">
-            <Info size={14} aria-hidden="true" />
-          </span>
-        </Tooltip>
-        <button type="button" onClick={onClose} aria-label="Turn off schedule send"
-          className="flex h-6 w-6 shrink-0 items-center justify-center rounded border-0 bg-transparent p-0 text-foreground-secondary hover:bg-hover hover:text-foreground focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)]">
-          <X size={14} aria-hidden="true" />
-        </button>
+        <div className="ml-auto flex shrink-0 items-center gap-1">
+          <Tooltip
+            content={<>
+              Scheduled prompts are sent once their time arrives and they reach the front of the queue. Queued prompts are kept only while this chat is open in the plugin.
+              <br /><br />
+              Each queued prompt uses the model and other configuration options selected when it was added to the queue.
+            </>}
+            contentClassName="!max-w-[min(320px,calc(100vw-16px))] !text-xs"
+          >
+            <span tabIndex={0} aria-label="About scheduled prompts" className={`block cursor-default p-1 ${chatFocusClassName}`}>
+              <Info size={14} aria-hidden="true" />
+            </span>
+          </Tooltip>
+          <button type="button" onClick={onClose} aria-label="Turn off schedule send"
+            className={`p-1 text-foreground-secondary transition-colors hover:text-foreground ${chatFocusClassName}`}>
+            <X size={14} aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </div>
   );

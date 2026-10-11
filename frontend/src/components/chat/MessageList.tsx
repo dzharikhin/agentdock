@@ -6,6 +6,7 @@ import { AssistantMessage } from './AssistantMessage';
 import { ChatLoadingIndicator } from './ChatLoadingIndicator';
 import { Tooltip } from './shared/Tooltip';
 import { Button } from '../ui/Button';
+import { useChatSearch } from './ChatSearch';
 
 const BOTTOM_PIN_THRESHOLD_PX = 10;
 const READ_ACK_THRESHOLD_PX = 48;
@@ -77,6 +78,7 @@ interface MessageListProps {
   isHistoryReplaying?: boolean;
   onForkFromMessage?: (messageId: string) => void;
   scrollToBottomOnInitialMessages?: boolean;
+  isActive?: boolean;
 }
 
 function MessageList({ 
@@ -93,7 +95,8 @@ function MessageList({
   availableAgents,
   isHistoryReplaying = false,
   onForkFromMessage,
-  scrollToBottomOnInitialMessages = false
+  scrollToBottomOnInitialMessages = false,
+  isActive = false
 }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -302,6 +305,11 @@ function MessageList({
     publishViewportState(el);
   };
 
+  // Reveals hidden messages from the given prompt onwards; 0 reveals all.
+  const revealFromPrompt = (promptNumber: number) => {
+    setRevealedPromptCount((count) => count + hiddenPromptCount - promptNumber + 1);
+  };
+
   const handlePromptClick = (message: Message, promptNumber: number) => {
     handleUserIntentScrollUp();
     if (promptElementsRef.current.has(message.id)) {
@@ -309,8 +317,31 @@ function MessageList({
       return;
     }
     pendingPromptIdRef.current = message.id;
-    setRevealedPromptCount((count) => count + hiddenPromptCount - promptNumber + 1);
+    revealFromPrompt(promptNumber);
   };
+
+  const search = useChatSearch({
+    messages,
+    isActive,
+    containerRef,
+    hiddenCount,
+    revealMessage: (index) => {
+      handleUserIntentScrollUp();
+      revealFromPrompt(countUserMessages(messages, index + 1));
+    },
+    scrollToRange: (range) => {
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = range.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
+      const bottom = footerRef.current?.getBoundingClientRect().top ?? box.bottom;
+      if (rect.top >= box.top && rect.bottom <= bottom) return;
+      handleUserIntentScrollUp();
+      el.scrollTop += rect.top + rect.height / 2 - (box.top + bottom) / 2;
+      lastScrollTopRef.current = el.scrollTop;
+      publishViewportState(el);
+    },
+  });
 
   useLayoutEffect(() => {
     const id = pendingPromptIdRef.current;
@@ -593,6 +624,7 @@ function MessageList({
               onImageClick={onImageClick}
               promptNumber={userPromptNumberById.get(message.id)}
               onElementChange={registerPromptElement}
+              forceExpanded={search.currentMessageId === message.id}
             />
           );
         })}
@@ -616,10 +648,11 @@ function MessageList({
     </div>
     {footer && (
       <div ref={footerRef} onWheel={handleFooterWheel} onClick={handleFooterClick}
-        className="absolute bottom-0 left-0 right-0 z-20 bg-background px-4 pt-2 app-wide:px-6">
+        className="absolute bottom-0 left-0 right-0 z-20 bg-background px-4 pt-1 app-wide:px-6">
         <div aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 bottom-full h-8 bg-gradient-to-b from-transparent to-background" />
         <div className="relative mx-auto flex w-full max-w-app-content flex-col">
+          {search.bar}
           {footer}
         </div>
       </div>

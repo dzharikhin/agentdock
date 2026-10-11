@@ -53,6 +53,15 @@ function isWorkBlock(block: RichContentBlock | undefined): block is ExploringBlo
     || (block?.type === 'tool_call' && ['edit', 'delete', 'move'].includes(block.entry.kind ?? ''));
 }
 
+// Markdown sources of the main text in render order, which the chat search covers.
+export function assistantMessageTexts(message: Message): string[] {
+  if (message.contentBlocks?.length) return message.contentBlocks.filter(isTextBlock).map((block) => block.text);
+  if (message.blocks?.length) {
+    return message.blocks.filter((block) => !(block.type === 'image' && block.data)).map((block) => (block as any).text || '');
+  }
+  return message.content ? [message.content] : [];
+}
+
 function groupAssistantBlocks(blocks: RichContentBlock[]) {
   const groups: Array<{ key: string; block: RichContentBlock; work?: Array<ExploringBlock | ToolCallBlock> }> = [];
 
@@ -131,7 +140,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
                 </div>
               );
             }
-            return <MarkdownMessage key={idx} content={(block as any).text || ''} />;
+            return <MarkdownMessage key={idx} content={(block as any).text || ''} searchable />;
           })}
         </div>
       );
@@ -139,7 +148,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
 
     return (
       <div className="[&>.markdown-body]:my-0">
-        {message.content ? <MarkdownMessage content={message.content} /> : null}
+        {message.content ? <MarkdownMessage content={message.content} searchable /> : null}
       </div>
     );
   };
@@ -180,7 +189,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
   );
 
   return (
-    <div className={hasFollowingMessage ? 'mt-4 mb-8' : 'mt-4'}>
+    <div data-message-id={message.id} className={hasFollowingMessage ? 'mt-4 mb-8' : 'mt-4'}>
       <div className="break-words text-foreground" onClick={handleReplyImageClick}>
         {renderContent()}
       </div>

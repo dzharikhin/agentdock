@@ -12,6 +12,8 @@ interface UserMessageProps {
   onImageClick: (src: string) => void;
   promptNumber?: number;
   onElementChange?: (id: string, element: HTMLDivElement | null) => void;
+  // Expands a long prompt that holds the current search match.
+  forceExpanded?: boolean;
 }
 
 export function formatPromptTime(timestamp?: number): string | null {
@@ -46,7 +48,29 @@ export function formatPromptTime(timestamp?: number): string | null {
   }
 }
 
-export const UserMessage = memo(({ message, onImageClick, promptNumber, onElementChange }: UserMessageProps) => {
+function splitBlocks(message: Message) {
+  const inline: RichContentBlock[] = [];
+  const trailing: RichContentBlock[] = [];
+  if (message.blocks) {
+    message.blocks.forEach(b => {
+      if (b.type === 'file' || (b.type === 'image' && (b as ImageBlock).isInline === false)) {
+        trailing.push(b);
+      } else {
+        inline.push(b);
+      }
+    });
+  }
+  return { inline, trailing };
+}
+
+// Text in render order, which the chat search covers.
+export function userMessageTexts(message: Message): string[] {
+  const { inline } = splitBlocks(message);
+  if (inline.length === 0) return [message.content];
+  return inline.filter((block): block is TextBlock => block.type === 'text').map((block) => block.text);
+}
+
+export const UserMessage = memo(({ message, onImageClick, promptNumber, onElementChange, forceExpanded = false }: UserMessageProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLargeContent, setIsLargeContent] = useState(false);
   const [contentHeight, setContentHeight] = useState<number | undefined>(undefined);
@@ -76,6 +100,10 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
   }, [message.content, message.blocks]);
 
   useEffect(() => {
+    if (forceExpanded) setIsExpanded(true);
+  }, [forceExpanded]);
+
+  useEffect(() => {
     if (!copied) return;
     const timer = window.setTimeout(() => setCopied(false), 1400);
     return () => window.clearTimeout(timer);
@@ -89,22 +117,7 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
     }
   };
 
-  const getBlocks = () => {
-    const inline: RichContentBlock[] = [];
-    const trailing: RichContentBlock[] = [];
-    if (message.blocks) {
-      message.blocks.forEach(b => {
-        if (b.type === 'file' || (b.type === 'image' && (b as ImageBlock).isInline === false)) {
-          trailing.push(b);
-        } else {
-          inline.push(b);
-        }
-      });
-    }
-    return { inline, trailing };
-  };
-
-  const { inline, trailing } = getBlocks();
+  const { inline, trailing } = splitBlocks(message);
 
   const handleOpenFile = (path: string, startLine?: number) => {
     openFile(path, startLine ? startLine - 1 : undefined);
@@ -144,12 +157,16 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
                 />
               );
             }
-            return <span className="cursor-text" key={idx}>{block.type === 'text' ? (block as TextBlock).text : ''}</span>;
+            return (
+              <span className="cursor-text" key={idx} data-search-text={block.type === 'text' || undefined}>
+                {block.type === 'text' ? (block as TextBlock).text : ''}
+              </span>
+            );
           })}
         </div>
       );
     }
-    return <div className="whitespace-pre-wrap">{message.content}</div>;
+    return <div className="whitespace-pre-wrap" data-search-text>{message.content}</div>;
   };
 
   const renderTrailingAttachments = () => {
@@ -189,7 +206,7 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
   };
 
   return (
-    <div ref={(element) => onElementChange?.(message.id, element)} className="flex flex-col">
+    <div ref={(element) => onElementChange?.(message.id, element)} data-message-id={message.id} className="flex flex-col">
       <div className="group relative ml-auto flex max-w-[80%] flex-col items-end">
         <div className="user-message-bubble bg-accent rounded-[12px] group max-w-full px-4 pt-3 pb-4 text-foreground"
           style={{backgroundColor: 'var(--user-message-bg)',}}

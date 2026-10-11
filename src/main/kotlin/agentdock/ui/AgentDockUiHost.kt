@@ -368,6 +368,7 @@ private fun KeyEvent.shouldGoDirectlyToJcef(): Boolean {
         return false
     }
     if (isAltGraphDown) return keyChar != KeyEvent.CHAR_UNDEFINED
+    if (isFindShortcut()) return true
     if (isAltDown || isMetaDown) return false
     if (isControlDown) return isTextControlShortcut()
 
@@ -423,6 +424,13 @@ private fun KeyEvent.isTextControlShortcut(): Boolean {
         KeyEvent.VK_END -> true
         else -> false
     }
+}
+
+// Ctrl/Cmd+F opens the chat search; F3 and Shift+F3 move between its matches.
+private fun KeyEvent.isFindShortcut(): Boolean = !isAltDown && when (keyCode) {
+    KeyEvent.VK_F -> !isShiftDown && isControlDown != isMetaDown
+    KeyEvent.VK_F3 -> !isControlDown && !isMetaDown
+    else -> false
 }
 
 private fun KeyEvent.isZoomShortcut(): Boolean = when (keyCode) {

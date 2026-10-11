@@ -114,6 +114,17 @@
     margin: 1px;
     top: -1px;
   }
+
+  /* Fixed colors stay visible on every theme. */
+  ::highlight(chat-search) {
+    background-color: #fcd34d;
+    color: #000;
+  }
+
+  ::highlight(chat-search-current) {
+    background-color: #fb923c;
+    color: #000;
+  }
 }
 
 /* Keep outside @layer so Chromium opts into a classic 8px gutter instead of overlay. */

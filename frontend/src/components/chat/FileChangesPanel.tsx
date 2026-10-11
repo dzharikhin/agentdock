@@ -67,9 +67,10 @@ const FileChangesPanel = memo(({
               </div>
             </div>
 
-            <div className="flex items-center gap-1 flex-shrink-0" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-1 flex-shrink-0">
+              {/* Only the action buttons stop the click; the chevron toggles the panel like the rest of the header. */}
               {confirmUndoAll ? (
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                   <span className="text-sm text-foreground-secondary mr-2 mt-1">Undo all?</span>
                   <button
                     type="button"
@@ -87,7 +88,7 @@ const FileChangesPanel = memo(({
                   </button>
                 </div>
               ) : (
-                <>
+                <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
                   <Tooltip variant="minimal" content="Accept all changes">
                     <button
                       type="button"
@@ -106,10 +107,10 @@ const FileChangesPanel = memo(({
                       <Undo2 size={14} />
                     </button>
                   </Tooltip>
-                </>
+                </div>
               )}
-              <div 
-                className={`p-1 ml-1 text-foreground-secondary transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
+              <div
+                className={`p-1 text-foreground-secondary transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
               >
                 <ChevronRight size={14} />
               </div>
@@ -119,7 +120,8 @@ const FileChangesPanel = memo(({
           <div {...(!expanded ? { inert: '' } : {})}
             className={`grid transition-[grid-template-rows] duration-300 ease-in-out overflow-hidden ${expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'}`}
           >
-            <div className={`overflow-hidden bg-background-secondary border-t transition-colors duration-300 ${expanded ? 'border-border' : 'border-transparent'}`}>
+            {/* A collapsed grid row cannot shrink a border, so the separator exists only while expanded. */}
+            <div className={`overflow-hidden bg-background-secondary ${expanded ? 'border-t border-border' : ''}`}>
               <div className="py-1 max-h-48 overflow-y-auto">
                 {fileChanges.map((fc) => (
                   <div

@@ -327,6 +327,7 @@ export default function ChatSessionView({
             isHistoryReplaying={isHistoryReplaying}
             onForkFromMessage={handleForkFromMessage}
             scrollToBottomOnInitialMessages={Boolean(initialMessages?.length) && !historySession}
+            isActive={isActive}
             footer={<>
         <FileChangesPanel
           hasPluginEdits={hasPluginEdits}
