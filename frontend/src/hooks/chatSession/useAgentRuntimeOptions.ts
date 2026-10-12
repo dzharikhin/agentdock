@@ -5,7 +5,11 @@ import {
   SessionConfigOptionsPayload,
 } from '../../types/chat';
 import { ACPBridge } from '../../utils/bridge';
-import { findReasoningEffortOption } from '../../utils/configOptions';
+import {
+  buildModeProfileSnapshot,
+  findReasoningEffortOption,
+  resolveModeProfileValues,
+} from '../../utils/configOptions';
 
 type UseAgentRuntimeOptionsArgs = {
   availableAgents: AgentOption[];
@@ -105,6 +109,7 @@ export function useAgentRuntimeOptions({
 
   const modeOption = findOption(effectiveOptions, 'mode');
   const reasoningOption = findReasoningEffortOption(effectiveOptions);
+  const modeConfigOptions = effectiveSelectedAgent?.modeConfigOptions ?? {};
   const selectedModeId = modeOption ? configValues[modeOption.id] ?? '' : '';
   const selectedReasoningEffortId = reasoningOption ? configValues[reasoningOption.id] ?? '' : '';
   const availableModes = modeOption?.options.map((option) => ({
@@ -164,6 +169,39 @@ export function useAgentRuntimeOptions({
   const selectConfigValue = (configId: string, value: string, targetAgentId = selectedAgentId) =>
     updateConfigValue(configId, value, targetAgentId, true);
 
+  const rememberModeConfigValues = (modeId: string, values: Record<string, string>, targetAgentId = selectedAgentId) => {
+    if (!targetAgentId || !modeId) return;
+    const nonEmpty = Object.fromEntries(Object.entries(values).filter(([, value]) => value !== ''));
+    if (Object.keys(nonEmpty).length === 0) return;
+    ACPBridge.rememberAgentModeConfigOptions(targetAgentId, modeId, nonEmpty);
+  };
+
+  const switchMode = (value: string, rememberChoice: boolean) => {
+    if (!modeOption || !selectedAgentId || !value) return;
+    const modeChanged = selectedModeId !== value;
+    if (modeChanged && selectedModeId) {
+      rememberModeConfigValues(selectedModeId, buildModeProfileSnapshot(
+        modelOption?.id,
+        reasoningOption?.id,
+        selectedModelId,
+        selectedReasoningEffortId
+      ));
+    }
+    const override = modeChanged
+      ? resolveModeProfileValues(modeConfigOptions[value], modelOption, reasoningOption?.id)
+      : {};
+    if (rememberChoice) ACPBridge.rememberAgentConfigOption(selectedAgentId, modeOption.id, value);
+    setSelectedByAgent((current) => ({
+      ...current,
+      [selectedAgentId]: {
+        ...current[selectedAgentId],
+        [modeOption.id]: value,
+        ...(override.modelId !== undefined && modelOption ? { [modelOption.id]: override.modelId } : {}),
+        ...(override.effortId !== undefined && reasoningOption ? { [reasoningOption.id]: override.effortId } : {}),
+      },
+    }));
+  };
+
   const restoreConfigValues = useCallback((values: Record<string, string>) => {
     if (!selectedAgentId) return;
     setSelectedByAgent((current) => ({ ...current, [selectedAgentId]: { ...values } }));
@@ -176,7 +214,11 @@ export function useAgentRuntimeOptions({
     const option = agentId === sessionAgentId
       ? modelOption
       : agent?.configOptions?.find((item) => matches(item, 'model'));
-    if (option) selectConfigValue(option.id, modelId, agentId);
+    if (!option) return;
+    selectConfigValue(option.id, modelId, agentId);
+    if (agentId === selectedAgentId && selectedModeId) {
+      rememberModeConfigValues(selectedModeId, { [option.id]: modelId });
+    }
   };
 
   return {
@@ -197,11 +239,13 @@ export function useAgentRuntimeOptions({
     modelIdForStart: selectedAgentId ? selectedModelId : '',
     handleSessionConfigOptions,
     handleModelChange,
-    handleReportedModeChange: (value: string) =>
-      modeOption && updateConfigValue(modeOption.id, value),
-    handleModeChange: (value: string) => modeOption && selectConfigValue(modeOption.id, value),
-    handleReasoningEffortChange: (value: string) =>
-      reasoningOption && selectConfigValue(reasoningOption.id, value),
+    handleReportedModeChange: (value: string) => switchMode(value, false),
+    handleModeChange: (value: string) => switchMode(value, true),
+    handleReasoningEffortChange: (value: string) => {
+      if (!reasoningOption) return;
+      selectConfigValue(reasoningOption.id, value);
+      if (selectedModeId) rememberModeConfigValues(selectedModeId, { [reasoningOption.id]: value });
+    },
     handleConfigOptionChange: selectConfigValue,
   };
 }

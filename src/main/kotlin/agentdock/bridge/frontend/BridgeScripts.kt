@@ -51,6 +51,9 @@ internal object BridgeScripts {
             window.__rememberAgentConfigOption = function(adapterId, configId, value) {
                 invoke('rememberConfigOption', JSON.stringify({ adapterId: adapterId, configValues: { [configId]: value } }));
             };
+            window.__rememberAgentModeConfigOptions = function(adapterId, modeId, configValues) {
+                invoke('rememberModeConfigOptions', JSON.stringify({ adapterId: adapterId, modeId: modeId, configValues: (configValues || {}) }));
+            };
             window.__startAgent = function(chatId, adapterId, configValues, requestId) {
                 invoke('startAgent', JSON.stringify({ requestId: (requestId || ''), chatId: chatId, adapterId: (adapterId || ''), configValues: (configValues || {}) }));
             };

@@ -207,6 +207,7 @@ private fun AcpBridge.buildAdapterPayload(
         },
         configOptions = runtimeMetadata.configOptions,
         configOptionsByModel = runtimeMetadata.configOptionsByModel,
+        modeConfigOptions = savedPreference?.modeConfigOptions.orEmpty(),
         downloaded = downloaded,
         downloadedKnown = downloadedKnown,
         downloadPath = if (downloaded == true) {

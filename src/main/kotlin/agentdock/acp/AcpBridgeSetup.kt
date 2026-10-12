@@ -329,6 +329,14 @@ internal fun AcpBridge.installAdapterQueries() {
         }
     }
 
+    host.register("rememberModeConfigOptions") { payload ->
+        val parsed = parseRememberModeConfigPayload(payload)
+        if (parsed.adapterId != null && parsed.modeId != null && parsed.configValues.isNotEmpty()) {
+            AcpAgentPreferencesStore.rememberModeConfigOptions(parsed.adapterId, parsed.modeId, parsed.configValues)
+            pushAdapters()
+        }
+    }
+
     host.register("downloadAgent") { payload ->
         val adapterId = parseIdOnlyPayload(payload)
         if (adapterId != null) {

@@ -26,6 +26,12 @@ internal data class ParsedCancelPayload(
     val chatId: String?
 )
 
+internal data class ParsedRememberModeConfigPayload(
+    val adapterId: String?,
+    val modeId: String?,
+    val configValues: Map<String, String>
+)
+
 internal fun parseIdOnlyPayload(payload: String): String? {
     return payload.trim().takeIf { it.isNotEmpty() }
 }
@@ -53,6 +59,19 @@ internal fun parseStartRequestPayload(payload: String): ParsedStartPayload {
         val adapterId = obj["adapterId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
         ParsedStartPayload(requestId, chatId, adapterId, parseConfigValues(obj))
     } catch (_: Exception) { ParsedStartPayload(null, null, null, emptyMap()) }
+}
+
+internal fun parseRememberModeConfigPayload(payload: String): ParsedRememberModeConfigPayload {
+    val raw = payload.trim().orEmpty()
+    if (raw.isEmpty()) return ParsedRememberModeConfigPayload(null, null, emptyMap())
+    return try {
+        val obj = Json.parseToJsonElement(raw).jsonObject
+        ParsedRememberModeConfigPayload(
+            adapterId = obj["adapterId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
+            modeId = obj["modeId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
+            configValues = parseConfigValues(obj)
+        )
+    } catch (_: Exception) { ParsedRememberModeConfigPayload(null, null, emptyMap()) }
 }
 
 internal fun parseConversationLoadPayload(payload: String): Triple<String?, String?, String?> {

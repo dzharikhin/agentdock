@@ -5,10 +5,12 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import agentdock.utils.atomicWriteText
 import java.io.File
+import org.jetbrains.annotations.TestOnly
 
 @Serializable
 data class AcpAgentPreference(
-    val configOptions: Map<String, String> = emptyMap()
+    val configOptions: Map<String, String> = emptyMap(),
+    val modeConfigOptions: Map<String, Map<String, String>> = emptyMap()
 )
 
 @Serializable
@@ -31,7 +33,11 @@ object AcpAgentPreferencesStore {
     private val lock = Any()
     private var cachedState: StoredState? = null
 
-    private fun stateFile(): File = File(AcpAdapterPaths.getBaseRuntimeDir(), "acp-agent-preferences.json")
+    @Volatile
+    private var stateFileOverride: File? = null
+
+    private fun stateFile(): File = stateFileOverride
+        ?: File(AcpAdapterPaths.getBaseRuntimeDir(), "acp-agent-preferences.json")
 
     fun load(): AcpAgentPreferencesState = synchronized(lock) {
         readStoredState().state
@@ -60,10 +66,38 @@ object AcpAgentPreferencesStore {
         }.toMap()
         if (trimmedAdapterId.isEmpty() || normalizedValues.isEmpty()) return
         updateState { current ->
-            val configOptions = current.agents[trimmedAdapterId]
-                ?.configOptions
-                .orEmpty() + normalizedValues
-            current.copy(agents = current.agents + (trimmedAdapterId to AcpAgentPreference(configOptions)))
+            val preference = current.agents[trimmedAdapterId] ?: AcpAgentPreference()
+            val configOptions = preference.configOptions + normalizedValues
+            current.copy(
+                agents = current.agents + (
+                    trimmedAdapterId to preference.copy(
+                        configOptions = configOptions,
+                        modeConfigOptions = preference.modeConfigOptions
+                    )
+                    )
+            )
+        }
+    }
+
+    fun rememberModeConfigOptions(adapterId: String, modeId: String, values: Map<String, String>) {
+        val trimmedAdapterId = adapterId.trim()
+        val trimmedModeId = modeId.trim()
+        val normalizedValues = values.mapNotNull { (id, value) ->
+            val normalizedId = id.trim()
+            val normalizedValue = value.trim()
+            if (normalizedId.isEmpty() || normalizedValue.isEmpty()) null else normalizedId to normalizedValue
+        }.toMap()
+        if (trimmedAdapterId.isEmpty() || trimmedModeId.isEmpty() || normalizedValues.isEmpty()) return
+        updateState { current ->
+            val preference = current.agents[trimmedAdapterId] ?: AcpAgentPreference()
+            val modeValues = preference.modeConfigOptions[trimmedModeId].orEmpty() + normalizedValues
+            current.copy(
+                agents = current.agents + (
+                    trimmedAdapterId to preference.copy(
+                        modeConfigOptions = preference.modeConfigOptions + (trimmedModeId to modeValues)
+                    )
+                    )
+            )
         }
     }
 
@@ -103,13 +137,26 @@ object AcpAgentPreferencesStore {
             if (trimmedAdapterId.isEmpty()) {
                 null
             } else {
-                val normalizedPref = AcpAgentPreference(pref.configOptions.mapNotNull { (id, value) ->
-                    val normalizedId = id.trim()
-                    val normalizedValue = value.trim()
-                    if (normalizedId.isEmpty() || normalizedValue.isEmpty()) null
-                    else normalizedId to normalizedValue
-                }.toMap())
-                if (normalizedPref.configOptions.isEmpty()) {
+                val normalizedPref = AcpAgentPreference(
+                    configOptions = pref.configOptions.mapNotNull { (id, value) ->
+                        val normalizedId = id.trim()
+                        val normalizedValue = value.trim()
+                        if (normalizedId.isEmpty() || normalizedValue.isEmpty()) null
+                        else normalizedId to normalizedValue
+                    }.toMap(),
+                    modeConfigOptions = pref.modeConfigOptions.mapNotNull { (modeId, values) ->
+                        val normalizedModeId = modeId.trim()
+                        val normalizedValues = values.mapNotNull { (id, value) ->
+                            val normalizedId = id.trim()
+                            val normalizedValue = value.trim()
+                            if (normalizedId.isEmpty() || normalizedValue.isEmpty()) null
+                            else normalizedId to normalizedValue
+                        }.toMap()
+                        if (normalizedModeId.isEmpty() || normalizedValues.isEmpty()) null
+                        else normalizedModeId to normalizedValues
+                    }.toMap()
+                )
+                if (normalizedPref.configOptions.isEmpty() && normalizedPref.modeConfigOptions.isEmpty()) {
                     null
                 } else {
                     trimmedAdapterId to normalizedPref
@@ -121,5 +168,13 @@ object AcpAgentPreferencesStore {
             lastAgentId = normalizedLastAgentId,
             agents = normalizedAgents
         )
+    }
+
+    @TestOnly
+    internal fun setStateFileForTests(file: File?) {
+        synchronized(lock) {
+            stateFileOverride = file
+            cachedState = null
+        }
     }
 }

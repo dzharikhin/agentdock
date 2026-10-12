@@ -386,6 +386,10 @@ export const ACPBridge = {
     window.__rememberAgentConfigOption?.(adapterId, configId, value);
   },
 
+  rememberAgentModeConfigOptions: (adapterId: string, modeId: string, configValues: Record<string, string>) => {
+    window.__rememberAgentModeConfigOptions?.(adapterId, modeId, configValues);
+  },
+
   startAgent: (conversationId: string, adapterId?: string, configValues?: Record<string, string>) => {
     if (typeof window.__startAgent !== 'function') {
       return Promise.reject(new Error('Start agent bridge is not available.'));

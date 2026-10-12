@@ -155,6 +155,7 @@ export interface AgentOption {
   availableReasoningEfforts?: ReasoningEffortOption[];
   configOptions?: ConfigOption[];
   configOptionsByModel?: Record<string, ConfigOption[]>;
+  modeConfigOptions?: Record<string, Record<string, string>>;
   downloaded?: boolean;
   downloadedKnown?: boolean;
   downloadPath?: string;
@@ -552,6 +553,11 @@ declare global {
     ) => void;
     __requestAdapters?: (adapterIdToRefresh?: string) => void;
     __rememberAgentConfigOption?: (adapterId: string, configId: string, value: string) => void;
+    __rememberAgentModeConfigOptions?: (
+      adapterId: string,
+      modeId: string,
+      configValues: Record<string, string>
+    ) => void;
     __notifyReady?: () => void;
     __respondPermission?: (requestId: string, decision: string) => void;
     __cancelPrompt?: (conversationId: string, requestId?: string) => void;
