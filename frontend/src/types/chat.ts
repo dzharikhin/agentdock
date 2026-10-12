@@ -529,6 +529,17 @@ export interface GitCommitGenerationSettings {
   instructions: string;
 }
 
+export interface ShortcutSettings {
+  search: string;
+  newChat: string;
+  closeChat: string;
+  history: string;
+  manage: string;
+  focusInput: string;
+  cancelPrompt: string;
+  tabNumbers: boolean;
+}
+
 export interface GlobalSettings {
   audioNotificationsEnabled: boolean;
   uiZoomPercent: number;
@@ -544,6 +555,7 @@ export interface GlobalSettings {
   userMessageDetailsHoverOnly: boolean;
   sidebarEnabled: boolean;
   sidebarPosition: 'left' | 'right';
+  shortcuts: ShortcutSettings;
 }
 
 export interface GlobalSettingsPayload {

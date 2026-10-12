@@ -581,6 +581,7 @@ function MessageList({
         onTouchEnd={handleTouchEnd}
         onKeyDown={handleKeyDown}
         tabIndex={-1}
+        data-active-chat-output={isActive || undefined}
         className="relative flex-1 min-h-0 overflow-x-hidden overflow-y-auto scroll-auto [overflow-anchor:none] outline-none
           px-4 app-wide:px-6 opacity-100 transition-opacity duration-300"
       >

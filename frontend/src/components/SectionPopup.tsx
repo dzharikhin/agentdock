@@ -53,7 +53,8 @@ export function SectionPopup({ sections, activeSection, compact, onClose, childr
 
   useEffect(() => {
     if (!open) return;
-    dialog?.focus();
+    // The section may have focused one of its controls already.
+    if (!dialog?.contains(document.activeElement)) dialog?.focus();
     // Capture phase, so presses whose handlers stop propagation count too.
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Element;

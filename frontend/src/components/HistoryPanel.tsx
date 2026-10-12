@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { conversationKeyOf } from '../types/chat';
 import type { AgentOption, ChatTab, HistorySessionMeta } from '../types/chat';
 import ConfirmationModal from './ConfirmationModal';
@@ -68,7 +68,12 @@ export default function HistoryPanel({
     historyList,
     historyLoaded
   );
-  const hasOpenPendingChat = tabs.some((tab) => pendingDeleteIds.includes(conversationKeyOf(tab)));
+  // Opening the history starts a search.
+  useEffect(() => {
+    if (isActive) searchInputRef.current?.focus();
+  }, [isActive]);
+
+  const hasOpenPendingChat =tabs.some((tab) => pendingDeleteIds.includes(conversationKeyOf(tab)));
 
   return (
     <div className="flex min-h-0 w-full flex-col bg-background text-foreground">

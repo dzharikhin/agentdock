@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Palette } from 'lucide-react';
 import {
   AgentOption,
   GitCommitGenerationSettings as GitCommitGenerationSettingsValue,
-  GlobalSettingsPayload
+  GlobalSettingsPayload,
+  ShortcutSettings
 } from '../types/chat';
+import { isMac, ShortcutAction } from '../hooks/useShortcuts';
 import { ACPBridge } from '../utils/bridge';
 import { AudioTranscriptionSettingsView } from './audio/AudioTranscriptionSettingsView';
 import { normalizeAudioTranscriptionProvider } from './audio/audioTranscription';
@@ -34,6 +36,22 @@ const SIDEBAR_POSITION_OPTIONS: DropdownOption[] = [
   { value: 'right', label: 'Right' },
   { value: 'left', label: 'Left' },
 ];
+
+const DEFAULT_SHORTCUTS: ShortcutSettings = {
+  search: 'F', newChat: '', closeChat: '', history: 'H', manage: '', focusInput: '', cancelPrompt: '', tabNumbers: false
+};
+const SHORTCUT_LABELS: Array<[ShortcutAction, string]> = [
+  ['search', 'Search in chat'],
+  ['newChat', 'New chat'],
+  ['closeChat', 'Close chat'],
+  ['history', 'Chat history'],
+  ['manage', 'Open settings'],
+  ['focusInput', 'Focus chat input'],
+  ['cancelPrompt', 'Cancel prompt'],
+];
+// Text editing keeps these.
+const RESERVED_SHORTCUT_LETTERS = 'ACVXYZ';
+const SHORTCUT_MODIFIER = isMac ? 'Cmd' : 'Ctrl';
 
 function normalizeUiZoomPercent(value: unknown): number {
   const percent = Math.round(Number(value));
@@ -92,7 +110,8 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
       promptNavigationHoverOnly: payload?.settings?.promptNavigationHoverOnly ?? true,
       userMessageDetailsHoverOnly: payload?.settings?.userMessageDetailsHoverOnly ?? false,
       sidebarEnabled: payload?.settings?.sidebarEnabled ?? true,
-      sidebarPosition: payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left'
+      sidebarPosition: payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left',
+      shortcuts: { ...DEFAULT_SHORTCUTS, ...payload?.settings?.shortcuts }
     }
   };
 }
@@ -113,6 +132,8 @@ export function SettingsView() {
     normalizeGlobalSettings(ACPBridge.getGlobalSettingsSnapshot())
   );
   const [installedAgents, setInstalledAgents] = useState<AgentOption[]>([]);
+  // Why the last key pressed in a shortcut field was not taken.
+  const [shortcutError, setShortcutError] = useState<{ action: ShortcutAction; message: string } | null>(null);
   const liveZoomRef = useRef<number | null>(null);
   const persistLiveZoomRef = useRef(false);
 
@@ -350,6 +371,51 @@ export function SettingsView() {
               installedAgents={installedAgents}
               onChange={(gitCommitGeneration) => updateGlobalSettings({ gitCommitGeneration })}
             />
+          </SettingsSection>
+
+          <SettingsSection title='Keyboard shortcuts'>
+            <div className='text-foreground-secondary'>
+              These shortcuts override the IDE shortcuts while the plugin has focus.
+            </div>
+
+            <SettingsCheckbox
+              title='Number shortcuts'
+              description={`Use ${SHORTCUT_MODIFIER}+1–9 to switch chats`}
+              checked={globalSettings.settings.shortcuts.tabNumbers}
+              onToggle={() => updateGlobalSettings({
+                shortcuts: { ...globalSettings.settings.shortcuts, tabNumbers: !globalSettings.settings.shortcuts.tabNumbers }
+              })}
+              ariaLabel='Number shortcuts'
+            />
+
+            <div className='grid grid-cols-[max-content_max-content] items-center gap-x-2 gap-y-3'>
+              {SHORTCUT_LABELS.map(([action, label]) => (
+                <Fragment key={action}>
+                  <span className='text-foreground'>{label}:</span>
+                  <span className='flex items-center gap-1 text-foreground'>
+                    {SHORTCUT_MODIFIER}+
+                    <input
+                      type='text'
+                      value={globalSettings.settings.shortcuts[action]}
+                      onChange={(event) => {
+                        const letter = event.target.value.slice(-1).toUpperCase();
+                        const shortcuts = globalSettings.settings.shortcuts;
+                        const taken = SHORTCUT_LABELS.find(([other]) => other !== action && shortcuts[other] === letter);
+                        const error = !letter ? null
+                          : !/[A-Z]/.test(letter) ? 'Use a letter'
+                          : RESERVED_SHORTCUT_LETTERS.includes(letter) ? 'Kept for text editing'
+                          : taken ? `Used by ${taken[1]}` : null;
+                        setShortcutError(error ? { action, message: error } : null);
+                        if (!error) updateGlobalSettings({ shortcuts: { ...shortcuts, [action]: letter } });
+                      }}
+                      aria-label={`${label} shortcut letter`}
+                      className='w-8 rounded-[3px] text-center'
+                    />
+                    {shortcutError?.action === action && <span className='text-error'>{shortcutError.message}</span>}
+                  </span>
+                </Fragment>
+              ))}
+            </div>
           </SettingsSection>
 
           <AudioTranscriptionSettingsView

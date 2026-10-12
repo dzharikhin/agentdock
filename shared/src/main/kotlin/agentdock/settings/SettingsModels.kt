@@ -94,6 +94,22 @@ data class GitCommitGenerationSettings(
     val instructions: String = ""
 )
 
+/** Ctrl/Cmd shortcuts that override the IDE ones while the plugin has focus; an empty letter leaves the IDE one. */
+@Serializable
+data class ShortcutSettings(
+    val search: String = "F",
+    val newChat: String = "",
+    val closeChat: String = "",
+    val history: String = "H",
+    val manage: String = "",
+    val focusInput: String = "",
+    val cancelPrompt: String = "",
+    /** Ctrl/Cmd+1…9 open the chats in the order they are listed. */
+    val tabNumbers: Boolean = false
+) {
+    val letters: List<String> get() = listOf(search, newChat, closeChat, history, manage, focusInput, cancelPrompt)
+}
+
 @Serializable
 data class GlobalSettings(
     val audioNotificationsEnabled: Boolean = true,
@@ -109,7 +125,8 @@ data class GlobalSettings(
     val promptNavigationHoverOnly: Boolean = true,
     val userMessageDetailsHoverOnly: Boolean = false,
     val sidebarEnabled: Boolean = true,
-    val sidebarPosition: String = "left"
+    val sidebarPosition: String = "left",
+    val shortcuts: ShortcutSettings = ShortcutSettings()
 )
 
 @Serializable

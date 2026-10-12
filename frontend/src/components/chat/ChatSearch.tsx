@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import type { Message } from '../../types/chat';
+import { isShortcut, useKeyDown } from '../../hooks/useShortcuts';
 import { assistantMessageTexts } from './AssistantMessage';
 import { markdownHtml } from './MarkdownMessage';
 import { userMessageTexts } from './UserMessage';
@@ -63,7 +64,7 @@ function textRanges(element: Element, pattern: RegExp): Range[] {
 }
 
 // Searches the main text of user and assistant messages, including messages that are not rendered.
-// Nothing runs while the search bar is closed, except the Ctrl/Cmd+F listener of the active chat.
+// Nothing runs while the search bar is closed, except the shortcut listener of the active chat.
 export function useChatSearch({ messages, isActive, containerRef, hiddenCount, revealMessage, scrollToRange }: ChatSearchOptions) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -156,10 +157,8 @@ export function useChatSearch({ messages, isActive, containerRef, hiddenCount, r
     containerRef.current?.focus({ preventScroll: true });
   };
 
-  const keyHandlerRef = useRef<(event: KeyboardEvent) => void>();
-  keyHandlerRef.current = (event) => {
-    if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'f') {
-      event.preventDefault();
+  useKeyDown((event) => {
+    if (isShortcut(event, 'search')) {
       const selection = window.getSelection()?.toString().trim();
       if (selection && !selection.includes('\n')) setQuery(selection);
       setOpen(true);
@@ -167,18 +166,12 @@ export function useChatSearch({ messages, isActive, containerRef, hiddenCount, r
         inputRef.current?.focus();
         inputRef.current?.select();
       });
-    } else if (event.key === 'F3' && open) {
-      event.preventDefault();
-      navigate(event.shiftKey ? -1 : 1);
+      return true;
     }
-  };
-
-  useEffect(() => {
-    if (!isActive) return;
-    const onKeyDown = (event: KeyboardEvent) => keyHandlerRef.current?.(event);
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isActive]);
+    if (event.key !== 'F3' || !open) return false;
+    navigate(event.shiftKey ? -1 : 1);
+    return true;
+  }, isActive);
 
   const searched = query.length >= MIN_QUERY_LENGTH;
   const counter = !searched ? '' : matches.length === 0 ? '0'

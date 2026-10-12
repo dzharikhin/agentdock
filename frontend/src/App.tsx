@@ -10,6 +10,7 @@ import { getNavigationActions } from './components/tabbar/NavigationActions';
 import ConfirmationModal from './components/ConfirmationModal';
 import { useAppController } from './hooks/app/useAppController';
 import { useAppLayout } from './hooks/app/useAppLayout';
+import { useAppShortcuts } from './hooks/useShortcuts';
 import { ACPBridge } from './utils/bridge';
 import { conversationKeyOf } from './types/chat';
 import type { GlobalSettings } from './types/chat';
@@ -177,6 +178,16 @@ function App() {
     sidebarPosition,
     onUseSidebar: !sidebarEnabled ? () => setSidebarLayoutEnabled(true) : undefined,
   };
+
+  // Chat numbers follow the visible list: open tabs in the tab bar, open and pinned chats in the sidebar.
+  useAppShortcuts({
+    chats: sidebarEnabled ? chats : tabs,
+    activeChatId: activeTabId,
+    onSelectChat: handleSelectTab,
+    onNewChat: handleNewTab,
+    onCloseChat: handleCloseTab,
+    onOpenSection: openSection,
+  });
 
   function setSidebarLayoutEnabled(enabled: boolean) {
     const settings = ACPBridge.getGlobalSettingsSnapshot()?.settings;

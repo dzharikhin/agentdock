@@ -368,7 +368,7 @@ private fun KeyEvent.shouldGoDirectlyToJcef(): Boolean {
         return false
     }
     if (isAltGraphDown) return keyChar != KeyEvent.CHAR_UNDEFINED
-    if (isFindShortcut()) return true
+    if (isPluginShortcut()) return true
     if (isAltDown || isMetaDown) return false
     if (isControlDown) return isTextControlShortcut()
 
@@ -426,11 +426,18 @@ private fun KeyEvent.isTextControlShortcut(): Boolean {
     }
 }
 
-// Ctrl/Cmd+F opens the chat search; F3 and Shift+F3 move between its matches.
-private fun KeyEvent.isFindShortcut(): Boolean = !isAltDown && when (keyCode) {
-    KeyEvent.VK_F -> !isShiftDown && isControlDown != isMetaDown
-    KeyEvent.VK_F3 -> !isControlDown && !isMetaDown
-    else -> false
+// Ctrl/Cmd plus a letter set in the shortcut settings, or a digit when those are on; F3 and Shift+F3 move between
+// the chat search matches.
+private fun KeyEvent.isPluginShortcut(): Boolean {
+    if (isAltDown) return false
+    if (keyCode == KeyEvent.VK_F3) return !isControlDown && !isMetaDown
+    if (isShiftDown || isControlDown == isMetaDown) return false
+    val shortcuts = FrontendSettings.current.shortcuts
+    return when (keyCode) {
+        in KeyEvent.VK_A..KeyEvent.VK_Z -> keyCode.toChar().toString() in shortcuts.letters
+        in KeyEvent.VK_1..KeyEvent.VK_9 -> shortcuts.tabNumbers
+        else -> false
+    }
 }
 
 private fun KeyEvent.isZoomShortcut(): Boolean = when (keyCode) {
