@@ -393,7 +393,8 @@ internal object HistorySyncService {
                     allAdapterNames = visibleAdapterNames.ifEmpty {
                         visibleSessions.map { it.adapterName }.distinct()
                     },
-                    pinned = conversation.pinned
+                    pinned = conversation.pinned,
+                    group = conversation.group
                 )
             }.sortedWith(compareByDescending<SessionMeta> { it.pinned }.thenByDescending { it.updatedAt })
     }

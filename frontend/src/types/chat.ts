@@ -270,6 +270,7 @@ export interface HistorySessionMeta {
   updatedAt: number;
   deletable?: boolean;
   pinned?: boolean;
+  group?: string;
 }
 
 export interface ContentChunk {
@@ -555,6 +556,7 @@ export interface GlobalSettings {
   userMessageDetailsHoverOnly: boolean;
   sidebarEnabled: boolean;
   sidebarPosition: 'left' | 'right';
+  historyGroupsExpanded: boolean;
   shortcuts: ShortcutSettings;
 }
 
@@ -597,7 +599,9 @@ declare global {
       conversationId: string;
       newTitle?: string;
       pinned?: boolean;
+      group?: string;
     }) => void;
+    __renameHistoryGroup?: (payload: { projectPath: string; group: string; newGroup: string }) => void;
     __loadHistoryConversation?: (conversationId: string, projectPath: string, historyConversationId: string) => void;
     __recoverRuntime?: (reason?: string, requestId?: string) => void;
     __loginAgent?: (adapterId: string, methodId: string) => void;

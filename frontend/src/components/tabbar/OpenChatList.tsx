@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { Clock, EllipsisVertical, Pencil, Pin, SquareTerminal, Trash2, X } from 'lucide-react';
 import { conversationKeyOf } from '../../types/chat';
@@ -11,6 +11,7 @@ import { ChatSpinnerIcon } from '../chat/ChatLoadingIndicator';
 import { getTabIcon } from './TabIcons';
 import { TabTitleInput } from './TabTitleInput';
 import { useTabReordering } from './useTabReordering';
+import { historyGroups, moveToGroupAction } from '../history/historyGroups';
 import { menuRowClassName, rowButtonClassName, rowFocusClassName, RowAction, sidebarRowClassName } from './rows';
 
 export interface OpenChatListProps {
@@ -35,8 +36,9 @@ export const PinIcon = ({ pinned }: { pinned: boolean }) => (
 /**
  * The header names the listed chats and offers "Close all" once more than one chat is open. Pinned chats always show
  * the pin (unpinning them) before the status indicator; closed ones have no close button. In the sidebar rows can be
- * reordered by dragging, and pinning, renaming, opening in the terminal and deleting sit in a row menu; in the tab bar
- * menu (`onAction` given, closing the menu), where a nested menu would be awkward, pin and rename are row buttons.
+ * reordered by dragging, and pinning, renaming, moving to a group, opening in the terminal and deleting sit in a row
+ * menu; in the tab bar menu (`onAction` given, closing the menu), where a nested menu would be awkward, pin and rename
+ * are row buttons.
  */
 export function OpenChatList({
   chats,
@@ -67,6 +69,7 @@ export function OpenChatList({
   const itemRole = onAction ? 'menuitem' : undefined;
   const tooltipPlacement = sidebar ? 'top' : 'bottom';
   const historyByConversationId = new Map(historyList.map((item) => [item.conversationId, item]));
+  const groups = useMemo(() => historyGroups(historyList), [historyList]);
 
   if (chats.length === 0) return null;
 
@@ -198,6 +201,10 @@ export function OpenChatList({
                     >
                       {popupMenuActions([
                         { label: 'Rename', icon: <Pencil size={12} aria-hidden="true" />, onClick: () => setRenamingTabId(tab.id) },
+                        ...(togglePin && !pinned
+                          ? [{ label: 'Pin', icon: <PinIcon pinned={false} />, onClick: togglePin }]
+                          : []),
+                        ...(historyItem ? [moveToGroupAction(historyItem, groups)] : []),
                         ...(historyItem && canOpenCli ? [{
                           label: 'Open in terminal',
                           icon: <SquareTerminal size={12} aria-hidden="true" />,
@@ -212,9 +219,6 @@ export function OpenChatList({
                             open: !tab.closed,
                           }),
                         }] : []),
-                        ...(togglePin && !pinned
-                          ? [{ label: 'Pin', icon: <PinIcon pinned={false} />, onClick: togglePin }]
-                          : []),
                       ], true)}
                     </PopupMenu>
                   ) : (

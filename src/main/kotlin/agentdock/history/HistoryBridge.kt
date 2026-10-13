@@ -36,7 +36,15 @@ class HistoryBridge(
         val projectPath: String,
         val conversationId: String,
         val newTitle: String? = null,
-        val pinned: Boolean? = null
+        val pinned: Boolean? = null,
+        val group: String? = null
+    )
+
+    @Serializable
+    private data class RenameHistoryGroupPayload(
+        val projectPath: String,
+        val group: String,
+        val newGroup: String
     )
 
     @Serializable
@@ -159,7 +167,8 @@ class HistoryBridge(
                         request.projectPath,
                         request.conversationId,
                         request.newTitle,
-                        request.pinned
+                        request.pinned,
+                        request.group
                     )
                     val history = AgentDockHistoryService.getHistoryList(request.projectPath)
                     pushHistoryList(permissiveJson.encodeToString(history))
@@ -175,6 +184,21 @@ class HistoryBridge(
                         }
                     }
                     sendJsError("Error during conversation update: ${e.message}")
+                }
+            }
+        }
+
+        host.register("renameHistoryGroup") { payload ->
+            if (payload.isBlank()) return@register
+
+            scope.launch(Dispatchers.Default) {
+                try {
+                    val request = permissiveJson.decodeFromString<RenameHistoryGroupPayload>(payload)
+                    val success = AgentDockHistoryService.renameGroup(request.projectPath, request.group, request.newGroup)
+                    pushHistoryList(permissiveJson.encodeToString(AgentDockHistoryService.getHistoryList(request.projectPath)))
+                    if (!success) sendJsError("Failed to rename group")
+                } catch (e: Exception) {
+                    sendJsError("Error during group rename: ${e.message}")
                 }
             }
         }

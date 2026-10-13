@@ -6,6 +6,7 @@ import { iconButtonClassName } from './LayoutControls';
 import type { SectionType } from '../types/chat';
 import type { NavigationAction } from './tabbar/NavigationActions';
 import { rowButtonClassName, sidebarRowClassName } from './tabbar/rows';
+import { HistoryGroupNav, type HistoryGroupNavProps } from './history/HistoryGroupNav';
 
 interface SectionPopupProps {
   /** Listed in a sidebar that switches between them. */
@@ -13,6 +14,8 @@ interface SectionPopupProps {
   activeSection: SectionType | null;
   /** The sidebar shows only icons, named in tooltips, and the title bar names the open section. */
   compact: boolean;
+  /** Lists the history groups under "Chat History" once there is one, unless `compact`. */
+  historyGroupNav: HistoryGroupNavProps;
   onClose: () => void;
   children: ReactNode;
 }
@@ -44,7 +47,7 @@ const clampOffset = (dialog: HTMLElement | null, { x, y }: Offset): Offset => {
  * outside it closes it and still acts there, except on `[data-section-opener]` controls, which switch the section
  * instead; Esc inside it closes it too. Row menus portaled out of it count as inside. It stays mounted while closed so cached sections keep their state.
  */
-export function SectionPopup({ sections, activeSection, compact, onClose, children }: SectionPopupProps) {
+export function SectionPopup({ sections, activeSection, compact, historyGroupNav, onClose, children }: SectionPopupProps) {
   const [dialog, setDialog] = useState<HTMLDivElement | null>(null);
   const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 });
   const open = activeSection !== null;
@@ -103,12 +106,15 @@ export function SectionPopup({ sections, activeSection, compact, onClose, childr
       >
         <nav
           aria-label="Sections"
-          className="flex w-max shrink-0 flex-col overflow-y-auto border-r border-border px-2 pb-2 text-ide-small"
+          className="flex w-max max-w-[240px] shrink-0 flex-col overflow-y-auto border-r border-border px-2 pb-2 text-ide-small"
         >
           {/* Drags like the title bar. */}
           <div className="h-[44px] shrink-0 select-none" onPointerDown={startDrag} />
           {sections.map((section) => {
             const active = section.type === activeSection;
+            if (section.type === 'history' && !compact && historyGroupNav.groups.length > 0) {
+              return <HistoryGroupNav key={section.type} section={section} active={active} {...historyGroupNav} />;
+            }
             const button = (
               <button
                 type="button"

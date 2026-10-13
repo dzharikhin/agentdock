@@ -111,6 +111,7 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
       userMessageDetailsHoverOnly: payload?.settings?.userMessageDetailsHoverOnly ?? false,
       sidebarEnabled: payload?.settings?.sidebarEnabled ?? true,
       sidebarPosition: payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left',
+      historyGroupsExpanded: payload?.settings?.historyGroupsExpanded ?? false,
       shortcuts: { ...DEFAULT_SHORTCUTS, ...payload?.settings?.shortcuts }
     }
   };

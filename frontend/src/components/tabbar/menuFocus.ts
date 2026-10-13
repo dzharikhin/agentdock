@@ -2,7 +2,9 @@ export function getMenuItems(menu: HTMLDivElement | null): HTMLButtonElement[] {
   if (!menu) {
     return [];
   }
-  return Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'));
+  // Items of a submenu nested in the menu belong to the submenu.
+  return Array.from(menu.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'))
+    .filter((item) => item.closest('[role="menu"]') === menu);
 }
 
 export function focusMenuItem(menu: HTMLDivElement | null, index: number) {

@@ -126,6 +126,8 @@ data class GlobalSettings(
     val userMessageDetailsHoverOnly: Boolean = false,
     val sidebarEnabled: Boolean = true,
     val sidebarPosition: String = "left",
+    /** The history groups are listed under "Chat History" in the section popup. */
+    val historyGroupsExpanded: Boolean = false,
     val shortcuts: ShortcutSettings = ShortcutSettings()
 )
 

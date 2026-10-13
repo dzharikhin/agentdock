@@ -8,10 +8,18 @@ interface TabTitleInputProps {
   className?: string;
   /** Padding on the hidden sizer, to keep the row's intrinsic width unchanged while editing. */
   sizerClassName?: string;
+  ariaLabel?: string;
 }
 
-/** Inline chat title editor, shared by the tab itself and the tab overflow menu. */
-export function TabTitleInput({ initialTitle, onCommit, onClose, className, sizerClassName }: TabTitleInputProps) {
+/** Inline chat title editor, shared by the tab itself and the tab overflow menu; group names use it too. */
+export function TabTitleInput({
+  initialTitle,
+  onCommit,
+  onClose,
+  className,
+  sizerClassName,
+  ariaLabel = 'Chat title',
+}: TabTitleInputProps) {
   const [value, setValue] = useState(initialTitle);
   const inputRef = useRef<HTMLInputElement>(null);
   const finishedRef = useRef(false);
@@ -49,7 +57,7 @@ export function TabTitleInput({ initialTitle, onCommit, onClose, className, size
         ref={inputRef}
         type="text"
         size={1}
-        aria-label="Chat title"
+        aria-label={ariaLabel}
         value={value}
         onChange={(event) => setValue(event.target.value)}
         onBlur={() => finish(true)}

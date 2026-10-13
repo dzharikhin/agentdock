@@ -105,6 +105,7 @@ internal object BridgeScripts {
             window.__syncHistoryList = function(projectPath) { invoke('syncHistoryList', projectPath); };
             window.__deleteHistoryConversations = function(payload) { invoke('deleteHistoryConversations', JSON.stringify(payload)); };
             window.__updateHistoryConversation = function(payload) { invoke('updateHistoryConversation', JSON.stringify(payload)); };
+            window.__renameHistoryGroup = function(payload) { invoke('renameHistoryGroup', JSON.stringify(payload)); };
 
             window.__loadMcpServers = function() { invoke('loadMcpServers', ''); };
             window.__saveMcpServers = function(json) { invoke('saveMcpServers', json); };

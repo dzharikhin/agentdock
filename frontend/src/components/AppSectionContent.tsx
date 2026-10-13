@@ -16,6 +16,8 @@ interface AppSectionContentProps {
   tabs: ChatTab[];
   historyList: HistorySessionMeta[];
   historyLoaded: boolean;
+  historyGroup: string | null;
+  onHistoryGroupChange: (group: string | null) => void;
   hasOpenConversationsForAdapter: (adapterId: string) => boolean;
   onUpdateAgent: (adapterId: string) => void;
   onOpenHistory: Parameters<typeof HistoryPanel>[0]['onOpenSession'];
@@ -28,6 +30,8 @@ export function AppSectionContent({
   tabs,
   historyList,
   historyLoaded,
+  historyGroup,
+  onHistoryGroupChange,
   hasOpenConversationsForAdapter,
   onUpdateAgent,
   onOpenHistory,
@@ -50,6 +54,8 @@ export function AppSectionContent({
           historyList={historyList}
           historyLoaded={historyLoaded}
           isActive={isActive}
+          group={historyGroup}
+          onGroupChange={onHistoryGroupChange}
           onOpenSession={onOpenHistory}
         />
       )}

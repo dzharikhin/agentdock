@@ -7,6 +7,7 @@ import { EmptyStateView } from './components/EmptyStateView';
 import { SidebarVisibilityButton } from './components/LayoutControls';
 import { SectionPopup } from './components/SectionPopup';
 import { getNavigationActions } from './components/tabbar/NavigationActions';
+import { useHistoryGroupNav } from './components/history/useHistoryGroupNav';
 import ConfirmationModal from './components/ConfirmationModal';
 import { useAppController } from './hooks/app/useAppController';
 import { useAppLayout } from './hooks/app/useAppLayout';
@@ -150,6 +151,7 @@ function App() {
     handleContinueInCurrentConversation,
     handleCancelAgentSwitch,
   } = useAppController();
+  const { historyGroup, setHistoryGroup, historyGroupNav } = useHistoryGroupNav(historyList, activeSection, openSection);
 
   const navigationProps: TabBarProps = {
     isIslandsTheme,
@@ -308,6 +310,7 @@ function App() {
         sections={getNavigationActions(navigationProps)}
         activeSection={activeSection}
         compact={compactSections}
+        historyGroupNav={historyGroupNav}
         onClose={closeActiveSection}
       >
         {mountedSections.map((section) => (
@@ -317,6 +320,8 @@ function App() {
             tabs={tabs}
             historyList={historyList}
             historyLoaded={historyLoaded}
+            historyGroup={historyGroup}
+            onHistoryGroupChange={setHistoryGroup}
             isActive={section === activeSection}
             availableAgents={availableAgents}
             hasOpenConversationsForAdapter={hasOpenConversationsForAdapter}

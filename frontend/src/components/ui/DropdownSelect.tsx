@@ -1,5 +1,6 @@
 import { ChevronDown } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { chosenMenuItemClassName } from './PopupMenu';
 
 export interface DropdownOption {
   label: string;
@@ -104,7 +105,7 @@ export function DropdownSelect({
         <div
           role="listbox"
           className={cx(
-            'absolute left-0 top-[calc(100%+0.35em)] z-20 min-w-full w-max overflow-hidden rounded-[3px] ' +
+            'group/menu absolute left-0 top-[calc(100%+0.35em)] z-20 min-w-full w-max overflow-hidden rounded-[3px] ' +
             'border border-border bg-background px-1.5 py-0.5',
             menuClassName
           )}
@@ -144,9 +145,8 @@ export function DropdownSelect({
                 }}
                 className={cx(
                   'flex w-full items-center whitespace-nowrap rounded-[3px] text-left leading-none my-0.5 px-2 min-h-7',
-                  isSelected
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-foreground hover:bg-accent hover:text-accent-foreground',
+                  'hover:bg-accent hover:text-accent-foreground',
+                  isSelected ? chosenMenuItemClassName : 'text-foreground',
                   'focus:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]',
                   optionClassName
                 )}

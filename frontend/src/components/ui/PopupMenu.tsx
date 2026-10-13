@@ -2,9 +2,21 @@ import { KeyboardEvent, ReactNode, RefObject, useEffect, useLayoutEffect, useRef
 import { createPortal } from 'react-dom';
 import { focusMenuItem, getMenuItems, moveMenuFocus } from '../tabbar/menuFocus';
 
-/** Styled like the chat input dropdowns (`ChatDropdown`). */
-const popupMenuItemClassName = `my-0.5 flex w-full items-center rounded pl-2 pr-3 text-left text-foreground outline-none
-  focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)]`;
+/**
+ * Marks the chosen item of a menu panel (`group/menu`) as IDE menus do: until the pointer is over another item of the
+ * panel. Such panels must not nest, so a submenu's pointer does not clear its menu's choice.
+ */
+export const chosenMenuItemClassName = `bg-accent text-accent-foreground group-hover/menu:[&:not(:hover)]:bg-transparent
+  group-hover/menu:[&:not(:hover)]:text-foreground`;
+
+/** Styled like the chat input dropdowns (`ChatDropdown`); see `popupMenuActions` for `compact`. */
+export const popupMenuItemClassName = (compact: boolean, chosen = false) => `my-0.5 flex w-full items-center rounded pl-2
+  pr-3 text-left outline-none hover:bg-accent hover:text-accent-foreground
+  focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)] ${compact ? 'min-h-[26px]' : 'min-h-8'}
+  ${chosen ? chosenMenuItemClassName : 'text-foreground'}`;
+
+export const popupMenuPanelClassName = `z-50 w-max rounded-md border border-border bg-background-secondary px-1 py-0.5
+  text-ide-small`;
 
 export interface PopupMenuAction {
   label: string;
@@ -14,9 +26,12 @@ export interface PopupMenuAction {
 
 /**
  * `PopupMenu` children for a plain list of actions; choosing one closes the menu. `compact` suits menus of row actions:
- * lower items with the sidebar row hover.
+ * lower items. A function renders its own keyed item, e.g. a `PopupSubmenu`.
  */
-export const popupMenuActions = (actions: PopupMenuAction[], compact = false) => (close: () => void) => actions.map((action) => (
+export const popupMenuActions = (
+  actions: Array<PopupMenuAction | ((close: () => void) => ReactNode)>,
+  compact = false
+) => (close: () => void) => actions.map((action) => typeof action === 'function' ? action(close) : (
   <button
     key={action.label}
     type="button"
@@ -25,9 +40,7 @@ export const popupMenuActions = (actions: PopupMenuAction[], compact = false) =>
       close();
       action.onClick();
     }}
-    className={`${popupMenuItemClassName} ${compact
-      ? 'min-h-[26px] hover:bg-hover'
-      : 'min-h-8 hover:bg-accent hover:text-accent-foreground'}`}
+    className={popupMenuItemClassName(compact)}
   >
     <span className="mr-2 flex">{action.icon}</span>
     <span className="truncate">{action.label}</span>
@@ -43,8 +56,8 @@ export interface PopupMenuTriggerProps {
 }
 
 /** Gap between the panel and the trigger, and the least distance between the panel and the window's right edge. */
-const PANEL_GAP_PX = 4;
-const WINDOW_EDGE_PX = 8;
+export const PANEL_GAP_PX = 4;
+export const WINDOW_EDGE_PX = 8;
 
 /**
  * The panel opens below the trigger (above it with `placement="top"`) at its natural width, from the trigger's left edge
@@ -154,7 +167,7 @@ export function PopupMenu({ renderTrigger, children, placement = 'bottom' }: Pop
             }
           }}
           style={position ?? { top: 0, left: 0, opacity: 0 }}
-          className="fixed z-50 w-max rounded-md border border-border bg-background-secondary px-1 py-0.5 text-ide-small"
+          className={`fixed ${popupMenuPanelClassName}`}
         >
           {/* The chosen item unmounts with the panel, so focus returns to the trigger instead of the page start. */}
           {children(() => {

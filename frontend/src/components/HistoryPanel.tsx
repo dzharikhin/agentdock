@@ -1,12 +1,16 @@
-import { useEffect, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useRef } from 'react';
+import type { ReactNode } from 'react';
 import { conversationKeyOf } from '../types/chat';
 import type { AgentOption, ChatTab, HistorySessionMeta } from '../types/chat';
 import ConfirmationModal from './ConfirmationModal';
-import { RefreshCw, Funnel, Search, X } from 'lucide-react';
+import { Bot, Folder, RefreshCw, Funnel, Search, X } from 'lucide-react';
 import { Button } from './ui/Button';
 import { LoadingSpinner } from './ui/LoadingSpinner';
+import { PopupMenu, popupMenuActions } from './ui/PopupMenu';
+import { PopupSubmenu, PopupSubmenuOption, PopupSubmenuSeparator } from './ui/PopupSubmenu';
 import { Tooltip } from './chat/shared/Tooltip';
 import { HistoryListItem } from './history/HistoryListItem';
+import { historyGroups } from './history/historyGroups';
 import { useHistoryPanelController } from './history/useHistoryPanelController';
 import { SectionPage } from './ui/SectionPage';
 
@@ -16,8 +20,45 @@ interface HistoryPanelProps {
   historyList: HistorySessionMeta[];
   historyLoaded: boolean;
   isActive: boolean;
+  /** Lists only the group's conversations; `''` the ungrouped ones, `null` all. */
+  group: string | null;
+  onGroupChange: (group: string | null) => void;
   onOpenSession: (session: HistorySessionMeta) => void;
 }
+
+/** `null` is all. */
+interface FilterOption {
+  value: string | null;
+  label: string;
+  /** Follows a separator. */
+  separated?: boolean;
+}
+
+/** Filter menu item choosing one of the options in a submenu; it shows the chosen one. */
+const filterSubmenu = (
+  label: string,
+  icon: ReactNode,
+  value: string | null,
+  options: FilterOption[],
+  onSelect: (value: string | null) => void
+) => (close: () => void) => (
+  <PopupSubmenu key={label} label={label} icon={icon} compact
+    value={options.find((option) => option.value === value)?.label}>
+    {options.map((option) => (
+      <Fragment key={option.value === null ? 'all' : `value:${option.value}`}>
+        {option.separated ? <PopupSubmenuSeparator /> : null}
+        <PopupSubmenuOption
+          label={option.label}
+          chosen={option.value === value}
+          onClick={() => {
+            close();
+            onSelect(option.value);
+          }}
+        />
+      </Fragment>
+    ))}
+  </PopupSubmenu>
+);
 
 export default function HistoryPanel({
   availableAgents,
@@ -25,48 +66,44 @@ export default function HistoryPanel({
   historyList,
   historyLoaded,
   isActive,
+  group,
+  onGroupChange,
   onOpenSession,
 }: HistoryPanelProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const groups = useMemo(() => historyGroups(historyList), [historyList]);
   const {
     isLoading,
     selectedConversationIds,
     pendingDeleteIds,
-    selectedAgents,
+    agent,
     searchQuery,
-    isFilterOpen,
     editingId,
     isDeleting,
     deleteErrors,
-    filterButtonRef,
-    filterOptionRefs,
     adapterDisplay,
     uniqueAgentsInHistory,
     filteredHistoryList,
-    selectedAgentLabel,
     selectedCount,
     filteredConversationIds,
     areAllFilteredSelected,
     formatDate,
     formatConversationLength,
-    setSelectedAgents,
+    setAgent,
     setSearchQuery,
-    setIsFilterOpen,
     setEditingId,
-    closeFilter,
     confirmDelete,
     refreshHistory,
     toggleSelectAllFiltered,
     openDeleteConfirmation,
-    handleFilterButtonKeyDown,
-    handleFilterOptionKeyDown,
     toggleSelection,
     cancelDelete,
   } = useHistoryPanelController(
     availableAgents,
     isActive,
     historyList,
-    historyLoaded
+    historyLoaded,
+    group
   );
   // Opening the history starts a search.
   useEffect(() => {
@@ -74,6 +111,7 @@ export default function HistoryPanel({
   }, [isActive]);
 
   const hasOpenPendingChat =tabs.some((tab) => pendingDeleteIds.includes(conversationKeyOf(tab)));
+  const filterActive = agent !== null || group !== null;
 
   return (
     <div className="flex min-h-0 w-full flex-col bg-background text-foreground">
@@ -93,77 +131,49 @@ export default function HistoryPanel({
             </button>
           </Tooltip>
 
-          <div className="relative flex items-center gap-1.5">
-            <Tooltip variant="minimal" content="Filter by AI agent">
-              <button
-                type="button"
-                ref={filterButtonRef}
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                onKeyDown={handleFilterButtonKeyDown}
-                aria-label="Filter by AI agent"
-                className={`rounded-[4px] p-1 text-foreground-secondary transition-colors 
-                  focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none 
-                  ${isFilterOpen || selectedAgents.length > 0 ? 'text-foreground' : 'text-foreground-secondary hover:text-foreground'}`}
-              >
-                <Funnel className="h-4 w-4" />
-              </button>
-            </Tooltip>
+          {uniqueAgentsInHistory.length > 1 || groups.length > 0 ? (
+            <PopupMenu
+              renderTrigger={(trigger) => (
+                <Tooltip variant="minimal" content="Filter">
+                  <button
+                    type="button"
+                    aria-label="Filter chats"
+                    {...trigger}
+                    className={`rounded-[4px] p-1 transition-colors
+                      focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none
+                      ${filterActive ? 'text-foreground' : 'text-foreground-secondary hover:text-foreground'}`}
+                  >
+                    <Funnel className="h-4 w-4" fill={filterActive ? 'currentColor' : 'none'} />
+                  </button>
+                </Tooltip>
+              )}
+            >
+              {popupMenuActions([
+                ...(uniqueAgentsInHistory.length > 1 ? [filterSubmenu(
+                  'Agent',
+                  <Bot size={12} aria-hidden="true" />,
+                  agent,
+                  [
+                    { value: null, label: 'All' },
+                    ...uniqueAgentsInHistory.map((id) => ({ value: id, label: adapterDisplay.get(id)?.name || id })),
+                  ],
+                  setAgent
+                )] : []),
+                ...(groups.length > 0 ? [filterSubmenu(
+                  'Group',
+                  <Folder size={12} aria-hidden="true" />,
+                  group,
+                  [
+                    { value: null, label: 'All' },
+                    ...groups.map((name) => ({ value: name, label: name })),
+                    { value: '', label: 'Ungrouped', separated: true },
+                  ],
+                  onGroupChange
+                )] : []),
+              ], true)}
+            </PopupMenu>
+          ) : null}
 
-            {selectedAgents.length > 0 ? (
-              <div className="flex items-center gap-1 mt-[1px]">
-                <span className="max-w-[140px] truncate text-ide-small text-foreground">
-                  {selectedAgentLabel}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelectedAgents([]);
-                    closeFilter();
-                  }}
-                  className="rounded-[4px] mt-[-1px] p-0.5 text-foreground-secondary hover:text-foreground
-                    focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
-                >
-                  <X size={12} />
-                </button>
-              </div>
-            ) : null}
-            
-            {isFilterOpen && (
-              <>
-                <div className="fixed inset-0 z-40" onClick={() => closeFilter()} />
-                <div role="listbox"
-                  className="absolute top-full left-0 mt-1 z-50 min-w-max overflow-hidden rounded-[7px] border border-border bg-background p-1"
-                >
-                  {uniqueAgentsInHistory.map((agentId, index) => {
-                    const agent = adapterDisplay.get(agentId);
-                    const label = agent?.name || agentId;
-                    const isSelected = selectedAgents.includes(agentId);
-                    return (
-                      <button 
-                        key={agentId}
-                        ref={(element) => {
-                          filterOptionRefs.current[index] = element;
-                        }}
-                        role="option"
-                        aria-selected={isSelected}
-                        className={`flex w-full items-center rounded-[4px] my-0.5 px-3 py-1 text-left text-ide-small whitespace-nowrap 
-                          transition-colors focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none 
-                          ${isSelected ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent hover:text-accent-foreground'}`}
-                        onClick={() => {
-                          setSelectedAgents([agentId]);
-                          closeFilter();
-                        }}
-                        onKeyDown={(event) => handleFilterOptionKeyDown(event, agentId, index)}
-                      >
-                        {label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
-            )}
-          </div>
-          
           <div className="relative flex w-36 min-w-0 items-center">
             <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2 text-foreground-secondary" />
             <input
@@ -224,7 +234,7 @@ export default function HistoryPanel({
           <div className="flex justify-center p-8 text-foreground">Loading history...</div>
         ) : filteredHistoryList.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-foreground">
-            {searchQuery.trim() || selectedAgents.length > 0 ? 'No matching chats.' : 'No history available yet.'}
+            {searchQuery.trim() || filterActive ?'No matching chats.' : 'No history available yet.'}
           </div>
         ) : (
           filteredHistoryList.map((item) => {
@@ -237,6 +247,8 @@ export default function HistoryPanel({
                 isSelected={selectedConversationIds.includes(conversationId)}
                 isOpen={tabs.some((tab) => conversationKeyOf(tab) === conversationId)}
                 conversationLength={formatConversationLength(item.promptCount)}
+                groups={groups}
+                showGroup={group === null}
                 deleteError={deleteErrors[conversationId]}
                 isEditing={editingId === conversationId}
                 formatDate={formatDate}

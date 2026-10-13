@@ -7,6 +7,7 @@ import { PinIcon } from '../tabbar/OpenChatList';
 import { Tooltip } from '../chat/shared/Tooltip';
 import { SectionRowButton, sectionRowButtonClassName } from '../ui/SectionList';
 import { TabTitleInput } from '../tabbar/TabTitleInput';
+import { moveToGroupAction } from './historyGroups';
 
 function getItemAgents(item: HistorySessionMeta): string[] {
   return item.allAdapterNames && item.allAdapterNames.length > 0
@@ -32,6 +33,9 @@ interface HistoryListItemProps {
   /** Open as a chat; resuming in the terminal suits only closed chats. */
   isOpen: boolean;
   conversationLength: string | null;
+  groups: string[];
+  /** Shows the conversation's group, while the list is not limited to one. */
+  showGroup: boolean;
   deleteError?: string;
   isEditing: boolean;
   formatDate: (ms: number) => string;
@@ -47,6 +51,8 @@ export function HistoryListItem({
   isSelected,
   isOpen,
   conversationLength,
+  groups,
+  showGroup,
   deleteError,
   isEditing,
   formatDate,
@@ -126,6 +132,12 @@ export function HistoryListItem({
               {conversationLength || item.modelId ? <span className="opacity-50">&bull;</span> : null}
               {conversationLength ? <span>{conversationLength}</span> : null}
               {item.modelId ? <span>{item.modelId}</span> : null}
+              {showGroup && item.group ? (
+                <>
+                  <span className="opacity-50">&bull;</span>
+                  <span className="min-w-0 truncate">{item.group}</span>
+                </>
+              ) : null}
             </div>
             {deleteError ? <div className="mt-1 text-xs text-error">{deleteError}</div> : null}
           </div>
@@ -148,6 +160,12 @@ export function HistoryListItem({
           >
             {popupMenuActions([
               { label: 'Rename', icon: <Pencil size={12} aria-hidden="true" />, onClick: () => onEditingChange(true) },
+              ...(item.pinned ? [] : [{
+                label: 'Pin',
+                icon: <PinIcon pinned={false} />,
+                onClick: () => ACPBridge.updateHistoryConversation(item.projectPath, conversationId, { pinned: true }),
+              }]),
+              moveToGroupAction(item, groups),
               ...(canOpenCli ? [{
                 label: 'Open in terminal',
                 icon: <SquareTerminal size={12} aria-hidden="true" />,
@@ -158,11 +176,6 @@ export function HistoryListItem({
                 icon: <Trash2 size={12} aria-hidden="true" />,
                 onClick: () => onOpenDeleteConfirmation([item]),
               }] : []),
-              ...(item.pinned ? [] : [{
-                label: 'Pin',
-                icon: <PinIcon pinned={false} />,
-                onClick: () => ACPBridge.updateHistoryConversation(item.projectPath, conversationId, { pinned: true }),
-              }]),
             ], true)}
           </PopupMenu>
 

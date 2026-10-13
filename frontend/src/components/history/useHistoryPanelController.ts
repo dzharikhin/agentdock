@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ACPBridge } from '../../utils/bridge';
 import { formatDate } from '../../utils/formatDate';
 import type { AgentOption, HistorySessionMeta } from '../../types/chat';
@@ -19,20 +18,19 @@ export function useHistoryPanelController(
   availableAgents: AgentOption[],
   isActive: boolean,
   historyList: HistorySessionMeta[],
-  historyLoaded: boolean
+  historyLoaded: boolean,
+  /** Lists only the group's conversations; `''` the ungrouped ones, `null` all. */
+  group: string | null
 ) {
   const [isLoading, setIsLoading] = useState(!historyLoaded);
   const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [deleteProjectPath, setDeleteProjectPath] = useState<string>('');
-  const [selectedAgents, setSelectedAgents] = useState<string[]>([]);
+  const [agent, setAgent] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
-  const filterButtonRef = useRef<HTMLButtonElement | null>(null);
-  const filterOptionRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
     const unsubDeleteResult = ACPBridge.onHistoryDeleteResult((e) => {
@@ -96,29 +94,20 @@ export function useHistoryPanelController(
     return Array.from(agentIds);
   }, [historyList]);
 
+  // All, once the agent is gone or the only one; the filter offers the agents only then.
+  const agentFilter = uniqueAgentsInHistory.length > 1 && agent !== null && uniqueAgentsInHistory.includes(agent)
+    ? agent
+    : null;
+
   const filteredHistoryList = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (selectedAgents.length === 0 && !query) return historyList;
+    if (agentFilter === null && !query && group === null) return historyList;
     return historyList.filter((item) =>
-      (selectedAgents.length === 0 || getItemAgents(item).some((a) => selectedAgents.includes(a))) &&
+      (agentFilter === null || getItemAgents(item).includes(agentFilter)) &&
+      (group === null || (item.group ?? '') === group) &&
       item.title.toLowerCase().includes(query)
     );
-  }, [historyList, selectedAgents, searchQuery]);
-
-  const selectedAgentLabel = useMemo(() => {
-    if (selectedAgents.length !== 1) return '';
-    const agent = adapterDisplay.get(selectedAgents[0]);
-    return agent?.name || selectedAgents[0];
-  }, [adapterDisplay, selectedAgents]);
-
-  useEffect(() => {
-    if (!isFilterOpen) return;
-    const selectedIndex = uniqueAgentsInHistory.findIndex((agentId) => selectedAgents.includes(agentId));
-    const targetIndex = selectedIndex >= 0 ? selectedIndex : 0;
-    requestAnimationFrame(() => {
-      filterOptionRefs.current[targetIndex]?.focus();
-    });
-  }, [isFilterOpen, selectedAgents, uniqueAgentsInHistory]);
+  }, [historyList, agentFilter, searchQuery, group]);
 
   const selectedCount = selectedConversationIds.length;
   const filteredConversationIds = filteredHistoryList
@@ -176,63 +165,6 @@ export function useHistoryPanelController(
     setDeleteProjectPath(deletableItems[0].projectPath);
   };
 
-  const closeFilter = (restoreFocus = false) => {
-    setIsFilterOpen(false);
-    if (restoreFocus) {
-      requestAnimationFrame(() => {
-        filterButtonRef.current?.focus();
-      });
-    }
-  };
-
-  const handleFilterButtonKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key !== 'ArrowDown' && event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    setIsFilterOpen(true);
-  };
-
-  const handleFilterOptionKeyDown = (
-    event: KeyboardEvent<HTMLButtonElement>,
-    agentId: string,
-    index: number
-  ) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      closeFilter(true);
-      return;
-    }
-
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      setSelectedAgents([agentId]);
-      closeFilter(true);
-      return;
-    }
-
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      filterOptionRefs.current[(index + 1) % uniqueAgentsInHistory.length]?.focus();
-      return;
-    }
-
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      filterOptionRefs.current[(index - 1 + uniqueAgentsInHistory.length) % uniqueAgentsInHistory.length]?.focus();
-      return;
-    }
-
-    if (event.key === 'Home') {
-      event.preventDefault();
-      filterOptionRefs.current[0]?.focus();
-      return;
-    }
-
-    if (event.key === 'End') {
-      event.preventDefault();
-      filterOptionRefs.current[uniqueAgentsInHistory.length - 1]?.focus();
-    }
-  };
-
   const cancelDelete = () => {
     setPendingDeleteIds([]);
     setDeleteProjectPath('');
@@ -242,34 +174,26 @@ export function useHistoryPanelController(
     isLoading,
     selectedConversationIds,
     pendingDeleteIds,
-    selectedAgents,
+    agent: agentFilter,
     searchQuery,
-    isFilterOpen,
     editingId,
     isDeleting,
     deleteErrors,
-    filterButtonRef,
-    filterOptionRefs,
     adapterDisplay,
     uniqueAgentsInHistory,
     filteredHistoryList,
-    selectedAgentLabel,
     selectedCount,
     filteredConversationIds,
     areAllFilteredSelected,
     formatDate,
     formatConversationLength,
-    setSelectedAgents,
+    setAgent,
     setSearchQuery,
-    setIsFilterOpen,
     setEditingId,
-    closeFilter,
     confirmDelete,
     refreshHistory,
     toggleSelectAllFiltered,
     openDeleteConfirmation,
-    handleFilterButtonKeyDown,
-    handleFilterOptionKeyDown,
     toggleSelection,
     cancelDelete,
   };
