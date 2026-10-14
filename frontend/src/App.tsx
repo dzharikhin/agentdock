@@ -33,6 +33,9 @@ function App() {
   const [userMessageDetailsHoverOnly, setUserMessageDetailsHoverOnly] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.userMessageDetailsHoverOnly ?? false
   );
+  const [systemInstructionsEnabled, setSystemInstructionsEnabled] = useState(
+    () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.systemInstructionsEnabled ?? false
+  );
   const [sidebarEnabled, setSidebarEnabled] = useState(
     () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.sidebarEnabled ?? true
   );
@@ -42,8 +45,7 @@ function App() {
   // Nothing is shown until the saved settings arrive, so the layout does not jump from the defaults on load.
   const [settingsLoaded, setSettingsLoaded] = useState(() => ACPBridge.getGlobalSettingsSnapshot() !== undefined);
   const [sidebarWidth, setSidebarWidth] = useState(240);
-  // A narrow window starts with the sidebar hidden, so it does not cover the content.
-  const [sidebarHidden, setSidebarHidden] = useState(!isWide);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
   const [sidebarVisibilityAnimating, setSidebarVisibilityAnimating] = useState(false);
   const sidebarAnimationTimerRef = useRef<number>();
 
@@ -59,9 +61,14 @@ function App() {
 
   useEffect(() => () => window.clearTimeout(sidebarAnimationTimerRef.current), []);
 
+  // A window that is narrow when the UI first appears starts with the sidebar hidden, so it does not cover the content.
+  useLayoutEffect(() => {
+    if (settingsLoaded) setSidebarHidden(!isWide);
+  }, [settingsLoaded]);
+
   // Narrowing the window past the breakpoint hides the sidebar instead of laying it over the content.
   useEffect(() => {
-    if (!isWide) setSidebarVisibility(true);
+    if (settingsLoaded && !isWide) setSidebarVisibility(true);
   }, [isWide]);
 
   const appContentRef = useRef<HTMLDivElement>(null);
@@ -79,6 +86,7 @@ function App() {
       setOpenInEditor(payload?.settings?.openInEditor ?? true);
       setPromptNavigationHoverOnly(payload?.settings?.promptNavigationHoverOnly ?? true);
       setUserMessageDetailsHoverOnly(payload?.settings?.userMessageDetailsHoverOnly ?? false);
+      setSystemInstructionsEnabled(payload?.settings?.systemInstructionsEnabled ?? false);
       const nextSidebarEnabled = payload?.settings?.sidebarEnabled ?? true;
       setSidebarEnabled(nextSidebarEnabled);
       if (!nextSidebarEnabled) setSidebarHidden(false);
@@ -160,6 +168,10 @@ function App() {
   useEffect(() => {
     if (activeSection === 'archive' && archivedHistory.length === 0) openSection('history');
   }, [activeSection, archivedHistory, openSection]);
+  // System instructions were turned off: their section is no longer listed.
+  useEffect(() => {
+    if (!systemInstructionsEnabled && activeSection === 'system-instructions') closeActiveSection();
+  }, [systemInstructionsEnabled, activeSection, closeActiveSection]);
   const [archiveGroup, setArchiveGroup] = useState<string | null>(null);
   const { historyGroup, setHistoryGroup, historyGroupNav } =
     useHistoryGroupNav(unarchivedHistory, activeSection, openSection);
@@ -187,7 +199,7 @@ function App() {
     onOpenCustomAcp: () => openSection('custom-acp'),
     onOpenPromptLibrary: () => openSection('prompt-library'),
     onOpenSystemInstructions: () => openSection('system-instructions'),
-    onOpenSettings: () => openSection('settings'),
+    onOpenSettings: openSection,
     sidebarPosition,
     onUseSidebar: !sidebarEnabled ? () => setSidebarLayoutEnabled(true) : undefined,
   };
@@ -321,6 +333,7 @@ function App() {
         sections={getNavigationActions({
           ...navigationProps,
           onOpenArchive: archivedHistory.length > 0 ? () => openSection('archive') : undefined,
+          onOpenSystemInstructions: systemInstructionsEnabled ? navigationProps.onOpenSystemInstructions : undefined,
         })}
         activeSection={activeSection}
         compact={compactSections}

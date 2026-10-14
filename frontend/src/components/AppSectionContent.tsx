@@ -67,7 +67,9 @@ export function AppSectionContent({
       {section === 'custom-acp' && <CustomAcpView />}
       {section === 'prompt-library' && <PromptLibraryView />}
       {section === 'system-instructions' && <SystemInstructionsView />}
-      {section === 'settings' && <SettingsView />}
+      {(section === 'general' || section === 'appearance' || section === 'shortcuts') && (
+        <SettingsView section={section} />
+      )}
     </SectionFrame>
   );
 }

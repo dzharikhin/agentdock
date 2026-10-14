@@ -120,6 +120,7 @@ data class GlobalSettings(
     val audioTranscription: AudioTranscriptionSettings = AudioTranscriptionSettings(),
     val audioOutput: AudioOutputSettings = AudioOutputSettings(),
     val gitCommitGeneration: GitCommitGenerationSettings = GitCommitGenerationSettings(),
+    val systemInstructionsEnabled: Boolean = false,
     val quotaWidgetEnabled: Boolean = false,
     val openInEditor: Boolean = true,
     val promptNavigationHoverOnly: Boolean = true,

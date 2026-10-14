@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { chosenMenuItemClassName } from './PopupMenu';
 
 export interface DropdownOption {
@@ -22,6 +22,14 @@ function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
 }
 
+/** Visible area of the nearest ancestor that clips its overflow, or of the window. */
+function clipBounds(element: HTMLElement) {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    if (getComputedStyle(node).overflowY !== 'visible') return node.getBoundingClientRect();
+  }
+  return new DOMRect(0, 0, window.innerWidth, window.innerHeight);
+}
+
 export function DropdownSelect({
   value,
   options,
@@ -33,8 +41,11 @@ export function DropdownSelect({
   optionClassName,
 }: DropdownSelectProps) {
   const [open, setOpen] = useState(false);
+  // The menu opens upwards when it does not fit below and there is more room above.
+  const [openUp, setOpenUp] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selected = useMemo(
     () => options.find((option) => option.value === value) ?? options[0],
@@ -64,6 +75,17 @@ export function DropdownSelect({
       window.removeEventListener('mousedown', handlePointerDown);
       window.removeEventListener('keydown', handleEscape);
     };
+  }, [open]);
+
+  useLayoutEffect(() => {
+    const root = rootRef.current;
+    const menu = menuRef.current;
+    if (!open || !root || !menu) return;
+    const bounds = clipBounds(root);
+    const button = root.getBoundingClientRect();
+    const below = bounds.bottom - button.bottom;
+    // Plus the 0.35em gap to the button.
+    setOpenUp(menu.getBoundingClientRect().height + 6 > below && button.top - bounds.top > below);
   }, [open]);
 
   useEffect(() => {
@@ -103,10 +125,12 @@ export function DropdownSelect({
 
       {open ? (
         <div
+          ref={menuRef}
           role="listbox"
           className={cx(
-            'group/menu absolute left-0 top-[calc(100%+0.35em)] z-20 min-w-full w-max overflow-hidden rounded-[3px] ' +
+            'group/menu absolute left-0 z-20 min-w-full w-max overflow-hidden rounded-[3px] ' +
             'border border-border bg-background px-1.5 py-0.5',
+            openUp ? 'bottom-[calc(100%+0.35em)]' : 'top-[calc(100%+0.35em)]',
             menuClassName
           )}
         >

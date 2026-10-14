@@ -64,7 +64,7 @@ export function NavigationMenu({
       ) : null}
       <OpenChatList {...props} onAction={onCloseMenu} />
       <div className="h-px bg-border my-1 mx-2" />
-      <SectionRow label="Manage" icon={<Settings size={14} aria-hidden="true" />}
+      <SectionRow label="Settings"icon={<Settings size={14} aria-hidden="true" />}
         onClick={() => { onOpenManagement(); onCloseMenu(); }} />
     </div>
   );

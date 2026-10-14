@@ -35,6 +35,8 @@ import java.awt.AWTEvent
 import java.awt.BorderLayout
 import java.awt.FlowLayout
 import java.awt.KeyboardFocusManager
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.event.KeyEvent
 import java.awt.dnd.DropTarget
 import javax.swing.JComponent
@@ -91,7 +93,6 @@ class AgentDockUiHost(
     }
 
     init {
-        homePanel.add(loadingPanel, BorderLayout.CENTER)
         FrontendSettings.addListener(settingsListener)
         // The settings may have arrived before this service was created.
         if (FrontendSettings.received) settingsListener(FrontendSettings.current, FrontendSettings.current)
@@ -116,7 +117,8 @@ class AgentDockUiHost(
         this.toolWindow = toolWindow
         val content = ContentFactory.getInstance().createContent(homePanel, "", false)
         toolWindow.contentManager.addContent(content)
-        startBrowser()
+        // The tool window stays empty until the saved settings say the UI belongs there.
+        if (openInEditor == false) startBrowser()
     }
 
     fun show(afterShow: (() -> Unit)? = null) {
@@ -126,7 +128,7 @@ class AgentDockUiHost(
                 afterShow?.invoke()
                 return
             }
-        if (openInEditor == true && toolWindow != null) {
+        if (openInEditor == true) {
             redirectToEditor(window, afterShow)
             return
         }
@@ -173,9 +175,12 @@ class AgentDockUiHost(
         // Moves only a UI that is showing in the other place; one restored in the right place stays put.
         if (enabled) {
             if (window.isVisible) redirectToEditor(window)
-        } else if (isEditorTabOpen()) {
-            closeEditorTab()
-            window.activate(null, true)
+        } else {
+            startBrowser()
+            if (isEditorTabOpen()) {
+                closeEditorTab()
+                window.activate(null, true)
+            }
         }
     }
 
@@ -219,6 +224,7 @@ class AgentDockUiHost(
     private fun startBrowser() {
         if (browserStarted) return
         browserStarted = true
+        moveContentTo(currentSurface())
         ApplicationManager.getApplication().executeOnPooledThread {
             var startupError: Exception? = null
             val supported = try {
@@ -277,15 +283,15 @@ class AgentDockUiHost(
 
             Disposer.register(this, browser)
             Disposer.register(this, bridge)
-            installBrowserChrome(browser, bridge)
             showStatus(browser.component)
+            installBrowserChrome(browser, bridge)
         } catch (e: Exception) {
             showStatus(JLabel("Error initializing browser: ${e.message}"))
         }
     }
 
     private fun installBrowserChrome(browser: JBCefBrowser, bridge: FrontendBridge) {
-        loadContent(browser)
+        loadWhenSized(browser)
 
         val connection = ApplicationManager.getApplication().messageBus.connect(browser)
         connection.subscribe(LafManagerListener.TOPIC, LafManagerListener {
@@ -293,6 +299,19 @@ class AgentDockUiHost(
             bridge.eval("if(window.__onThemeChanged) window.__onThemeChanged();")
             val theme = (if (IdeTheme.isDarkTheme()) "dark" else "light").jsStringLiteral()
             bridge.eval("window.__agentDockInvoke && window.__agentDockInvoke('themeChanged', $theme);")
+        })
+    }
+
+    /** Loads the page only once the browser has its size in its surface, so the UI never starts at a size it does not have. */
+    private fun loadWhenSized(browser: JBCefBrowser) {
+        val component = browser.component
+        if (component.width > 0) return loadContent(browser)
+        component.addComponentListener(object : ComponentAdapter() {
+            override fun componentResized(e: ComponentEvent) {
+                if (component.width == 0) return
+                component.removeComponentListener(this)
+                loadContent(browser)
+            }
         })
     }
 

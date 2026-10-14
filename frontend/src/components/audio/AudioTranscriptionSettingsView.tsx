@@ -3,7 +3,7 @@ import { AudioTranscriptionSettings } from '../../types/chat';
 import { ACPBridge } from '../../utils/bridge';
 import { Button } from '../ui/Button';
 import { DropdownSelect } from '../ui/DropdownSelect';
-import { SettingsField, SettingsSection } from '../settings/SettingsLayout';
+import { SettingsCheckbox, SettingsField } from '../settings/SettingsLayout';
 import ConfirmationModal from '../ConfirmationModal';
 import {
   AUDIO_TRANSCRIPTION_NONE,
@@ -42,6 +42,7 @@ export function AudioTranscriptionSettingsView({
     ? feature
     : { ...emptyAudioTranscriptionFeature, id: settings.provider };
   const actionLabel = activeFeature.installed ? 'Uninstall' : 'Install';
+  const enabled = settings.provider !== AUDIO_TRANSCRIPTION_NONE;
 
   const handleProviderChange = (provider: string) => {
     const next = {
@@ -52,7 +53,13 @@ export function AudioTranscriptionSettingsView({
     onSettingsSave(next);
   };
 
-  const handleLanguageChange = (language: string) => {
+  // The engine is kept while its installation runs, as in the engine dropdown.
+  const handleToggle = () => {
+    if (activeFeature.installing) return;
+    handleProviderChange(enabled ? AUDIO_TRANSCRIPTION_NONE : transcriptionProviderOptions[0].value);
+  };
+
+  const handleLanguageChange =(language: string) => {
     const next = { ...settings, language };
     onSettingsChange(next);
     onSettingsSave(next);
@@ -102,90 +109,90 @@ export function AudioTranscriptionSettingsView({
 
   return (
     <>
-      <SettingsSection title='Audio Input'>
-        <SettingsField label='Transcription engine' colon>
-          <DropdownSelect
-            value={settings.provider}
-            onChange={handleProviderChange}
-            options={transcriptionProviderOptions}
-            disabled={activeFeature.installing || pendingUninstall}
-            className='max-w-full'
-          />
-        </SettingsField>
+      <SettingsCheckbox
+        title='Voice Input'
+        description='Dictate chat prompts using speech transcription'
+        checked={enabled}
+        onToggle={handleToggle}
+        ariaLabel='Enable voice input'
+      >
+        {enabled && (
+          <>
+            <SettingsField label='Transcription engine' colon>
+              <DropdownSelect
+                value={settings.provider}
+                onChange={handleProviderChange}
+                options={transcriptionProviderOptions}
+                disabled={activeFeature.installing || pendingUninstall}
+                className='max-w-full'
+              />
+            </SettingsField>
 
-        {settings.provider !== AUDIO_TRANSCRIPTION_NONE && (
-          <SettingsField
-            label={activeProvider?.chatLabel || `Transcribe voice input in chat with ${activeFeature.title}`}
-            stacked
-          >
-            <div className='flex flex-col gap-3'>
-              {apiKeyLabel && (
-                <SettingsField
-                  label={apiKeyLabel}
-                  colon
-                  description={activeProvider?.apiKeyUrl ? (
-                    <span className='inline-block pt-1'>
-                      <button
-                        type='button'
-                        onClick={() => window.__openUrl?.(activeProvider.apiKeyUrl!)}
-                        className='text-link hover:underline'
-                      >
-                        Create an API key
-                      </button>
-                      {activeProvider.pricingDescription && ` · ${activeProvider.pricingDescription}`}
-                    </span>
-                  ) : undefined}
-                >
-                  <input
-                    type='password'
-                    value={providerSettings.apiKey}
-                    onChange={(event) => handleApiKeyChange(event.target.value)}
-                    onBlur={handleApiKeyBlur}
-                    placeholder={activeProvider?.apiKeyPlaceholder}
-                    autoComplete='off'
-                    aria-label={apiKeyLabel}
-                    className='w-60 max-w-full rounded-[3px]'
-                  />
-                </SettingsField>
-              )}
-
+            {apiKeyLabel && (
               <SettingsField
-                label='Language'
+                label={apiKeyLabel}
                 colon
-                description={
-                  activeFeature.installable && activeFeature.installed && activeFeature.installPath ? (
-                    <span className='break-all'>
-                      Installed at <span className='font-mono'>{activeFeature.installPath}</span>
-                    </span>
-                  ) : undefined
-                }
+                description={activeProvider?.apiKeyUrl ? (
+                  <span className='inline-block pt-1'>
+                    <button
+                      type='button'
+                      onClick={() => window.__openUrl?.(activeProvider.apiKeyUrl!)}
+                      className='text-link hover:underline'
+                    >
+                      Create an API key
+                    </button>
+                    {activeProvider.pricingDescription && ` · ${activeProvider.pricingDescription}`}
+                  </span>
+                ) : undefined}
               >
-                <DropdownSelect
-                  value={settings.language}
-                  onChange={handleLanguageChange}
-                  options={transcriptionLanguageOptions}
-                  disabled={!activeFeature.installed}
-                  className='max-w-full'
-                  menuClassName='!bottom-[calc(100%+0.35em)] !top-auto'
+                <input
+                  type='password'
+                  value={providerSettings.apiKey}
+                  onChange={(event) => handleApiKeyChange(event.target.value)}
+                  onBlur={handleApiKeyBlur}
+                  placeholder={activeProvider?.apiKeyPlaceholder}
+                  autoComplete='off'
+                  aria-label={apiKeyLabel}
+                  className='w-60 max-w-full rounded-[3px]'
                 />
               </SettingsField>
+            )}
 
-              {activeFeature.installable && activeFeature.supported && (
-                <div className='mt-1'>
-                  <Button
-                    onClick={handleAudioInputAction}
-                    disabled={activeFeature.installing}
-                    variant={activeFeature.installed ? 'accentOutline' : 'install'}
-                    leftIcon={activeFeature.installing ? <SettingsLoadingSpinner /> : undefined}
-                  >
-                    {actionLabel}
-                  </Button>
-                </div>
-              )}
-            </div>
-          </SettingsField>
+            <SettingsField
+              label='Language'
+              colon
+              description={
+                activeFeature.installable && activeFeature.installed && activeFeature.installPath ? (
+                  <span className='break-all'>
+                    Installed at <span className='font-mono'>{activeFeature.installPath}</span>
+                  </span>
+                ) : undefined
+              }
+            >
+              <DropdownSelect
+                value={settings.language}
+                onChange={handleLanguageChange}
+                options={transcriptionLanguageOptions}
+                disabled={!activeFeature.installed}
+                className='max-w-full'
+              />
+            </SettingsField>
+
+            {activeFeature.installable && activeFeature.supported && (
+              <div>
+                <Button
+                  onClick={handleAudioInputAction}
+                  disabled={activeFeature.installing}
+                  variant={activeFeature.installed ? 'accentOutline' : 'install'}
+                  leftIcon={activeFeature.installing ? <SettingsLoadingSpinner /> : undefined}
+                >
+                  {actionLabel}
+                </Button>
+              </div>
+            )}
+          </>
         )}
-      </SettingsSection>
+      </SettingsCheckbox>
 
       <ConfirmationModal
         isOpen={pendingUninstall}

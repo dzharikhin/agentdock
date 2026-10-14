@@ -1,6 +1,6 @@
 import { AudioOutputSettings } from '../../types/chat';
 import { DropdownSelect } from '../ui/DropdownSelect';
-import { SettingsField, SettingsSection } from '../settings/SettingsLayout';
+import { SettingsCheckbox, SettingsField } from '../settings/SettingsLayout';
 import { AUDIO_OUTPUT_NONE, SYSTEM_VOICES, speechProviders, useSystemVoices } from './speechOutput';
 
 interface AudioOutputSettingsViewProps {
@@ -15,8 +15,9 @@ export function AudioOutputSettingsView({ settings, onSettingsChange, onSettings
   const voices = useSystemVoices();
   // System voices are offered only where the client has some.
   const providerOptions = speechProviders
-    .filter(({ value }) => value !== SYSTEM_VOICES || voices.length > 0)
+    .filter(({ value }) => value !== AUDIO_OUTPUT_NONE && (value !== SYSTEM_VOICES || voices.length > 0))
     .map(({ value, label }) => ({ value, label }));
+  const enabled = settings.provider !== AUDIO_OUTPUT_NONE;
   const activeProvider = speechProviders.find(({ value }) => value === settings.provider);
   const providerSettings = settings.providers[settings.provider] || { apiKey: '', voice: '' };
   const voiceOptions = settings.provider === SYSTEM_VOICES
@@ -34,57 +35,66 @@ export function AudioOutputSettingsView({ settings, onSettingsChange, onSettings
   };
 
   return (
-    <SettingsSection title='Audio Output'>
-      <SettingsField label='Speech engine' colon>
-        <DropdownSelect
-          value={settings.provider}
-          onChange={(provider) => save({ ...settings, provider })}
-          options={providerOptions}
-          className='max-w-full'
-        />
-      </SettingsField>
+    <SettingsCheckbox
+      title='Voice Output'
+      description='Read assistant messages aloud'
+      checked={enabled}
+      onToggle={() => save({ ...settings, provider: enabled ? AUDIO_OUTPUT_NONE : providerOptions[0].value })}
+      ariaLabel='Enable voice output'
+    >
+      {enabled && (
+        <>
+          <SettingsField label='Speech engine' colon>
+            <DropdownSelect
+              value={settings.provider}
+              onChange={(provider) => save({ ...settings, provider })}
+              options={providerOptions}
+              className='max-w-full'
+            />
+          </SettingsField>
 
-      {activeProvider?.apiKeyLabel && (
-        <SettingsField
-          label={activeProvider.apiKeyLabel}
-          colon
-          description={activeProvider.apiKeyUrl ? (
-            <span className='inline-block pt-1'>
-              <button
-                type='button'
-                onClick={() => window.__openUrl?.(activeProvider.apiKeyUrl!)}
-                className='text-link hover:underline'
-              >
-                Create an API key
-              </button>
-              {activeProvider.pricingDescription && ` · ${activeProvider.pricingDescription}`}
-            </span>
-          ) : undefined}
-        >
-          <input
-            type='password'
-            value={providerSettings.apiKey}
-            onChange={(event) => onSettingsChange(withProviderSettings({ apiKey: event.target.value }))}
-            onBlur={() => save(withProviderSettings({ apiKey: providerSettings.apiKey.trim() }))}
-            placeholder={activeProvider.apiKeyPlaceholder}
-            autoComplete='off'
-            aria-label={activeProvider.apiKeyLabel}
-            className='w-60 max-w-full rounded-[3px]'
-          />
-        </SettingsField>
-      )}
+          {activeProvider?.apiKeyLabel && (
+            <SettingsField
+              label={activeProvider.apiKeyLabel}
+              colon
+              description={activeProvider.apiKeyUrl ? (
+                <span className='inline-block pt-1'>
+                  <button
+                    type='button'
+                    onClick={() => window.__openUrl?.(activeProvider.apiKeyUrl!)}
+                    className='text-link hover:underline'
+                  >
+                    Create an API key
+                  </button>
+                  {activeProvider.pricingDescription && ` · ${activeProvider.pricingDescription}`}
+                </span>
+              ) : undefined}
+            >
+              <input
+                type='password'
+                value={providerSettings.apiKey}
+                onChange={(event) => onSettingsChange(withProviderSettings({ apiKey: event.target.value }))}
+                onBlur={() => save(withProviderSettings({ apiKey: providerSettings.apiKey.trim() }))}
+                placeholder={activeProvider.apiKeyPlaceholder}
+                autoComplete='off'
+                aria-label={activeProvider.apiKeyLabel}
+                className='w-60 max-w-full rounded-[3px]'
+              />
+            </SettingsField>
+          )}
 
-      {settings.provider !== AUDIO_OUTPUT_NONE && voiceOptions.length > 0 && (
-        <SettingsField label='Voice' colon>
-          <DropdownSelect
-            value={providerSettings.voice}
-            onChange={(voice) => save(withProviderSettings({ voice }))}
-            options={voiceOptions}
-            className='max-w-full'
-            menuClassName='!bottom-[calc(100%+0.35em)] !top-auto'
-          />
-        </SettingsField>
+          {voiceOptions.length > 0 && (
+            <SettingsField label='Voice' colon>
+              <DropdownSelect
+                value={providerSettings.voice}
+                onChange={(voice) => save(withProviderSettings({ voice }))}
+                options={voiceOptions}
+                className='max-w-full'
+              />
+            </SettingsField>
+          )}
+        </>
       )}
-    </SettingsSection>
+    </SettingsCheckbox>
   );
 }

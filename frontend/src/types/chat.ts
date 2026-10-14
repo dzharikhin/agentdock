@@ -220,7 +220,8 @@ export interface TabUiFlags {
   queued: boolean;
 }
 
-export type SectionType = 'management' | 'design' | 'history' | 'archive' | 'mcp' | 'custom-acp' | 'system-instructions' | 'prompt-library' | 'settings';
+export type SectionType = 'management' | 'design' | 'history' | 'archive' | 'mcp' | 'custom-acp' | 'system-instructions' | 'prompt-library' | SettingsSectionType;
+export type SettingsSectionType = 'general' | 'appearance' | 'shortcuts';
 
 export interface ChatTab {
   id: string;
@@ -557,6 +558,7 @@ export interface GlobalSettings {
   audioTranscription: AudioTranscriptionSettings;
   audioOutput: AudioOutputSettings;
   gitCommitGeneration: GitCommitGenerationSettings;
+  systemInstructionsEnabled: boolean;
   quotaWidgetEnabled: boolean;
   openInEditor: boolean;
   promptNavigationHoverOnly: boolean;

@@ -53,7 +53,7 @@ interface AppShortcutsOptions {
   onOpenSection: (section: SectionType) => void;
 }
 
-// The shortcuts that work outside the chats: chat numbers, a new chat, closing the active one, the history and Manage.
+// The shortcuts that work outside the chats: chat numbers, a new chat, closing the active one, the history and Settings.
 export function useAppShortcuts({
   chats, activeChatId, onSelectChat, onNewChat, onCloseChat, onOpenSection,
 }: AppShortcutsOptions) {

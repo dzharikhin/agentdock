@@ -1,13 +1,15 @@
-import type { SectionType } from '../../types/chat';
+import type { SectionType, SettingsSectionType } from '../../types/chat';
 import {
+  AppearanceTabIcon,
   ArchiveTabIcon,
   DesignTabIcon,
+  GeneralTabIcon,
   HistoryTabIcon,
   ManagementTabIcon,
   McpTabIcon,
   CustomAcpTabIcon,
   PromptLibraryTabIcon,
-  SettingsTabIcon,
+  ShortcutsTabIcon,
   SystemInstructionsTabIcon,
 } from './TabIcons';
 
@@ -27,8 +29,9 @@ export interface NavigationActionsProps {
   onOpenMcp: () => void;
   onOpenCustomAcp: () => void;
   onOpenPromptLibrary: () => void;
-  onOpenSystemInstructions: () => void;
-  onOpenSettings: () => void;
+  /** Lists "System Instructions" only when given. */
+  onOpenSystemInstructions?: () => void;
+  onOpenSettings: (section: SettingsSectionType) => void;
 }
 
 export function getNavigationActions({
@@ -45,9 +48,13 @@ export function getNavigationActions({
   const isDev = !!(window as any).__IS_DEV;
   return [
     { type: 'management', label: 'Service Providers', icon: <ManagementTabIcon />, onClick: onOpenManagement },
-    { type: 'settings', label: 'Settings', icon: <SettingsTabIcon />, onClick: onOpenSettings },
+    { type: 'general', label: 'General', icon: <GeneralTabIcon />, onClick: () => onOpenSettings('general') },
+    { type: 'appearance', label: 'Appearance', icon: <AppearanceTabIcon />, onClick: () => onOpenSettings('appearance') },
+    { type: 'shortcuts', label: 'Keyboard Shortcuts', icon: <ShortcutsTabIcon />, onClick: () => onOpenSettings('shortcuts') },
     { type: 'prompt-library', label: 'Prompt Library', icon: <PromptLibraryTabIcon />, onClick: onOpenPromptLibrary },
-    { type: 'system-instructions', label: 'System Instructions', icon: <SystemInstructionsTabIcon />, onClick: onOpenSystemInstructions },
+    ...(onOpenSystemInstructions ? [{
+      type: 'system-instructions' as const, label: 'System Instructions', icon: <SystemInstructionsTabIcon />, onClick: onOpenSystemInstructions,
+    }] : []),
     { type: 'mcp', label: 'MCP Servers', icon: <McpTabIcon />, onClick: onOpenMcp },
     { type: 'custom-acp', label: 'Custom ACP', icon: <CustomAcpTabIcon />, onClick: onOpenCustomAcp },
     { type: 'history', label: 'Chat History', icon: <HistoryTabIcon />, onClick: onOpenHistory },

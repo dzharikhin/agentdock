@@ -5,6 +5,7 @@ import {
   ChatTab,
   GlobalSettings,
   HistorySessionMeta,
+  SettingsSectionType,
   TabUiFlags,
   isAgentRunnable,
 } from '../types/chat';
@@ -45,7 +46,7 @@ export interface TabBarProps {
   onOpenCustomAcp: () => void;
   onOpenPromptLibrary: () => void;
   onOpenSystemInstructions: () => void;
-  onOpenSettings: () => void;
+  onOpenSettings: (section: SettingsSectionType) => void;
   sidebarPosition?: GlobalSettings['sidebarPosition'];
   onUseSidebar?: () => void;
 }

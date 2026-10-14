@@ -67,6 +67,8 @@ object GlobalSettingsStore {
 
     fun areAudioNotificationsEnabled(): Boolean = load().audioNotificationsEnabled
 
+    fun isSystemInstructionsEnabled(): Boolean = load().systemInstructionsEnabled
+
     fun userMessageBackgroundStyle(): String = normalizeUserMessageBackgroundStyle(load().userMessageBackgroundStyle)
 
     private inline fun <T> withStoreLock(action: () -> T): T = synchronized(storeLock) {
