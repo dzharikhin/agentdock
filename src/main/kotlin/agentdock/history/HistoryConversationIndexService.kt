@@ -245,30 +245,30 @@ internal object HistoryConversationIndexService {
     }
 
     /**
-     * Renames the conversation (a user-set title), pins or unpins it and/or moves it to a group, a blank one leaving it
-     * ungrouped; `null` leaves that property unchanged.
+     * Renames the conversations (a user-set title), pins or unpins them and/or moves them to a group, a blank one
+     * leaving them ungrouped; `null` leaves that property unchanged.
      */
     @Synchronized
-    fun updateConversation(
+    fun updateConversations(
         projectPath: String?,
-        conversationId: String,
+        conversationIds: List<String>,
         newTitle: String?,
         pinned: Boolean?,
         group: String?
     ): Boolean {
         val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
-        val cleanConversationId = runCatching {
-            HistoryStorage.requireSafeConversationId(conversationId)
+        val cleanConversationIds = runCatching {
+            conversationIds.mapTo(hashSetOf(), HistoryStorage::requireSafeConversationId)
         }.getOrElse { return false }
         val normalizedTitle = newTitle?.trim()
-        if (cleanProjectPath.isBlank() || cleanConversationId.isBlank() || normalizedTitle?.isBlank() == true) return false
+        if (cleanProjectPath.isBlank() || cleanConversationIds.isEmpty() || normalizedTitle?.isBlank() == true) return false
 
         val indexFile = HistoryStorage.ensureProjectIndexFile(cleanProjectPath)
         val existing = HistoryStorage.readProjectIndex(indexFile)
         var updated = false
 
         val rewritten = existing.map { conversation ->
-            if (conversation.id == cleanConversationId) {
+            if (conversation.id in cleanConversationIds) {
                 updated = true
                 conversation.copy(
                     title = normalizedTitle ?: conversation.title,

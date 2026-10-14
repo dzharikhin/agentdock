@@ -31,6 +31,8 @@ function handleHistoryRowKeyDown(
 interface HistoryListItemProps {
   item: HistorySessionMeta;
   adapterDisplay: Map<string, AgentOption>;
+  /** Shows the checkbox; clicking the row selects it instead of opening it. */
+  isSelecting: boolean;
   isSelected: boolean;
   /** Open as a chat; resuming in the terminal suits only closed chats. */
   isOpen: boolean;
@@ -54,6 +56,7 @@ interface HistoryListItemProps {
 export function HistoryListItem({
   item,
   adapterDisplay,
+  isSelecting,
   isSelected,
   isOpen,
   conversationLength,
@@ -77,6 +80,7 @@ export function HistoryListItem({
   const canOpenCli = !isOpen && !!mainAgent?.cliResumeAvailable;
   const canDelete = item.deletable !== false;
   const query = searchQuery.trim();
+  const activate = () => (isSelecting ? onToggleSelection(conversationId) : onOpenSession(item));
 
   return (
     <div className="group relative border-b border-border last:border-b-0">
@@ -86,8 +90,8 @@ export function HistoryListItem({
           tabIndex={isEditing ? -1 : 0}
           className="flex min-w-0 flex-1 items-center gap-3 max-[400px]:gap-2 cursor-pointer rounded-[4px]
             focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
-          onClick={() => { if (!isEditing) onOpenSession(item); }}
-          onKeyDown={(event) => handleHistoryRowKeyDown(event, isEditing, () => onOpenSession(item))}
+          onClick={() => { if (!isEditing) activate(); }}
+          onKeyDown={(event) => handleHistoryRowKeyDown(event, isEditing, activate)}
         >
           <div className="flex flex-col items-center shrink-0 gap-0.5 pt-0.5 mx-0.5 section-narrow:hidden">
             {mainAgent?.custom ? (
@@ -128,7 +132,7 @@ export function HistoryListItem({
                 <TabTitleInput
                   initialTitle={item.title}
                   onCommit={(title) =>
-                    ACPBridge.updateHistoryConversation(item.projectPath, conversationId, { newTitle: title })}
+                    ACPBridge.updateHistoryConversations(item.projectPath, [conversationId], { newTitle: title })}
                   onClose={() => onEditingChange(false)}
                   className="-ml-1 rounded-[3px] bg-background px-1 py-0.5 font-semibold"
                 />
@@ -179,7 +183,7 @@ export function HistoryListItem({
               ...(item.pinned ? [] : [{
                 label: 'Pin',
                 icon: <PinIcon pinned={false} />,
-                onClick: () => ACPBridge.updateHistoryConversation(item.projectPath, conversationId, { pinned: true }),
+                onClick: () => ACPBridge.updateHistoryConversations(item.projectPath, [conversationId], { pinned: true }),
               }]),
               moveToGroupAction(item, groups),
               ...(canOpenCli ? [{
@@ -198,21 +202,22 @@ export function HistoryListItem({
           {item.pinned ? (
             <SectionRowButton
               label="Unpin chat"
-              onClick={() => ACPBridge.updateHistoryConversation(item.projectPath, conversationId, { pinned: false })}
+              onClick={() => ACPBridge.updateHistoryConversations(item.projectPath, [conversationId], { pinned: false })}
               className="mr-1"
             >
               <Pin className="h-3.5 w-3.5 rotate-45" fill="currentColor" />
             </SectionRowButton>
           ) : null}
 
-          <Checkbox
-            checked={isSelected}
-            disabled={!canDelete}
-            onCheckedChange={() => onToggleSelection(conversationId)}
-            onClick={(e) => e.stopPropagation()}
-            className="!top-0 ml-1 disabled:opacity-50"
-            aria-label={`Select ${item.title}`}
-          />
+          {isSelecting ? (
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={() => onToggleSelection(conversationId)}
+              onClick={(e) => e.stopPropagation()}
+              className="!top-0 ml-1"
+              aria-label={`Select ${item.title}`}
+            />
+          ) : null}
         </div>
       </div>
     </div>

@@ -600,9 +600,9 @@ declare global {
     __requestHistoryList?: (projectPath?: string) => void;
     __syncHistoryList?: (projectPath?: string) => void;
     __deleteHistoryConversations?: (payload: { projectPath: string; conversationIds: string[] }) => void;
-    __updateHistoryConversation?: (payload: {
+    __updateHistoryConversations?: (payload: {
       projectPath: string;
-      conversationId: string;
+      conversationIds: string[];
       newTitle?: string;
       pinned?: boolean;
       group?: string;

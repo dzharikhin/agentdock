@@ -121,7 +121,7 @@ export function OpenChatList({
           const pinned = historyItem?.pinned === true;
           const pinLabel = pinned ? 'Unpin' : 'Pin';
           const togglePin = historyItem
-            ? () => ACPBridge.updateHistoryConversation(historyItem.projectPath, conversationId, { pinned: !pinned })
+            ? () => ACPBridge.updateHistoryConversations(historyItem.projectPath, [conversationId], { pinned: !pinned })
             : undefined;
           // Pinned chats show the pin, the tab bar menu also offers it on unpinned ones.
           const showPinButton = togglePin && (pinned || !sidebar);

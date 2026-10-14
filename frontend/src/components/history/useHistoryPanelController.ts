@@ -35,6 +35,8 @@ export function useHistoryPanelController(
   group: string | null
 ) {
   const [isLoading, setIsLoading] = useState(!historyLoaded);
+  /** Rows show checkboxes, and clicking one selects it instead of opening it. */
+  const [isSelecting, setIsSelecting] = useState(false);
   const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);
   const [deleteProjectPath, setDeleteProjectPath] = useState<string>('');
@@ -70,9 +72,7 @@ export function useHistoryPanelController(
 
   useEffect(() => {
     if (!historyLoaded) return;
-    setSelectedConversationIds((prev) => prev.filter((id) => (
-      historyList.some((item) => item.conversationId === id && item.deletable !== false)
-    )));
+    setSelectedConversationIds((prev) => prev.filter((id) => historyList.some((item) => item.conversationId === id)));
     setDeleteErrors((prev) => Object.fromEntries(
       Object.entries(prev).filter(([conversationId]) => (
         historyList.some((item) => item.conversationId === conversationId)
@@ -184,9 +184,7 @@ export function useHistoryPanelController(
   const resultCount = resultCountRef.current;
 
   const selectedCount = selectedConversationIds.length;
-  const filteredConversationIds = filteredHistoryList
-    .filter((item) => item.deletable !== false)
-    .map((item) => item.conversationId);
+  const filteredConversationIds = filteredHistoryList.map((item) => item.conversationId);
   const areAllFilteredSelected = filteredConversationIds.length > 0 &&
     filteredConversationIds.every((conversationId) => selectedConversationIds.includes(conversationId));
 
@@ -244,8 +242,14 @@ export function useHistoryPanelController(
     setDeleteProjectPath('');
   };
 
+  const stopSelecting = () => {
+    setIsSelecting(false);
+    setSelectedConversationIds([]);
+  };
+
   return {
     isLoading,
+    isSelecting,
     selectedConversationIds,
     pendingDeleteIds,
     agent: agentFilter,
@@ -273,5 +277,7 @@ export function useHistoryPanelController(
     openDeleteConfirmation,
     toggleSelection,
     cancelDelete,
+    startSelecting: () => setIsSelecting(true),
+    stopSelecting,
   };
 }

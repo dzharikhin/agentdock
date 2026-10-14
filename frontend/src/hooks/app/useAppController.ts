@@ -188,7 +188,7 @@ export function useAppController() {
       setChats((prev) => prev.map((item) => (
         item.id === tabId ? { ...item, title } : item
       )));
-      ACPBridge.updateHistoryConversation(projectPath, conversationId, { newTitle: title });
+      ACPBridge.updateHistoryConversations(projectPath, [conversationId], { newTitle: title });
       return;
     }
 
@@ -207,7 +207,7 @@ export function useAppController() {
       const conversationId = conversationKeyOf(tab);
       const projectPath = historyConversationIndex.get(conversationId)?.projectPath;
       if (!projectPath) return;
-      ACPBridge.updateHistoryConversation(projectPath, conversationId, { newTitle: tab.pendingTitle });
+      ACPBridge.updateHistoryConversations(projectPath, [conversationId], { newTitle: tab.pendingTitle });
       flushedTabIds.add(tab.id);
     });
     if (flushedTabIds.size === 0) return;

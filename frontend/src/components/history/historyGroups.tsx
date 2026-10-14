@@ -14,30 +14,33 @@ export function historyGroups(historyList: HistorySessionMeta[]): string[] {
 
 /** Compact `popupMenuActions` item moving the conversation to a group, a new one or out of them ("Ungrouped"). */
 export function moveToGroupAction(item: HistorySessionMeta, groups: string[]) {
-  const current = item.group ?? '';
   return (close: () => void) => (
     <PopupSubmenu key="move-to-group" label="Move to group" icon={<FolderInput size={12} aria-hidden="true" />} compact>
-      <GroupOptions
-        groups={groups}
-        current={current}
-        onSelect={(group) => {
-          close();
-          if (group !== current) ACPBridge.updateHistoryConversation(item.projectPath, item.conversationId, { group });
-        }}
-      />
+      <GroupOptions items={[item]} groups={groups} onMove={close} />
     </PopupSubmenu>
   );
 }
 
-/** The groups, "Ungrouped" (`''`) and "New group…", which turns into a name input; the current one is chosen. */
-function GroupOptions({ groups, current, onSelect }: {
+/**
+ * Menu items moving the conversations to one of the groups, out of them ("Ungrouped", `''`) or to a new one: "New
+ * group…" turns into a name input. The conversations' common group is chosen.
+ */
+export function GroupOptions({ items, groups, onMove }: {
+  items: HistorySessionMeta[];
   groups: string[];
-  current: string;
-  onSelect: (group: string) => void;
+  onMove: () => void;
 }) {
   const [creating, setCreating] = useState(false);
   // Leaving the name input focuses "New group…" again, so the submenu keeps the focus.
   const refocusRef = useRef(false);
+  const itemGroups = new Set(items.map((item) => item.group ?? ''));
+  const current = itemGroups.size === 1 ? [...itemGroups][0] : null;
+  const onSelect = (group: string) => {
+    onMove();
+    const moved = items.filter((item) => (item.group ?? '') !== group);
+    if (moved.length === 0) return;
+    ACPBridge.updateHistoryConversations(moved[0].projectPath, moved.map((item) => item.conversationId), { group });
+  };
 
   return (
     <>

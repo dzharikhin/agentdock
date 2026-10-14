@@ -3,14 +3,15 @@ import type { ReactNode } from 'react';
 import { conversationKeyOf } from '../types/chat';
 import type { AgentOption, ChatTab, HistorySessionMeta } from '../types/chat';
 import ConfirmationModal from './ConfirmationModal';
-import { Bot, Folder, RefreshCw, Funnel, Search, X } from 'lucide-react';
-import { Button } from './ui/Button';
+import { Bot, Folder, FolderInput, RefreshCw, Funnel, Pin, Search, Trash2, X } from 'lucide-react';
+import { ACPBridge } from '../utils/bridge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
+import { SectionRowButton, sectionRowButtonClassName } from './ui/SectionList';
 import { PopupMenu, popupMenuActions } from './ui/PopupMenu';
 import { PopupSubmenu, PopupSubmenuOption, PopupSubmenuSeparator } from './ui/PopupSubmenu';
 import { Tooltip } from './chat/shared/Tooltip';
 import { HistoryListItem } from './history/HistoryListItem';
-import { historyGroups } from './history/historyGroups';
+import { GroupOptions, historyGroups } from './history/historyGroups';
 import { useHistoryPanelController } from './history/useHistoryPanelController';
 import { SectionPage } from './ui/SectionPage';
 
@@ -28,6 +29,10 @@ interface HistoryPanelProps {
 
 /** Rows rendered at first and added on reaching the end, so a long history stays light until scrolled through. */
 const RENDER_BATCH = 100;
+
+const linkButtonClassName = `rounded-[4px] p-1 text-ide-small text-link hover:underline
+  focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none`;
+const disabledButtonClassName = 'disabled:pointer-events-none disabled:opacity-50';
 
 /** `null` is all. */
 interface FilterOption {
@@ -77,6 +82,7 @@ export default function HistoryPanel({
   const groups = useMemo(() => historyGroups(historyList), [historyList]);
   const {
     isLoading,
+    isSelecting,
     selectedConversationIds,
     pendingDeleteIds,
     agent,
@@ -104,6 +110,8 @@ export default function HistoryPanel({
     openDeleteConfirmation,
     toggleSelection,
     cancelDelete,
+    startSelecting,
+    stopSelecting,
   } = useHistoryPanelController(
     availableAgents,
     isActive,
@@ -133,6 +141,9 @@ export default function HistoryPanel({
 
   const hasOpenPendingChat =tabs.some((tab) => pendingDeleteIds.includes(conversationKeyOf(tab)));
   const filterActive = agent !== null || group !== null;
+  const selectedItems = historyList.filter((item) => selectedConversationIds.includes(item.conversationId));
+  // Pins all once any is unpinned, otherwise unpins all.
+  const pinSelected = selectedItems.some((item) => !item.pinned);
 
   return (
     <div className="flex min-h-0 w-full flex-col bg-background text-foreground">
@@ -227,25 +238,62 @@ export default function HistoryPanel({
           </span>
         </div>
         
-        <div className="flex items-center gap-3 shrink-0">
-          {selectedCount > 0 && (
-            <Button
-              onClick={() => openDeleteConfirmation(historyList.filter((item) => selectedConversationIds.includes(item.conversationId)))}
-              variant="danger"
-              className="max-h-8"
-            >
-              Delete ({selectedCount})
-            </Button>
-          )}
-
-          {filteredConversationIds.length > 0 && (
-            <button
-              type="button"
-              onClick={toggleSelectAllFiltered}
-              className="text-ide-small text-link hover:underline p-1 rounded-[4px] focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-            >
-              {areAllFilteredSelected ? 'Clear all' : 'Select all'}
-            </button>
+        <div className="flex shrink-0 items-center gap-1">
+          {isSelecting ? (
+            <>
+              <span className="pr-1 text-ide-small text-foreground-secondary max-[399px]:hidden">
+                {selectedCount} selected
+              </span>
+              {filteredConversationIds.length > 0 && (
+                <button type="button" onClick={toggleSelectAllFiltered} className={linkButtonClassName}>
+                  {areAllFilteredSelected ? 'Clear all' : 'Select all'}
+                </button>
+              )}
+              <SectionRowButton
+                label={pinSelected ? 'Pin' : 'Unpin'}
+                aria-label={pinSelected ? 'Pin selected chats' : 'Unpin selected chats'}
+                disabled={selectedCount === 0}
+                onClick={() => ACPBridge.updateHistoryConversations(
+                  selectedItems[0].projectPath,
+                  selectedItems.filter((item) => !item.pinned === pinSelected).map((item) => item.conversationId),
+                  { pinned: pinSelected }
+                )}
+                className={disabledButtonClassName}
+              >
+                <Pin size={13} className="rotate-45" fill={pinSelected ? 'none' : 'currentColor'} />
+              </SectionRowButton>
+              <PopupMenu
+                renderTrigger={(trigger) => (
+                  <Tooltip variant="minimal" content="Move to group">
+                    <button
+                      type="button"
+                      aria-label="Move selected chats to group"
+                      disabled={selectedCount === 0}
+                      {...trigger}
+                      className={`${sectionRowButtonClassName} ${disabledButtonClassName}`}
+                    >
+                      <FolderInput size={13} />
+                    </button>
+                  </Tooltip>
+                )}
+              >
+                {(close) => <GroupOptions items={selectedItems} groups={groups} onMove={close} />}
+              </PopupMenu>
+              <SectionRowButton
+                label="Delete"
+                aria-label="Delete selected chats"
+                disabled={!selectedItems.some((item) => item.deletable !== false)}
+                onClick={() => openDeleteConfirmation(selectedItems)}
+                className={`!text-error ${disabledButtonClassName}`}
+              >
+                <Trash2 size={13} />
+              </SectionRowButton>
+              <SectionRowButton label="Done" aria-label="Stop selecting" onClick={stopSelecting}>
+                <X size={13} />
+              </SectionRowButton>
+            </>
+          ) : (
+            <button type="button" onClick={startSelecting} className={linkButtonClassName}>Select</button>
           )}
         </div>
       </div>
@@ -267,6 +315,7 @@ export default function HistoryPanel({
                 key={conversationId}
                 item={item}
                 adapterDisplay={adapterDisplay}
+                isSelecting={isSelecting}
                 isSelected={selectedConversationIds.includes(conversationId)}
                 isOpen={tabs.some((tab) => conversationKeyOf(tab) === conversationId)}
                 conversationLength={formatConversationLength(item.promptCount)}

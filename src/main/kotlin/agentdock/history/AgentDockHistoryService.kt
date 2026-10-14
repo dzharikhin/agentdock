@@ -310,14 +310,14 @@ object AgentDockHistoryService {
         )
     }
 
-    suspend fun updateConversation(
+    suspend fun updateConversations(
         projectPath: String?,
-        conversationId: String,
+        conversationIds: List<String>,
         newTitle: String?,
         pinned: Boolean?,
         group: String?
     ): Boolean = withContext(Dispatchers.IO) {
-        HistoryConversationIndexService.updateConversation(projectPath, conversationId, newTitle, pinned, group)
+        HistoryConversationIndexService.updateConversations(projectPath, conversationIds, newTitle, pinned, group)
     }
 
     suspend fun renameGroup(projectPath: String?, group: String, newGroup: String): Boolean =

@@ -34,7 +34,7 @@ class HistoryBridge(
     @Serializable
     private data class UpdateHistoryPayload(
         val projectPath: String,
-        val conversationId: String,
+        val conversationIds: List<String>,
         val newTitle: String? = null,
         val pinned: Boolean? = null,
         val group: String? = null
@@ -168,7 +168,7 @@ class HistoryBridge(
             }
         }
 
-        host.register("updateHistoryConversation") { payload ->
+        host.register("updateHistoryConversations") { payload ->
             if (payload.isBlank()) return@register
 
             scope.launch(Dispatchers.Default) {
@@ -176,9 +176,9 @@ class HistoryBridge(
                 try {
                     val request = permissiveJson.decodeFromString<UpdateHistoryPayload>(payload)
                     failedRequest = request
-                    val success = AgentDockHistoryService.updateConversation(
+                    val success = AgentDockHistoryService.updateConversations(
                         request.projectPath,
-                        request.conversationId,
+                        request.conversationIds,
                         request.newTitle,
                         request.pinned,
                         request.group
