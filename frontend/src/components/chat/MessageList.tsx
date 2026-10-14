@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, memo, useState, useMemo, useEffect, useCallback } from 'react';
 import type { ReactNode } from 'react';
-import { Message, RichContentBlock, ExploringBlock, ToolCallBlock, PlanBlock, AgentOption } from '../../types/chat';
+import { Message, RichContentBlock, ExploringBlock, PlanBlock, AgentOption } from '../../types/chat';
 import { UserMessage, formatPromptTime } from './UserMessage';
 import { AssistantMessage } from './AssistantMessage';
 import { ChatLoadingIndicator } from './ChatLoadingIndicator';
@@ -186,13 +186,12 @@ function MessageList({
       if (block.type === 'text') {
         return (block as any).text?.length || 0;
       }
+      // Fixed weight per tool call: their collapsed rows mount the raw JSON, results and diffs only on expand
       if (block.type === 'exploring') {
-        const exp = block as ExploringBlock;
-        return exp.entries ? JSON.stringify(exp.entries).length : 0;
+        return 100 * ((block as ExploringBlock).entries?.length ?? 0);
       }
       if (block.type === 'tool_call') {
-        const tc = block as ToolCallBlock;
-        return tc.entry ? JSON.stringify(tc.entry).length : 0;
+        return 100;
       }
       if (block.type === 'plan') {
          const plan = block as PlanBlock;
