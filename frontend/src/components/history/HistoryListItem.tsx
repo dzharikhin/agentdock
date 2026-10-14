@@ -26,7 +26,7 @@ function handleHistoryRowKeyDown(
 interface HistoryListItemProps {
   item: HistorySessionMeta;
   agents: AgentOption[];
-  /** Shows the checkbox; clicking the row selects it instead of opening it. */
+  /** Shows the checkbox. */
   isSelecting: boolean;
   isSelected: boolean;
   /** Open as a chat; resuming in the terminal suits only closed chats. */
@@ -77,7 +77,7 @@ export function HistoryListItem({
   const canOpenCli = !isOpen && !!mainAgent?.cliResumeAvailable;
   const canDelete = item.deletable !== false;
   const query = searchQuery.trim();
-  const activate = () => (isSelecting ? onToggleSelection(conversationId) : onOpenSession(item));
+  const activate = () => onOpenSession(item);
 
   return (
     <div className="group relative border-b border-border last:border-b-0">

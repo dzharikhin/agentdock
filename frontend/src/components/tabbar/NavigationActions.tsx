@@ -50,7 +50,7 @@ export function getNavigationActions({
     { type: 'management', label: 'Service Providers', icon: <ManagementTabIcon />, onClick: onOpenManagement },
     { type: 'general', label: 'General', icon: <GeneralTabIcon />, onClick: () => onOpenSettings('general') },
     { type: 'appearance', label: 'Appearance', icon: <AppearanceTabIcon />, onClick: () => onOpenSettings('appearance') },
-    { type: 'shortcuts', label: 'Keyboard Shortcuts', icon: <ShortcutsTabIcon />, onClick: () => onOpenSettings('shortcuts') },
+    { type: 'shortcuts', label: 'Shortcuts', icon: <ShortcutsTabIcon />, onClick: () => onOpenSettings('shortcuts') },
     { type: 'prompt-library', label: 'Prompt Library', icon: <PromptLibraryTabIcon />, onClick: onOpenPromptLibrary },
     ...(onOpenSystemInstructions ? [{
       type: 'system-instructions' as const, label: 'System Instructions', icon: <SystemInstructionsTabIcon />, onClick: onOpenSystemInstructions,

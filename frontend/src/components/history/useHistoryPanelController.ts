@@ -35,7 +35,7 @@ export function useHistoryPanelController(
   group: string | null
 ) {
   const [isLoading, setIsLoading] = useState(!historyLoaded);
-  /** Rows show checkboxes, and clicking one selects it instead of opening it. */
+  /** Rows show checkboxes. */
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([]);

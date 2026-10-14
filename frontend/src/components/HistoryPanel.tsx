@@ -156,9 +156,9 @@ export default function HistoryPanel({
   return (
     <div className="flex min-h-0 w-full flex-col bg-background text-foreground">
       <SectionPage padding="px-5 pt-1.5 pb-2" toolbar={(
-      <div className="flex items-center gap-3 min-h-12 px-4 py-1 border-b border-border">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
-          <div className="relative flex w-56 min-w-0 items-center">
+      <div className="flex shrink-0 flex-wrap items-center gap-3 min-h-12 px-4 py-1 border-b border-border">
+        <div className="flex min-w-0 flex-auto items-center gap-1.5">
+          <div className="relative flex w-32 max-w-56 grow items-center">
             <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2 text-foreground-secondary" />
             <input
               ref={searchInputRef}
@@ -194,9 +194,7 @@ export default function HistoryPanel({
                     type="button"
                     aria-label="Filter chats"
                     {...trigger}
-                    className={`rounded-[4px] p-1 transition-colors
-                      focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none
-                      ${filterActive ? 'text-foreground' : 'text-foreground-secondary hover:text-foreground'}`}
+                    className={`${sectionRowButtonClassName} ${filterActive ? '!text-foreground' : ''}`}
                   >
                     <Funnel size={14} fill={filterActive ? 'currentColor' : 'none'} />
                   </button>
@@ -229,13 +227,13 @@ export default function HistoryPanel({
             </PopupMenu>
           ) : null}
 
-          <span className="shrink-0 pl-1 text-foreground-secondary text-ide-small max-[399px]:hidden">
+          <span className="shrink-0 pl-1 text-foreground-secondary text-ide-small max-[499px]:hidden">
             {isSelecting ? `${selectedCount} of ` : ''}{resultCount} chat{resultCount !== 1 ? 's' : ''}
             {isSelecting ? ' selected' : ''}
           </span>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
           {isSelecting ? (
             <>
               <SectionRowButton
@@ -306,12 +304,10 @@ export default function HistoryPanel({
             <button
               onClick={refreshHistory}
               disabled={isLoading}
-              className={`rounded-[4px] p-1 text-foreground-secondary transition-colors hover:text-foreground
-                focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none
-                ${isLoading ? 'animate-spin' : ''}`}
+              className={sectionRowButtonClassName}
               aria-label="Refresh history"
             >
-              <RefreshCw size={14} />
+              <RefreshCw size={14} className={isLoading ? 'animate-spin' : ''} />
             </button>
           </Tooltip>
         </div>
