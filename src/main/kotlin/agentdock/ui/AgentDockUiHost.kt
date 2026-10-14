@@ -23,6 +23,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.wm.ex.ToolWindowManagerListener
+import com.intellij.ui.BadgeIconSupplier
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
@@ -39,6 +40,7 @@ import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.event.KeyEvent
 import java.awt.dnd.DropTarget
+import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
@@ -69,6 +71,11 @@ class AgentDockUiHost(
     private val editorSurfaces = LinkedHashSet<JPanel>()
 
     private var toolWindow: ToolWindow? = null
+    private val badgeIcons = BadgeIconSupplier(AgentDockFileType.getIcon())
+    /** The plugin icon with the open chats' dot, or `null`; the editor tab may read it off the EDT. */
+    @Volatile
+    var attentionIcon: Icon? = null
+        private set
     private var browserStarted = false
     private var browser: JBCefBrowser? = null
     private var bridge: FrontendBridge? = null
@@ -164,6 +171,24 @@ class AgentDockUiHost(
         if (liveContent?.parent === panel) {
             moveContentTo(editorSurfaces.lastOrNull() ?: homePanel)
         }
+    }
+
+    /**
+     * Mirrors the open chats' dot on the tool window button and the editor tab: `warning` while one waits for a
+     * permission, `unread` while one has an unread reply, anything else clears it.
+     */
+    fun setAttention(level: String) {
+        val icon = when (level) {
+            "warning" -> badgeIcons.warningIcon
+            "unread" -> badgeIcons.infoIcon
+            else -> null
+        }
+        if (icon === attentionIcon) return
+        attentionIcon = icon
+        // [toolWindow] is bound only once the tool window has been shown, which a UI restored in an editor tab skips.
+        (toolWindow ?: ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID))
+            ?.setIcon(icon ?: badgeIcons.originalIcon)
+        FileEditorManager.getInstance(project).updateFilePresentation(virtualFile)
     }
 
     fun preferredFocusComponent(): JComponent = browser?.component ?: liveContent ?: homePanel

@@ -211,6 +211,8 @@ export interface DropdownOption {
   subOptions?: DropdownOption[];
 }
 
+export type AttentionLevel = 'warning' | 'unread' | '';
+
 export interface TabUiFlags {
   unread: boolean;
   atBottom: boolean;
@@ -635,6 +637,10 @@ declare global {
     __continueConversationWithSession?: (payload: ContinueConversationPayload) => void;
     __saveConversationTranscript?: (payload: string) => void;
     __requestHostRepaint?: (reason?: string) => void;
+    /** Answered with an `agent-dock-ui-visibility` event telling whether the UI is on screen. */
+    __readUiVisibility?: () => void;
+    /** Mirrors the open chats' dot on the plugin icon: `warning`, `unread`, or empty for none. */
+    __setAttentionBadge?: (level: AttentionLevel) => void;
 
     // Callbacks (Backend -> Frontend)
     __onAcpLog?: (payload: AcpLogEntryPayload) => void;

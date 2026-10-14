@@ -139,6 +139,8 @@ internal object BridgeScripts {
             window.__stopSpeech = function(requestId) { invoke('stopSpeech', requestId || ''); };
             window.__agentDockPlaySound = function(sound) { invoke('playSound', sound); };
             window.__requestHostRepaint = function(reason) { invoke('repaint', reason || ''); };
+            window.__readUiVisibility = function() { invoke('readUiVisibility', ''); };
+            window.__setAttentionBadge = function(level) { invoke('setAttentionBadge', level || ''); };
 
             window.__settingsBridgeReady = true;
             window.dispatchEvent(new CustomEvent('settings-bridge-ready'));

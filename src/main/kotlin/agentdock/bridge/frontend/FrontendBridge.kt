@@ -5,6 +5,7 @@ import agentdock.acp.ideTerminalBridge
 import agentdock.rpc.TerminalCapability
 import agentdock.rpc.TerminalLaunchRequest
 import agentdock.rpc.UiMessage
+import agentdock.ui.AgentDockUiHost
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
@@ -23,6 +24,8 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.awt.Cursor
+import java.awt.event.HierarchyEvent
+import java.awt.event.HierarchyListener
 
 /**
  * The client half of the bridge.
@@ -50,9 +53,14 @@ internal class FrontendBridge(
             if (!browser.isDisposed) reloadUi()
         }, ModalityState.any())
     }
+    /** Hiding the tool window or switching away from the editor tab hides the browser component. */
+    private val visibilityListener = HierarchyListener { event ->
+        if ((event.changeFlags and HierarchyEvent.SHOWING_CHANGED.toLong()) != 0L) pushUiVisibility()
+    }
 
     fun install() {
         installLocalCommands()
+        browser.component.addHierarchyListener(visibilityListener)
         audioInput.install()
         audioOutput.install()
 
@@ -136,6 +144,20 @@ internal class FrontendBridge(
 
         commands.register("openUrl", ::openUrl)
         commands.register("readUiZoom") { pushUiZoom() }
+        commands.register("readUiVisibility") {
+            ApplicationManager.getApplication().invokeLater({ pushUiVisibility() }, ModalityState.any())
+        }
+
+        commands.register("setAttentionBadge") { level ->
+            ApplicationManager.getApplication().invokeLater({
+                if (!project.isDisposed) AgentDockUiHost.getInstance(project).setAttention(level)
+            }, ModalityState.any())
+        }
+    }
+
+    private fun pushUiVisibility() {
+        if (browser.isDisposed) return
+        eval("window.dispatchEvent(new CustomEvent('agent-dock-ui-visibility',{detail:${browser.component.isShowing}}));")
     }
 
     private fun pushUiZoom() {
@@ -184,6 +206,7 @@ internal class FrontendBridge(
     }
 
     override fun dispose() {
+        browser.component.removeHierarchyListener(visibilityListener)
         audioInput.dispose()
         audioOutput.dispose()
         Disposer.dispose(connection)
