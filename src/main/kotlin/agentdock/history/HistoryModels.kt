@@ -22,6 +22,7 @@ data class SessionMeta(
     val deletable: Boolean = true,
     val allAdapterNames: List<String> = emptyList(),
     val pinned: Boolean = false,
+    val archived: Boolean = false,
     val group: String? = null
 )
 
@@ -116,6 +117,7 @@ internal data class HistoryConversationIndexEntry(
     val title: String = "",
     val titleUserSet: Boolean = false,
     val pinned: Boolean = false,
+    val archived: Boolean = false,
     /** The user's group of the conversation; `null` while ungrouped. */
     val group: String? = null,
     val promptCount: Int? = null,

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { HistorySessionMeta, SectionType } from '../../types/chat';
 import { ACPBridge } from '../../utils/bridge';
 import type { HistoryGroupNavProps } from './HistoryGroupNav';
-import { historyGroups } from './historyGroups';
+import { existingGroup, historyGroups } from './historyGroups';
 
 /**
  * The group the history lists, chosen in the section popup's group navigation or the history's filter, and that
@@ -33,8 +33,7 @@ export function useHistoryGroupNav(
     if (activeSection !== 'history') setSelected(null);
   }, [activeSection]);
 
-  // All, once the group is gone.
-  const historyGroup = groups.length > 0 && (selected === '' || groups.includes(selected ?? '')) ? selected : null;
+  const historyGroup = existingGroup(groups, selected);
 
   return {
     historyGroup,

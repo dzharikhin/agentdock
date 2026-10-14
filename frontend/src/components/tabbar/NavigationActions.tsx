@@ -1,5 +1,6 @@
 import type { SectionType } from '../../types/chat';
 import {
+  ArchiveTabIcon,
   DesignTabIcon,
   HistoryTabIcon,
   ManagementTabIcon,
@@ -19,6 +20,8 @@ export type NavigationAction = {
 
 export interface NavigationActionsProps {
   onOpenHistory: () => void;
+  /** Lists "Chat Archive" only when given. */
+  onOpenArchive?: () => void;
   onOpenManagement: () => void;
   onOpenDesignSystem: () => void;
   onOpenMcp: () => void;
@@ -30,6 +33,7 @@ export interface NavigationActionsProps {
 
 export function getNavigationActions({
   onOpenHistory,
+  onOpenArchive,
   onOpenManagement,
   onOpenDesignSystem,
   onOpenMcp,
@@ -47,6 +51,7 @@ export function getNavigationActions({
     { type: 'mcp', label: 'MCP Servers', icon: <McpTabIcon />, onClick: onOpenMcp },
     { type: 'custom-acp', label: 'Custom ACP', icon: <CustomAcpTabIcon />, onClick: onOpenCustomAcp },
     { type: 'history', label: 'Chat History', icon: <HistoryTabIcon />, onClick: onOpenHistory },
+    ...(onOpenArchive ? [{ type: 'archive' as const, label: 'Chat Archive', icon: <ArchiveTabIcon />, onClick: onOpenArchive }] : []),
     ...(isDev ? [{ type: 'design' as const, label: 'Design System', icon: <DesignTabIcon />, onClick: onOpenDesignSystem }] : []),
   ];
 }

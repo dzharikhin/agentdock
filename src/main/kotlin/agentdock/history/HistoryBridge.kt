@@ -37,6 +37,7 @@ class HistoryBridge(
         val conversationIds: List<String>,
         val newTitle: String? = null,
         val pinned: Boolean? = null,
+        val archived: Boolean? = null,
         val group: String? = null
     )
 
@@ -181,6 +182,7 @@ class HistoryBridge(
                         request.conversationIds,
                         request.newTitle,
                         request.pinned,
+                        request.archived,
                         request.group
                     )
                     val history = AgentDockHistoryService.getHistoryList(request.projectPath)

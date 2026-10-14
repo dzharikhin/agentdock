@@ -220,7 +220,7 @@ export interface TabUiFlags {
   queued: boolean;
 }
 
-export type SectionType = 'management' | 'design' | 'history' | 'mcp' | 'custom-acp' | 'system-instructions' | 'prompt-library' | 'settings';
+export type SectionType = 'management' | 'design' | 'history' | 'archive' | 'mcp' | 'custom-acp' | 'system-instructions' | 'prompt-library' | 'settings';
 
 export interface ChatTab {
   id: string;
@@ -276,6 +276,7 @@ export interface HistorySessionMeta {
   updatedAt: number;
   deletable?: boolean;
   pinned?: boolean;
+  archived?: boolean;
   group?: string;
 }
 
@@ -605,6 +606,7 @@ declare global {
       conversationIds: string[];
       newTitle?: string;
       pinned?: boolean;
+      archived?: boolean;
       group?: string;
     }) => void;
     __renameHistoryGroup?: (payload: { projectPath: string; group: string; newGroup: string }) => void;

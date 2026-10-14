@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { FolderInput } from 'lucide-react';
+import { Archive, ArchiveRestore, FolderInput } from 'lucide-react';
 import type { HistorySessionMeta } from '../../types/chat';
 import { ACPBridge } from '../../utils/bridge';
 import { popupMenuItemClassName } from '../ui/PopupMenu';
@@ -12,6 +12,10 @@ export function historyGroups(historyList: HistorySessionMeta[]): string[] {
     .sort((a, b) => a.localeCompare(b));
 }
 
+/** The listed group (`''` the ungrouped conversations, `null` all) while it exists, otherwise all. */
+export const existingGroup = (groups: string[], group: string | null) =>
+  groups.length > 0 && (group === '' || groups.includes(group ?? '')) ? group : null;
+
 /** Compact `popupMenuActions` item moving the conversation to a group, a new one or out of them ("Ungrouped"). */
 export function moveToGroupAction(item: HistorySessionMeta, groups: string[]) {
   return (close: () => void) => (
@@ -20,6 +24,13 @@ export function moveToGroupAction(item: HistorySessionMeta, groups: string[]) {
     </PopupSubmenu>
   );
 }
+
+/** `popupMenuActions` item archiving the conversation or unarchiving the archived one. */
+export const archiveAction = (item: HistorySessionMeta) => ({
+  label: item.archived ? 'Unarchive' : 'Archive',
+  icon: item.archived ? <ArchiveRestore size={12} aria-hidden="true" /> : <Archive size={12} aria-hidden="true" />,
+  onClick: () => ACPBridge.updateHistoryConversations(item.projectPath, [item.conversationId], { archived: !item.archived }),
+});
 
 /**
  * Menu items moving the conversations to one of the groups, out of them ("Ungrouped", `''`) or to a new one: "New

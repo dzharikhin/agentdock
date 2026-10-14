@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import TabBar, { TabBarProps } from './components/TabBar';
 import { Sidebar } from './components/Sidebar';
 import { AppTabContent } from './components/AppTabContent';
@@ -151,7 +151,18 @@ function App() {
     handleContinueInCurrentConversation,
     handleCancelAgentSwitch,
   } = useAppController();
-  const { historyGroup, setHistoryGroup, historyGroupNav } = useHistoryGroupNav(historyList, activeSection, openSection);
+  // Listed apart: the archive lists the archived conversations, the history and the empty state the others.
+  const [unarchivedHistory, archivedHistory] = useMemo(() => [
+    historyList.filter((item) => !item.archived),
+    historyList.filter((item) => item.archived),
+  ], [historyList]);
+  // The archive's last conversation is gone: its section is no longer listed.
+  useEffect(() => {
+    if (activeSection === 'archive' && archivedHistory.length === 0) openSection('history');
+  }, [activeSection, archivedHistory, openSection]);
+  const [archiveGroup, setArchiveGroup] = useState<string | null>(null);
+  const { historyGroup, setHistoryGroup, historyGroupNav } =
+    useHistoryGroupNav(unarchivedHistory, activeSection, openSection);
 
   const navigationProps: TabBarProps = {
     isIslandsTheme,
@@ -295,10 +306,10 @@ function App() {
             onOpenManagement={() => openSection('management')}
             agents={availableAgents}
             // In the history order, pinned ones first; open chats are left out.
-            recentChats={historyList
+            recentChats={unarchivedHistory
               .filter((item) => !tabs.some((tab) => conversationKeyOf(tab) === item.conversationId))
               .slice(0, 5)}
-            historyCount={historyList.length}
+            historyCount={unarchivedHistory.length}
             onOpenChat={handleOpenHistory}
             onOpenHistory={() => openSection('history')}
           />
@@ -307,7 +318,10 @@ function App() {
 
       {/* Sections mount on first use and remain cached without becoming tabs. */}
       <SectionPopup
-        sections={getNavigationActions(navigationProps)}
+        sections={getNavigationActions({
+          ...navigationProps,
+          onOpenArchive: archivedHistory.length > 0 ? () => openSection('archive') : undefined,
+        })}
         activeSection={activeSection}
         compact={compactSections}
         historyGroupNav={historyGroupNav}
@@ -319,10 +333,10 @@ function App() {
             section={section}
             tabs={tabs}
             tabUi={tabUi}
-            historyList={historyList}
+            historyList={section === 'archive' ? archivedHistory : unarchivedHistory}
             historyLoaded={historyLoaded}
-            historyGroup={historyGroup}
-            onHistoryGroupChange={setHistoryGroup}
+            historyGroup={section === 'archive' ? archiveGroup : historyGroup}
+            onHistoryGroupChange={section === 'archive' ? setArchiveGroup : setHistoryGroup}
             isActive={section === activeSection}
             availableAgents={availableAgents}
             hasOpenConversationsForAdapter={hasOpenConversationsForAdapter}

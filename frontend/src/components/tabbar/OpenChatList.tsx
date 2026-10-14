@@ -11,7 +11,7 @@ import { ChatSpinnerIcon } from '../chat/ChatLoadingIndicator';
 import { getTabIcon } from './TabIcons';
 import { TabTitleInput } from './TabTitleInput';
 import { useTabReordering } from './useTabReordering';
-import { historyGroups, moveToGroupAction } from '../history/historyGroups';
+import { archiveAction, historyGroups, moveToGroupAction } from '../history/historyGroups';
 import { menuRowClassName, rowButtonClassName, rowFocusClassName, RowAction, sidebarRowClassName } from './rows';
 
 export interface OpenChatListProps {
@@ -215,7 +215,8 @@ export function OpenChatList({
                           icon: <SquareTerminal size={12} aria-hidden="true" />,
                           onClick: () => ACPBridge.openHistoryConversationCli(historyItem.projectPath, conversationId),
                         }] : []),
-                        ...(historyItem ? [{
+                        ...(historyItem ? [archiveAction(historyItem)] : []),
+                        ...(historyItem && historyItem.deletable !== false ? [{
                           label: 'Delete',
                           icon: <Trash2 size={12} aria-hidden="true" />,
                           onClick: () => setPendingDeleteChat({

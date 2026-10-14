@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { conversationKeyOf } from '../types/chat';
 import type { AgentOption, ChatTab, HistorySessionMeta, TabUiFlags } from '../types/chat';
 import ConfirmationModal from './ConfirmationModal';
-import { Bot, Folder, FolderInput, RefreshCw, Funnel, Pin, Search, Trash2, X } from 'lucide-react';
+import { Archive, ArchiveRestore, Bot, Folder, FolderInput, RefreshCw, Funnel, Pin, Search, Trash2, X } from 'lucide-react';
 import { ACPBridge } from '../utils/bridge';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { SectionRowButton, sectionRowButtonClassName } from './ui/SectionList';
@@ -11,7 +11,7 @@ import { PopupMenu, popupMenuActions } from './ui/PopupMenu';
 import { PopupSubmenu, PopupSubmenuOption, PopupSubmenuSeparator } from './ui/PopupSubmenu';
 import { Tooltip } from './chat/shared/Tooltip';
 import { HistoryListItem } from './history/HistoryListItem';
-import { GroupOptions, historyGroups } from './history/historyGroups';
+import { existingGroup, GroupOptions, historyGroups } from './history/historyGroups';
 import { useHistoryPanelController } from './history/useHistoryPanelController';
 import { SectionPage } from './ui/SectionPage';
 
@@ -19,10 +19,13 @@ interface HistoryPanelProps {
   availableAgents: AgentOption[];
   tabs: ChatTab[];
   tabUi: Record<string, TabUiFlags>;
+  /** Only the archived conversations or only the others. */
   historyList: HistorySessionMeta[];
   historyLoaded: boolean;
+  /** Lists the archived conversations, the selection unarchiving them instead. */
+  archived: boolean;
   isActive: boolean;
-  /** Lists only the group's conversations; `''` the ungrouped ones, `null` all. */
+  /** Lists only the group's conversations while it exists; `''` the ungrouped ones, `null` all. */
   group: string | null;
   onGroupChange: (group: string | null) => void;
   onOpenSession: (session: HistorySessionMeta) => void;
@@ -75,13 +78,15 @@ export default function HistoryPanel({
   tabUi,
   historyList,
   historyLoaded,
+  archived,
   isActive,
-  group,
+  group: chosenGroup,
   onGroupChange,
   onOpenSession,
 }: HistoryPanelProps) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const groups = useMemo(() => historyGroups(historyList), [historyList]);
+  const group = existingGroup(groups, chosenGroup);
   const {
     isLoading,
     isSelecting,
@@ -264,6 +269,19 @@ export default function HistoryPanel({
                 {(close) => <GroupOptions items={selectedItems} groups={groups} onMove={close} />}
               </PopupMenu>
               <SectionRowButton
+                label={archived ? 'Unarchive' : 'Archive'}
+                aria-label={archived ? 'Unarchive selected chats' : 'Archive selected chats'}
+                disabled={selectedCount === 0}
+                onClick={() => ACPBridge.updateHistoryConversations(
+                  selectedItems[0].projectPath,
+                  selectedItems.map((item) => item.conversationId),
+                  { archived: !archived }
+                )}
+                className={disabledButtonClassName}
+              >
+                {archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+              </SectionRowButton>
+              <SectionRowButton
                 label="Delete"
                 aria-label="Delete selected chats"
                 disabled={!selectedItems.some((item) => item.deletable !== false)}
@@ -306,7 +324,9 @@ export default function HistoryPanel({
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-foreground">
             {isTextSearching
               ? 'Searching…'
-              : searchQuery.trim() || filterActive ? 'No matching chats.' : 'No history available yet.'}
+              : searchQuery.trim() || filterActive
+                ? 'No matching chats.'
+                : archived ? 'No archived chats.' : 'No history available yet.'}
           </div>
         ) : (<>
           {filteredHistoryList.slice(0, renderLimit).map((item) => {

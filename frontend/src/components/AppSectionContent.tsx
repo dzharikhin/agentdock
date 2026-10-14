@@ -49,13 +49,14 @@ export function AppSectionContent({
         />
       )}
       {section === 'design' && <DesignSystemView />}
-      {section === 'history' && (
+      {(section === 'history' || section === 'archive') && (
         <HistoryPanel
           availableAgents={availableAgents}
           tabs={tabs}
           tabUi={tabUi}
           historyList={historyList}
           historyLoaded={historyLoaded}
+          archived={section === 'archive'}
           isActive={isActive}
           group={historyGroup}
           onGroupChange={onHistoryGroupChange}

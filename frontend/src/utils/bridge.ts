@@ -486,7 +486,7 @@ export const ACPBridge = {
   updateHistoryConversations: (
     projectPath: string,
     conversationIds: string[],
-    changes: { newTitle?: string; pinned?: boolean; group?: string }
+    changes: { newTitle?: string; pinned?: boolean; archived?: boolean; group?: string }
   ) => {
     window.__updateHistoryConversations?.({ projectPath, conversationIds, ...changes });
   },

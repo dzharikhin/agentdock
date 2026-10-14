@@ -10,7 +10,7 @@ import { TabTitleInput } from '../tabbar/TabTitleInput';
 import { getAgentIcon } from '../tabbar/TabIcons';
 import { searchPattern } from '../chat/ChatSearch';
 import { HighlightedText } from './HighlightedText';
-import { moveToGroupAction } from './historyGroups';
+import { archiveAction, moveToGroupAction } from './historyGroups';
 
 function handleHistoryRowKeyDown(
   event: React.KeyboardEvent<HTMLDivElement>,
@@ -161,6 +161,7 @@ export function HistoryListItem({
                 icon: <SquareTerminal size={12} aria-hidden="true" />,
                 onClick: () => ACPBridge.openHistoryConversationCli(item.projectPath, conversationId),
               }] : []),
+              archiveAction(item),
               ...(canDelete ? [{
                 label: 'Delete',
                 icon: <Trash2 size={12} aria-hidden="true" />,

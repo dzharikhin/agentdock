@@ -95,6 +95,7 @@ internal object HistoryConversationIndexService {
             },
             titleUserSet = mergedConversation?.titleUserSet ?: false,
             pinned = mergedConversation?.pinned ?: false,
+            archived = mergedConversation?.archived ?: false,
             group = mergedConversation?.group,
             promptCount = promptCountForConversation(
                 projectPath = cleanProjectPath,
@@ -245,8 +246,8 @@ internal object HistoryConversationIndexService {
     }
 
     /**
-     * Renames the conversations (a user-set title), pins or unpins them and/or moves them to a group, a blank one
-     * leaving them ungrouped; `null` leaves that property unchanged.
+     * Renames the conversations (a user-set title), pins or unpins them, archives or unarchives them and/or moves them
+     * to a group, a blank one leaving them ungrouped; `null` leaves that property unchanged.
      */
     @Synchronized
     fun updateConversations(
@@ -254,6 +255,7 @@ internal object HistoryConversationIndexService {
         conversationIds: List<String>,
         newTitle: String?,
         pinned: Boolean?,
+        archived: Boolean?,
         group: String?
     ): Boolean {
         val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
@@ -274,6 +276,7 @@ internal object HistoryConversationIndexService {
                     title = normalizedTitle ?: conversation.title,
                     titleUserSet = conversation.titleUserSet || normalizedTitle != null,
                     pinned = pinned ?: conversation.pinned,
+                    archived = archived ?: conversation.archived,
                     group = if (group == null) conversation.group else group.trim().ifBlank { null }
                 )
             } else {
@@ -341,6 +344,7 @@ internal object HistoryConversationIndexService {
             },
             titleUserSet = left.titleUserSet || right.titleUserSet,
             pinned = left.pinned || right.pinned,
+            archived = left.archived || right.archived,
             group = left.group ?: right.group,
             promptCount = mergePromptCounts(left.promptCount, right.promptCount),
             transcriptPath = when {
