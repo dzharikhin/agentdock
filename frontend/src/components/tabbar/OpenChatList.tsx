@@ -34,6 +34,32 @@ export const PinIcon = ({ pinned }: { pinned: boolean }) => (
 );
 
 /**
+ * An open chat's permission request, reply in progress, queued prompts or unread reply, the first of them; `className`
+ * places it.
+ */
+export function ChatStatusIndicator({ flags, tooltipPlacement, className }: {
+  flags: TabUiFlags | undefined;
+  tooltipPlacement?: 'top' | 'bottom';
+  className: string;
+}) {
+  const box = `flex h-3.5 w-3.5 shrink-0 items-center justify-center self-center ${className}`;
+  if (flags?.warning) return <span className={box}><span className="h-2 w-2 rounded-full bg-warning" /></span>;
+  if (flags?.processing) return <span className={`${box} text-foreground-secondary`}><ChatSpinnerIcon size={14} /></span>;
+  if (flags?.queued) {
+    return (
+      <Tooltip variant="minimal" placement={tooltipPlacement} content="Queued prompts"
+        className={`shrink-0 self-center cursor-default ${className}`}>
+        <span data-open-chat-status role="img" aria-label="Queued prompts" className="flex text-foreground-secondary">
+          <Clock size={14} aria-hidden="true" />
+        </span>
+      </Tooltip>
+    );
+  }
+  if (flags?.unread) return <span className={box}><span className="h-2 w-2 rounded-full bg-sky-500" /></span>;
+  return null;
+}
+
+/**
  * The header names the listed chats and offers "Close all" once more than one chat is open. Pinned chats always show
  * the pin (unpinning them) before the status indicator; closed ones have no close button. In the sidebar rows can be
  * reordered by dragging, and pinning, renaming, moving to a group, opening in the terminal and deleting sit in a row
@@ -111,11 +137,7 @@ export function OpenChatList({
       <div ref={listRef} className={sidebar ? 'pb-1' : undefined}>
         {chats.map((tab) => {
           const flags = tabUi[tab.id];
-          const hasWarning = flags?.warning;
-          const hasProcessing = flags?.processing;
-          const hasQueued = flags?.queued && !hasProcessing;
-          const hasUnread = flags?.unread;
-          const hasStatus = hasWarning || hasProcessing || hasQueued || hasUnread;
+          const hasStatus = flags?.warning || flags?.processing || flags?.queued || flags?.unread;
           const conversationId = conversationKeyOf(tab);
           const historyItem = historyByConversationId.get(conversationId);
           const pinned = historyItem?.pinned === true;
@@ -128,23 +150,6 @@ export function OpenChatList({
           // Resuming in the terminal suits only closed chats.
           const canOpenCli = tab.closed && agents.some((agent) => agent.id === historyItem?.adapterName && agent.cliResumeAvailable);
           const isActive = tab.id === activeTabId;
-          const statusIndicator = hasWarning ? (
-            <span className="ml-1 mr-3 h-2 w-2 shrink-0 self-center rounded-full bg-warning" />
-          ) : hasProcessing ? (
-            <span className="ml-1 mr-2 flex shrink-0 self-center text-foreground-secondary">
-              <ChatSpinnerIcon size={14} />
-            </span>
-          ) : hasQueued ? (
-            <Tooltip variant="minimal" placement={tooltipPlacement} content="Queued prompts"
-              className="ml-1 mr-2 shrink-0 self-center cursor-default">
-              <span data-open-chat-status role="img" aria-label="Queued prompts"
-                className="flex text-foreground-secondary">
-                <Clock size={14} aria-hidden="true" />
-              </span>
-            </Tooltip>
-          ) : hasUnread ? (
-            <span className="ml-1 mr-3 h-2 w-2 shrink-0 self-center rounded-full bg-sky-500" />
-          ) : null;
 
           return (
             <div
@@ -243,7 +248,7 @@ export function OpenChatList({
                   ) : null}
                 </>
               )}
-              {statusIndicator}
+              <ChatStatusIndicator flags={flags} tooltipPlacement={tooltipPlacement} className="ml-1 mr-2" />
             </div>
           );
         })}

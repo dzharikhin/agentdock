@@ -1,4 +1,4 @@
-import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Tooltip } from './chat/shared/Tooltip';
 import { ModalContainerContext } from './ConfirmationModal';
@@ -112,9 +112,6 @@ export function SectionPopup({ sections, activeSection, compact, historyGroupNav
           <div className="h-[44px] shrink-0 select-none" onPointerDown={startDrag} />
           {sections.map((section) => {
             const active = section.type === activeSection;
-            if (section.type === 'history' && !compact && historyGroupNav.groups.length > 0) {
-              return <HistoryGroupNav key={section.type} section={section} active={active} {...historyGroupNav} />;
-            }
             const button = (
               <button
                 type="button"
@@ -128,13 +125,21 @@ export function SectionPopup({ sections, activeSection, compact, historyGroupNav
               </button>
             );
             return (
-              <div key={section.type} className={`${sidebarRowClassName(active)} mb-0.5 h-8 ${compact ? 'w-8' : ''}`}>
-                {compact ? (
-                  <Tooltip variant="minimal" placement="right" content={section.label} className="flex flex-1">
-                    {button}
-                  </Tooltip>
-                ) : button}
-              </div>
+              <Fragment key={section.type}>
+                {/* The history is a different kind of section than the ones above it. */}
+                {section.type === 'history' ? <div className="mb-1.5 mt-1 h-px shrink-0 bg-border" /> : null}
+                {section.type === 'history' && !compact && historyGroupNav.groups.length > 0 ? (
+                  <HistoryGroupNav section={section} active={active} {...historyGroupNav} />
+                ) : (
+                  <div className={`${sidebarRowClassName(active)} mb-0.5 h-8 ${compact ? 'w-8' : ''}`}>
+                    {compact ? (
+                      <Tooltip variant="minimal" placement="right" content={section.label} className="flex flex-1">
+                        {button}
+                      </Tooltip>
+                    ) : button}
+                  </div>
+                )}
+              </Fragment>
             );
           })}
         </nav>

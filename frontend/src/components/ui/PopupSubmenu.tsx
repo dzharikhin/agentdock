@@ -3,9 +3,6 @@ import { ChevronRight } from 'lucide-react';
 import { focusMenuItem, moveMenuFocus } from '../tabbar/menuFocus';
 import { PANEL_GAP_PX, popupMenuItemClassName, popupMenuPanelClassName, WINDOW_EDGE_PX } from './PopupMenu';
 
-/** Delay before a submenu the pointer left closes, so the pointer can cross the gap to it. */
-const SUBMENU_CLOSE_DELAY_MS = 200;
-
 interface PopupSubmenuProps {
   label: string;
   icon: ReactNode;
@@ -30,7 +27,8 @@ export const PopupSubmenuSeparator = () => <div className="mx-1 my-1 h-px bg-bor
 
 /**
  * `PopupMenu` item opening a submenu beside the menu, right of it where the window allows: on hover, click, ArrowRight,
- * Enter or Space, the keys focusing its first item. ArrowLeft, Escape and Tab return to the item.
+ * Enter or Space, the keys focusing its first item. ArrowLeft, Escape and Tab return to the item. As in `ChatDropdown`,
+ * it stays open until the pointer is over another item of the menu, so the pointer can cross the gap to it.
  */
 export function PopupSubmenu({ label, icon, value, compact, children }: PopupSubmenuProps) {
   const [open, setOpen] = useState(false);
@@ -38,9 +36,20 @@ export function PopupSubmenu({ label, icon, value, compact, children }: PopupSub
   const itemRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const focusFirstRef = useRef(false);
-  const closeTimerRef = useRef<number>();
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => () => window.clearTimeout(closeTimerRef.current), []);
+  useEffect(() => {
+    if (!open) return;
+    const menu = itemRef.current?.closest<HTMLElement>('[role="menu"]');
+    const closeOnOtherItem = (event: PointerEvent) => {
+      // Stays open while used from the keyboard, e.g. typing in it.
+      if (event.pointerType !== 'mouse' || panelRef.current?.contains(document.activeElement)) return;
+      const target = event.target as Element;
+      if (target.closest('[role="menuitem"]') && !rootRef.current?.contains(target)) setOpen(false);
+    };
+    menu?.addEventListener('pointerover', closeOnOtherItem);
+    return () => menu?.removeEventListener('pointerover', closeOnOtherItem);
+  }, [open]);
 
   // As in `PopupMenu`: rendered transparent first, measured, then placed, its first item level with the item.
   useLayoutEffect(() => {
@@ -67,7 +76,6 @@ export function PopupSubmenu({ label, icon, value, compact, children }: PopupSub
   }, [open]);
 
   const openSubmenu = (focusFirst: boolean) => {
-    window.clearTimeout(closeTimerRef.current);
     focusFirstRef.current = focusFirst;
     if (open && focusFirst) focusMenuItem(panelRef.current, 0);
     setOpen(true);
@@ -79,14 +87,7 @@ export function PopupSubmenu({ label, icon, value, compact, children }: PopupSub
   };
 
   return (
-    <div
-      onPointerEnter={(event) => { if (event.pointerType === 'mouse') openSubmenu(false); }}
-      onPointerLeave={(event) => {
-        // Stays open while used from the keyboard, e.g. typing in it.
-        if (event.pointerType !== 'mouse' || panelRef.current?.contains(document.activeElement)) return;
-        closeTimerRef.current = window.setTimeout(() => setOpen(false), SUBMENU_CLOSE_DELAY_MS);
-      }}
-    >
+    <div ref={rootRef} onPointerEnter={(event) => { if (event.pointerType === 'mouse') openSubmenu(false); }}>
       <button
         ref={itemRef}
         type="button"

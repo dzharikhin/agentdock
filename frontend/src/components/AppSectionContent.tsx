@@ -1,4 +1,4 @@
-import type { AgentOption, ChatTab, HistorySessionMeta, SectionType } from '../types/chat';
+import type { AgentOption, ChatTab, HistorySessionMeta, SectionType, TabUiFlags } from '../types/chat';
 import { AgentManagementView } from './AgentManagement';
 import { DesignSystemView } from './DesignSystem';
 import HistoryPanel from './HistoryPanel';
@@ -14,6 +14,7 @@ interface AppSectionContentProps {
   isActive: boolean;
   availableAgents: AgentOption[];
   tabs: ChatTab[];
+  tabUi: Record<string, TabUiFlags>;
   historyList: HistorySessionMeta[];
   historyLoaded: boolean;
   historyGroup: string | null;
@@ -28,6 +29,7 @@ export function AppSectionContent({
   isActive,
   availableAgents,
   tabs,
+  tabUi,
   historyList,
   historyLoaded,
   historyGroup,
@@ -51,6 +53,7 @@ export function AppSectionContent({
         <HistoryPanel
           availableAgents={availableAgents}
           tabs={tabs}
+          tabUi={tabUi}
           historyList={historyList}
           historyLoaded={historyLoaded}
           isActive={isActive}

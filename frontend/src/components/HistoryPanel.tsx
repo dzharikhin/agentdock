@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { conversationKeyOf } from '../types/chat';
-import type { AgentOption, ChatTab, HistorySessionMeta } from '../types/chat';
+import type { AgentOption, ChatTab, HistorySessionMeta, TabUiFlags } from '../types/chat';
 import ConfirmationModal from './ConfirmationModal';
 import { Bot, Folder, FolderInput, RefreshCw, Funnel, Pin, Search, Trash2, X } from 'lucide-react';
 import { ACPBridge } from '../utils/bridge';
@@ -18,6 +18,7 @@ import { SectionPage } from './ui/SectionPage';
 interface HistoryPanelProps {
   availableAgents: AgentOption[];
   tabs: ChatTab[];
+  tabUi: Record<string, TabUiFlags>;
   historyList: HistorySessionMeta[];
   historyLoaded: boolean;
   isActive: boolean;
@@ -30,7 +31,7 @@ interface HistoryPanelProps {
 /** Rows rendered at first and added on reaching the end, so a long history stays light until scrolled through. */
 const RENDER_BATCH = 100;
 
-const linkButtonClassName = `rounded-[4px] p-1 text-ide-small text-link hover:underline
+const textButtonClassName = `rounded-[4px] p-1 text-ide-small text-foreground-secondary hover:text-foreground
   focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none`;
 const disabledButtonClassName = 'disabled:pointer-events-none disabled:opacity-50';
 
@@ -71,6 +72,7 @@ const filterSubmenu = (
 export default function HistoryPanel({
   availableAgents,
   tabs,
+  tabUi,
   historyList,
   historyLoaded,
   isActive,
@@ -139,6 +141,7 @@ export default function HistoryPanel({
     return () => observer.disconnect();
   }, [renderLimit, hasMore, isLoading]);
 
+  const tabByConversationId = useMemo(() => new Map(tabs.map((tab) => [conversationKeyOf(tab), tab])), [tabs]);
   const hasOpenPendingChat =tabs.some((tab) => pendingDeleteIds.includes(conversationKeyOf(tab)));
   const filterActive = agent !== null || group !== null;
   const selectedItems = historyList.filter((item) => selectedConversationIds.includes(item.conversationId));
@@ -147,21 +150,36 @@ export default function HistoryPanel({
 
   return (
     <div className="flex min-h-0 w-full flex-col bg-background text-foreground">
-      <SectionPage padding="px-5 pb-2" toolbar={(
-      <div className="flex items-center justify-between min-h-12 px-3 py-1 border-b border-border">
-        <div className="flex min-w-0 items-center gap-2">
-          <Tooltip variant="minimal" content="Synchronize history">
-            <button
-              onClick={refreshHistory}
-              disabled={isLoading}
-              className={`rounded-[4px] p-1 text-foreground-secondary transition-colors hover:text-foreground 
-                focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none 
-                ${isLoading ? 'animate-spin' : ''}`}
-              aria-label="Refresh history"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-          </Tooltip>
+      <SectionPage padding="px-5 pt-1.5 pb-2" toolbar={(
+      <div className="flex items-center gap-3 min-h-12 px-4 py-1 border-b border-border">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+          <div className="relative flex w-56 min-w-0 items-center">
+            <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2 text-foreground-secondary" />
+            <input
+              ref={searchInputRef}
+              type="text"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search…"
+              aria-label="Search chats"
+              className="h-7 w-full min-w-0 rounded-[4px] border border-border bg-input pl-7 pr-6 text-ide-small
+                text-foreground focus:outline-none"
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearchQuery('');
+                  searchInputRef.current?.focus();
+                }}
+                className="absolute right-1 rounded-[4px] p-0.5 text-foreground-secondary hover:text-foreground
+                  focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
+              >
+                <X size={12} />
+              </button>
+            ) : null}
+          </div>
 
           {uniqueAgentsInHistory.length > 1 || groups.length > 0 ? (
             <PopupMenu
@@ -175,7 +193,7 @@ export default function HistoryPanel({
                       focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none
                       ${filterActive ? 'text-foreground' : 'text-foreground-secondary hover:text-foreground'}`}
                   >
-                    <Funnel className="h-4 w-4" fill={filterActive ? 'currentColor' : 'none'} />
+                    <Funnel size={14} fill={filterActive ? 'currentColor' : 'none'} />
                   </button>
                 </Tooltip>
               )}
@@ -206,49 +224,15 @@ export default function HistoryPanel({
             </PopupMenu>
           ) : null}
 
-          <div className="relative flex w-36 min-w-0 items-center">
-            <Search size={14} aria-hidden="true" className="pointer-events-none absolute left-2 text-foreground-secondary" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search…"
-              aria-label="Search chats"
-              className="h-7 w-full min-w-0 rounded-[4px] border border-border bg-input pl-7 pr-6 text-ide-small
-                text-foreground focus:outline-none"
-            />
-            {searchQuery ? (
-              <button
-                type="button"
-                aria-label="Clear search"
-                onClick={() => {
-                  setSearchQuery('');
-                  searchInputRef.current?.focus();
-                }}
-                className="absolute right-1 rounded-[4px] p-0.5 text-foreground-secondary hover:text-foreground focus-visible:outline-none"
-              >
-                <X size={12} />
-              </button>
-            ) : null}
-          </div>
-
           <span className="shrink-0 pl-1 text-foreground-secondary text-ide-small max-[399px]:hidden">
-            {resultCount} chat{resultCount !== 1 ? 's' : ''}
+            {isSelecting ? `${selectedCount} of ` : ''}{resultCount} chat{resultCount !== 1 ? 's' : ''}
+            {isSelecting ? ' selected' : ''}
           </span>
         </div>
-        
-        <div className="flex shrink-0 items-center gap-1">
+
+        <div className="flex shrink-0 items-center gap-1.5">
           {isSelecting ? (
             <>
-              <span className="pr-1 text-ide-small text-foreground-secondary max-[399px]:hidden">
-                {selectedCount} selected
-              </span>
-              {filteredConversationIds.length > 0 && (
-                <button type="button" onClick={toggleSelectAllFiltered} className={linkButtonClassName}>
-                  {areAllFilteredSelected ? 'Clear all' : 'Select all'}
-                </button>
-              )}
               <SectionRowButton
                 label={pinSelected ? 'Pin' : 'Unpin'}
                 aria-label={pinSelected ? 'Pin selected chats' : 'Unpin selected chats'}
@@ -260,7 +244,7 @@ export default function HistoryPanel({
                 )}
                 className={disabledButtonClassName}
               >
-                <Pin size={13} className="rotate-45" fill={pinSelected ? 'none' : 'currentColor'} />
+                <Pin size={14} className="rotate-45" fill={pinSelected ? 'none' : 'currentColor'} />
               </SectionRowButton>
               <PopupMenu
                 renderTrigger={(trigger) => (
@@ -272,7 +256,7 @@ export default function HistoryPanel({
                       {...trigger}
                       className={`${sectionRowButtonClassName} ${disabledButtonClassName}`}
                     >
-                      <FolderInput size={13} />
+                      <FolderInput size={14} />
                     </button>
                   </Tooltip>
                 )}
@@ -284,17 +268,34 @@ export default function HistoryPanel({
                 aria-label="Delete selected chats"
                 disabled={!selectedItems.some((item) => item.deletable !== false)}
                 onClick={() => openDeleteConfirmation(selectedItems)}
-                className={`!text-error ${disabledButtonClassName}`}
+                className={disabledButtonClassName}
               >
-                <Trash2 size={13} />
+                <Trash2 size={14} />
               </SectionRowButton>
-              <SectionRowButton label="Done" aria-label="Stop selecting" onClick={stopSelecting}>
-                <X size={13} />
+              <SectionRowButton label="Cancel" aria-label="Cancel selection" onClick={stopSelecting}>
+                <X size={14} />
               </SectionRowButton>
+              {filteredConversationIds.length > 0 && (
+                <button type="button" onClick={toggleSelectAllFiltered} className={textButtonClassName}>
+                  {areAllFilteredSelected ? 'Clear all' : 'Select all'}
+                </button>
+              )}
             </>
           ) : (
-            <button type="button" onClick={startSelecting} className={linkButtonClassName}>Select</button>
+            <button type="button" onClick={startSelecting} className={textButtonClassName}>Select</button>
           )}
+          <Tooltip variant="minimal" content="Synchronize history">
+            <button
+              onClick={refreshHistory}
+              disabled={isLoading}
+              className={`rounded-[4px] p-1 text-foreground-secondary transition-colors hover:text-foreground
+                focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none
+                ${isLoading ? 'animate-spin' : ''}`}
+              aria-label="Refresh history"
+            >
+              <RefreshCw size={14} />
+            </button>
+          </Tooltip>
         </div>
       </div>
       )}>
@@ -310,14 +311,16 @@ export default function HistoryPanel({
         ) : (<>
           {filteredHistoryList.slice(0, renderLimit).map((item) => {
             const conversationId = item.conversationId;
+            const tab = tabByConversationId.get(conversationId);
             return (
               <HistoryListItem
                 key={conversationId}
                 item={item}
-                adapterDisplay={adapterDisplay}
+                agents={availableAgents}
                 isSelecting={isSelecting}
                 isSelected={selectedConversationIds.includes(conversationId)}
-                isOpen={tabs.some((tab) => conversationKeyOf(tab) === conversationId)}
+                isOpen={tab !== undefined}
+                status={tab && tabUi[tab.id]}
                 conversationLength={formatConversationLength(item.promptCount)}
                 groups={groups}
                 showGroup={group === null}

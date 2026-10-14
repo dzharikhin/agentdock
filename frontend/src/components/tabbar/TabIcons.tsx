@@ -11,15 +11,15 @@ export const PromptLibraryTabIcon = () => <Bookmark size={14} className="text-fo
 export const SystemInstructionsTabIcon = () => <FileText size={14} className="text-foreground/70 flex-shrink-0" />;
 export const SettingsTabIcon = () => <SlidersHorizontal size={14} className="text-foreground/70 flex-shrink-0" />;
 
-export const getAgentIcon = (agentId: string | undefined, agents: AgentOption[]) => {
+export const getAgentIcon = (agentId: string | undefined, agents: AgentOption[], sizeClassName = 'w-4 h-4') => {
   const agent = agentId ? agents.find(a => a.id === agentId) : undefined;
   if (agent && agent.iconPath) {
     if (agent.iconPath.startsWith('<svg')) {
       return (
-        <div className="w-4 h-4 flex-shrink-0 flex items-center justify-center text-foreground" dangerouslySetInnerHTML={{ __html: sanitizeSvg(agent.iconPath) }} />
+        <div className={`${sizeClassName} flex-shrink-0 flex items-center justify-center text-foreground`} dangerouslySetInnerHTML={{ __html: sanitizeSvg(agent.iconPath) }} />
       );
     }
-    return <img src={agent.iconPath} draggable={false} className="w-4 h-4 flex-shrink-0" alt="icon" />;
+    return <img src={agent.iconPath} draggable={false} className={`${sizeClassName} flex-shrink-0`} alt="icon" />;
   }
   return <Bot size={14} className="text-foreground flex-shrink-0" />;
 };

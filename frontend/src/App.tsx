@@ -318,6 +318,7 @@ function App() {
             key={section}
             section={section}
             tabs={tabs}
+            tabUi={tabUi}
             historyList={historyList}
             historyLoaded={historyLoaded}
             historyGroup={historyGroup}

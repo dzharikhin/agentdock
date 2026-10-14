@@ -1,21 +1,16 @@
-import { Bot, EllipsisVertical, Pencil, Pin, SquareTerminal, Trash2 } from 'lucide-react';
+import { EllipsisVertical, Pencil, Pin, SquareTerminal, Trash2 } from 'lucide-react';
 import { ACPBridge } from '../../utils/bridge';
-import type { AgentOption, HistorySessionMeta } from '../../types/chat';
+import type { AgentOption, HistorySessionMeta, TabUiFlags } from '../../types/chat';
 import { Checkbox } from '../ui/Checkbox';
 import { PopupMenu, popupMenuActions } from '../ui/PopupMenu';
-import { PinIcon } from '../tabbar/OpenChatList';
+import { ChatStatusIndicator, PinIcon } from '../tabbar/OpenChatList';
 import { Tooltip } from '../chat/shared/Tooltip';
 import { SectionRowButton, sectionRowButtonClassName } from '../ui/SectionList';
 import { TabTitleInput } from '../tabbar/TabTitleInput';
+import { getAgentIcon } from '../tabbar/TabIcons';
 import { searchPattern } from '../chat/ChatSearch';
 import { HighlightedText } from './HighlightedText';
 import { moveToGroupAction } from './historyGroups';
-
-function getItemAgents(item: HistorySessionMeta): string[] {
-  return item.allAdapterNames && item.allAdapterNames.length > 0
-    ? item.allAdapterNames
-    : [item.adapterName];
-}
 
 function handleHistoryRowKeyDown(
   event: React.KeyboardEvent<HTMLDivElement>,
@@ -30,12 +25,14 @@ function handleHistoryRowKeyDown(
 
 interface HistoryListItemProps {
   item: HistorySessionMeta;
-  adapterDisplay: Map<string, AgentOption>;
+  agents: AgentOption[];
   /** Shows the checkbox; clicking the row selects it instead of opening it. */
   isSelecting: boolean;
   isSelected: boolean;
   /** Open as a chat; resuming in the terminal suits only closed chats. */
   isOpen: boolean;
+  /** The open chat's status, shown after the title. */
+  status?: TabUiFlags;
   conversationLength: string | null;
   groups: string[];
   /** Shows the conversation's group, while the list is not limited to one. */
@@ -55,10 +52,11 @@ interface HistoryListItemProps {
 
 export function HistoryListItem({
   item,
-  adapterDisplay,
+  agents,
   isSelecting,
   isSelected,
   isOpen,
+  status,
   conversationLength,
   groups,
   showGroup,
@@ -73,10 +71,9 @@ export function HistoryListItem({
   onToggleSelection,
 }: HistoryListItemProps) {
   const conversationId = item.conversationId;
-  const itemAgents = getItemAgents(item);
-  const otherAgents = itemAgents.filter(a => a !== item.adapterName);
-  const mainAgent = adapterDisplay.get(item.adapterName);
-  const mainLabel = mainAgent?.name || item.adapterName;
+  // In the order last used, the current agent last.
+  const itemAgents = item.allAdapterNames?.length ? item.allAdapterNames : [item.adapterName];
+  const mainAgent = agents.find((agent) => agent.id === item.adapterName);
   const canOpenCli = !isOpen && !!mainAgent?.cliResumeAvailable;
   const canDelete = item.deletable !== false;
   const query = searchQuery.trim();
@@ -84,83 +81,56 @@ export function HistoryListItem({
 
   return (
     <div className="group relative border-b border-border last:border-b-0">
-      <div className="min-h-[56px] flex items-center gap-3 max-[400px]:gap-2 py-1">
+      <div className="min-h-[56px] flex items-center gap-3 py-1">
         <div
           role="button"
           tabIndex={isEditing ? -1 : 0}
-          className="flex min-w-0 flex-1 items-center gap-3 max-[400px]:gap-2 cursor-pointer rounded-[4px]
+          className="flex min-w-0 flex-1 flex-col justify-center pt-0.5 pb-1.5 cursor-pointer rounded-[4px]
             focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
           onClick={() => { if (!isEditing) activate(); }}
           onKeyDown={(event) => handleHistoryRowKeyDown(event, isEditing, activate)}
         >
-          <div className="flex flex-col items-center shrink-0 gap-0.5 pt-0.5 mx-0.5 section-narrow:hidden">
-            {mainAgent?.custom ? (
-              <Bot className="h-7 w-7 text-foreground-secondary opacity-75" strokeWidth={1.5} />
-            ) : mainAgent?.iconPath ? (
-              <img src={mainAgent.iconPath} alt={mainLabel} className="h-7 w-7 object-contain opacity-75" />
-            ) : (
-              <div className="flex items-center justify-center rounded bg-background border border-border font-bold uppercase shrink-0 h-8 w-8 text-base">
-                {mainLabel.slice(0, 1)}
-              </div>
-            )}
-
-            {otherAgents.length > 0 && (
-              <div className="flex flex-wrap items-center justify-center gap-0.5 py-0.5 w-full">
-                {otherAgents.map((agentId, idx) => {
-                  const adapter = adapterDisplay.get(agentId);
-                  const iconLabel = adapter?.name || agentId;
-                  if (adapter?.custom) {
-                    return <Bot key={idx} className="h-4 w-4 text-foreground-secondary opacity-80" strokeWidth={1.5} />;
-                  }
-                  if (adapter?.iconPath) {
-                    return <img key={idx} src={adapter.iconPath} className="h-4 w-4 object-contain opacity-80" />;
-                  }
-                  return (
-                    <div key={idx} className="flex h-4 min-w-4 items-center justify-center rounded bg-background
-                      border border-border text-[9px] font-bold uppercase shrink-0 opacity-80">
-                      {iconLabel.slice(0, 1)}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1 flex flex-col justify-center py-0.5">
-            {isEditing ? (
-              <div className="flex">
-                <TabTitleInput
-                  initialTitle={item.title}
-                  onCommit={(title) =>
-                    ACPBridge.updateHistoryConversations(item.projectPath, [conversationId], { newTitle: title })}
-                  onClose={() => onEditingChange(false)}
-                  className="-ml-1 rounded-[3px] bg-background px-1 py-0.5 font-semibold"
-                />
-              </div>
-            ) : (
-              <div className="py-0.5 text-ide-small font-semibold truncate">
-                <HighlightedText text={item.title} pattern={query ? searchPattern(query) : null} />
-              </div>
-            )}
-            <div className="flex items-center gap-2 text-xs text-foreground-secondary">
-              <span>{formatDate(item.updatedAt)}</span>
-              {conversationLength || item.modelId ? <span className="opacity-50">&bull;</span> : null}
-              {conversationLength ? <span>{conversationLength}</span> : null}
-              {item.modelId ? <span>{item.modelId}</span> : null}
-              {showGroup && item.group ? (
-                <>
-                  <span className="opacity-50">&bull;</span>
-                  <span className="min-w-0 truncate">{item.group}</span>
-                </>
-              ) : null}
+          {isEditing ? (
+            <div className="flex">
+              <TabTitleInput
+                initialTitle={item.title}
+                onCommit={(title) =>
+                  ACPBridge.updateHistoryConversations(item.projectPath, [conversationId], { newTitle: title })}
+                onClose={() => onEditingChange(false)}
+                className="-ml-1 rounded-[3px] bg-background px-1 py-0.5 font-semibold"
+              />
             </div>
-            {snippet ? (
-              <div className="mt-0.5 line-clamp-2 text-xs text-foreground-secondary">
-                <HighlightedText text={snippet} pattern={searchPattern(query.replace(/\s+/g, ' '), true)} />
-              </div>
+          ) : (
+            <div className="flex min-w-0 items-center pt-0.5 pb-1 text-ide-small font-semibold">
+              <span className="truncate">
+                <HighlightedText text={item.title} pattern={query ? searchPattern(query) : null} />
+              </span>
+              <ChatStatusIndicator flags={status} className="ml-2 -translate-y-px" />
+            </div>
+          )}
+          <div className="flex items-center gap-2 text-xs text-foreground-secondary">
+            <span className="flex shrink-0 items-center gap-1.5 opacity-80">
+              {itemAgents.map((agentId) => (
+                <span key={agentId} className="flex">{getAgentIcon(agentId, agents, 'h-3.5 w-3.5')}</span>
+              ))}
+            </span>
+            <span>{formatDate(item.updatedAt)}</span>
+            {conversationLength || item.modelId ? <span className="opacity-50">&bull;</span> : null}
+            {conversationLength ? <span>{conversationLength}</span> : null}
+            {item.modelId ? <span>{item.modelId}</span> : null}
+            {showGroup && item.group ? (
+              <>
+                <span className="opacity-50">&bull;</span>
+                <span className="min-w-0 truncate">{item.group}</span>
+              </>
             ) : null}
-            {deleteError ? <div className="mt-1 text-xs text-error">{deleteError}</div> : null}
           </div>
+          {snippet ? (
+            <div className="mt-0.5 line-clamp-2 text-xs text-foreground-secondary">
+              <HighlightedText text={snippet} pattern={searchPattern(query.replace(/\s+/g, ' '), true)} />
+            </div>
+          ) : null}
+          {deleteError ? <div className="mt-1 text-xs text-error">{deleteError}</div> : null}
         </div>
 
         <div className="flex shrink-0 items-center self-stretch relative z-10 ml-2" onClick={(e) => e.stopPropagation()}>
