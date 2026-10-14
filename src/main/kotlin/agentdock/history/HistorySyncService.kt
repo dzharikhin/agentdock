@@ -352,6 +352,7 @@ internal object HistorySyncService {
             val conversationId = when {
                 name.endsWith(".json") -> name.removeSuffix(".json")
                 name.endsWith(".transcript.txt") -> name.removeSuffix(".transcript.txt")
+                name.endsWith(".search.txt") -> name.removeSuffix(".search.txt")
                 else -> return@forEach
             }
             if (conversationId !in referencedIds) {

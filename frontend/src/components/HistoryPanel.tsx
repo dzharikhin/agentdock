@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { conversationKeyOf } from '../types/chat';
 import type { AgentOption, ChatTab, HistorySessionMeta } from '../types/chat';
@@ -25,6 +25,9 @@ interface HistoryPanelProps {
   onGroupChange: (group: string | null) => void;
   onOpenSession: (session: HistorySessionMeta) => void;
 }
+
+/** Rows rendered at first and added on reaching the end, so a long history stays light until scrolled through. */
+const RENDER_BATCH = 100;
 
 /** `null` is all. */
 interface FilterOption {
@@ -84,6 +87,9 @@ export default function HistoryPanel({
     adapterDisplay,
     uniqueAgentsInHistory,
     filteredHistoryList,
+    snippets,
+    isTextSearching,
+    resultCount,
     selectedCount,
     filteredConversationIds,
     areAllFilteredSelected,
@@ -109,6 +115,21 @@ export default function HistoryPanel({
   useEffect(() => {
     if (isActive) searchInputRef.current?.focus();
   }, [isActive]);
+
+  const [renderLimit, setRenderLimit] = useState(RENDER_BATCH);
+  const moreRef = useRef<HTMLDivElement>(null);
+  const hasMore = filteredHistoryList.length > renderLimit;
+  useEffect(() => setRenderLimit(RENDER_BATCH), [searchQuery, agent, group]);
+  // Recreated after each batch, so a batch not filling the view adds the next one.
+  useEffect(() => {
+    const more = moreRef.current;
+    if (!more) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) setRenderLimit((limit) => limit + RENDER_BATCH);
+    });
+    observer.observe(more);
+    return () => observer.disconnect();
+  }, [renderLimit, hasMore, isLoading]);
 
   const hasOpenPendingChat =tabs.some((tab) => pendingDeleteIds.includes(conversationKeyOf(tab)));
   const filterActive = agent !== null || group !== null;
@@ -182,7 +203,7 @@ export default function HistoryPanel({
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Search…"
-              aria-label="Search chats by title"
+              aria-label="Search chats"
               className="h-7 w-full min-w-0 rounded-[4px] border border-border bg-input pl-7 pr-6 text-ide-small
                 text-foreground focus:outline-none"
             />
@@ -202,7 +223,7 @@ export default function HistoryPanel({
           </div>
 
           <span className="shrink-0 pl-1 text-foreground-secondary text-ide-small max-[399px]:hidden">
-            {filteredHistoryList.length} chat{filteredHistoryList.length !== 1 ? 's' : ''}
+            {resultCount} chat{resultCount !== 1 ? 's' : ''}
           </span>
         </div>
         
@@ -234,10 +255,12 @@ export default function HistoryPanel({
           <div className="flex justify-center p-8 text-foreground">Loading history...</div>
         ) : filteredHistoryList.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-foreground">
-            {searchQuery.trim() || filterActive ?'No matching chats.' : 'No history available yet.'}
+            {isTextSearching
+              ? 'Searching…'
+              : searchQuery.trim() || filterActive ? 'No matching chats.' : 'No history available yet.'}
           </div>
-        ) : (
-          filteredHistoryList.map((item) => {
+        ) : (<>
+          {filteredHistoryList.slice(0, renderLimit).map((item) => {
             const conversationId = item.conversationId;
             return (
               <HistoryListItem
@@ -250,6 +273,8 @@ export default function HistoryPanel({
                 groups={groups}
                 showGroup={group === null}
                 deleteError={deleteErrors[conversationId]}
+                searchQuery={searchQuery}
+                snippet={snippets?.[conversationId]}
                 isEditing={editingId === conversationId}
                 formatDate={formatDate}
                 onOpenSession={onOpenSession}
@@ -258,8 +283,9 @@ export default function HistoryPanel({
                 onToggleSelection={toggleSelection}
               />
             );
-          })
-        )}
+          })}
+          {hasMore ? <div ref={moreRef} className="h-px" /> : null}
+        </>)}
       </div>
       </SectionPage>
 

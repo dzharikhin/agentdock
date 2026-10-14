@@ -12,6 +12,7 @@ import {
   FileChangeStatsResultPayload,
   GlobalSettingsPayload,
   HistoryDeleteResultPayload,
+  HistorySearchResultPayload,
   HistorySessionMeta,
   PermissionRequest,
   SessionConfigOptionsPayload,
@@ -34,6 +35,7 @@ export interface PermissionRequestEvent { request: PermissionRequest; }
 export interface AvailableCommandsEvent { adapterId: string; commands: AvailableCommand[]; }
 export interface HistoryListEvent { list: HistorySessionMeta[]; }
 export interface HistoryDeleteResultEvent { result: HistoryDeleteResultPayload; }
+export interface HistorySearchResultEvent { result: HistorySearchResultPayload; }
 export interface UndoResultEvent { chatId: string; result: UndoResultPayload; }
 export interface ChangesStateEvent { chatId: string; state: ChangesState; }
 export interface ToolCallBridgeEvent { chatId: string; payload: ToolCallEvent; }
@@ -76,6 +78,7 @@ export const EVENT_NAMES = {
   HISTORY_LIST: 'history-list',
   HISTORY_DELETE_RESULT: 'history-delete-result',
   HISTORY_DELETE_REQUEST: 'history-delete-request',
+  HISTORY_SEARCH_RESULT: 'history-search-result',
   UNDO_RESULT: 'acp-undo-result',
   CHANGES_STATE: 'acp-changes-state',
   BRIDGE_OPERATION_RESULT: 'acp-bridge-operation-result',

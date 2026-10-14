@@ -36,6 +36,7 @@ import {
   GlobalSettingsEvent,
   HistoryDeleteResultEvent,
   HistoryListEvent,
+  HistorySearchResultEvent,
   McpServersEvent,
   McpStatusEvent,
   CustomAcpConfigsEvent,
@@ -259,6 +260,10 @@ export const ACPBridge = {
 
     window.__onHistoryDeleteResult = (result) => {
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.HISTORY_DELETE_RESULT, { detail: { result } }));
+    };
+
+    window.__onHistorySearchResult = (result) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.HISTORY_SEARCH_RESULT, { detail: { result } }));
     };
 
     window.__onUndoResult = (chatId, result) => {
@@ -490,6 +495,14 @@ export const ACPBridge = {
   renameHistoryGroup: (projectPath: string, group: string, newGroup: string) => {
     window.__renameHistoryGroup?.({ projectPath, group, newGroup });
   },
+
+  /** Answered by `onHistorySearchResult` with the conversations having a word that starts with the query. */
+  searchHistoryConversations: (projectPath: string, conversationIds: string[], query: string) => {
+    window.__searchHistoryConversations?.({ projectPath, conversationIds, query });
+  },
+
+  onHistorySearchResult: (callback: (e: CustomEvent<HistorySearchResultEvent>) => void) =>
+    onBridgeEvent(EVENT_NAMES.HISTORY_SEARCH_RESULT, callback),
 
   updateSessionMetadata: (payload: SessionMetadataUpdatePayload) => {
     window.__updateSessionMetadata?.(payload);

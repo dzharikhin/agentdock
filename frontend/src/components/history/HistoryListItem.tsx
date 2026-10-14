@@ -7,6 +7,8 @@ import { PinIcon } from '../tabbar/OpenChatList';
 import { Tooltip } from '../chat/shared/Tooltip';
 import { SectionRowButton, sectionRowButtonClassName } from '../ui/SectionList';
 import { TabTitleInput } from '../tabbar/TabTitleInput';
+import { searchPattern } from '../chat/ChatSearch';
+import { HighlightedText } from './HighlightedText';
 import { moveToGroupAction } from './historyGroups';
 
 function getItemAgents(item: HistorySessionMeta): string[] {
@@ -37,6 +39,10 @@ interface HistoryListItemProps {
   /** Shows the conversation's group, while the list is not limited to one. */
   showGroup: boolean;
   deleteError?: string;
+  /** Marked in the title and the snippet. */
+  searchQuery: string;
+  /** The conversation's text around a match of the search. */
+  snippet?: string;
   isEditing: boolean;
   formatDate: (ms: number) => string;
   onOpenSession: (session: HistorySessionMeta) => void;
@@ -54,6 +60,8 @@ export function HistoryListItem({
   groups,
   showGroup,
   deleteError,
+  searchQuery,
+  snippet,
   isEditing,
   formatDate,
   onOpenSession,
@@ -68,6 +76,7 @@ export function HistoryListItem({
   const mainLabel = mainAgent?.name || item.adapterName;
   const canOpenCli = !isOpen && !!mainAgent?.cliResumeAvailable;
   const canDelete = item.deletable !== false;
+  const query = searchQuery.trim();
 
   return (
     <div className="group relative border-b border-border last:border-b-0">
@@ -125,7 +134,9 @@ export function HistoryListItem({
                 />
               </div>
             ) : (
-              <div className="py-0.5 text-ide-small font-semibold truncate">{item.title}</div>
+              <div className="py-0.5 text-ide-small font-semibold truncate">
+                <HighlightedText text={item.title} pattern={query ? searchPattern(query) : null} />
+              </div>
             )}
             <div className="flex items-center gap-2 text-xs text-foreground-secondary">
               <span>{formatDate(item.updatedAt)}</span>
@@ -139,6 +150,11 @@ export function HistoryListItem({
                 </>
               ) : null}
             </div>
+            {snippet ? (
+              <div className="mt-0.5 line-clamp-2 text-xs text-foreground-secondary">
+                <HighlightedText text={snippet} pattern={searchPattern(query.replace(/\s+/g, ' '), true)} />
+              </div>
+            ) : null}
             {deleteError ? <div className="mt-1 text-xs text-error">{deleteError}</div> : null}
           </div>
         </div>

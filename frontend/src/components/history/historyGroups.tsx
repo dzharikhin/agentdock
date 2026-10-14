@@ -47,7 +47,8 @@ function GroupOptions({ groups, current, onSelect }: {
       {groups.length > 0 ? <PopupSubmenuSeparator /> : null}
       <PopupSubmenuOption label="Ungrouped" chosen={current === ''} onClick={() => onSelect('')} />
       {creating ? (
-        <div className="my-0.5 flex min-h-[26px] w-48 items-center pl-2 pr-3">
+        // Zero intrinsic width: the input fills the submenu without widening it.
+        <div className="my-0.5 flex min-h-[26px] w-0 min-w-full items-center">
           <TabTitleInput
             initialTitle=""
             ariaLabel="New group name"
@@ -56,7 +57,8 @@ function GroupOptions({ groups, current, onSelect }: {
               refocusRef.current = true;
               setCreating(false);
             }}
-            className="-ml-1 rounded-[3px] bg-background px-1 text-foreground"
+            className="rounded bg-background px-2 py-1 text-foreground
+              focus:!shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)]"
           />
         </div>
       ) : (

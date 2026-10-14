@@ -253,6 +253,12 @@ export interface HistoryDeleteResultPayload {
   failures: HistoryDeleteFailure[];
 }
 
+export interface HistorySearchResultPayload {
+  query: string;
+  /** Keyed by the conversation id; only the conversations with a match. */
+  snippets: Record<string, string>;
+}
+
 export interface HistorySessionMeta {
   sessionId: string;
   adapterName: string;
@@ -602,6 +608,7 @@ declare global {
       group?: string;
     }) => void;
     __renameHistoryGroup?: (payload: { projectPath: string; group: string; newGroup: string }) => void;
+    __searchHistoryConversations?: (payload: { projectPath: string; conversationIds: string[]; query: string }) => void;
     __loadHistoryConversation?: (conversationId: string, projectPath: string, historyConversationId: string) => void;
     __recoverRuntime?: (reason?: string, requestId?: string) => void;
     __loginAgent?: (adapterId: string, methodId: string) => void;
@@ -638,6 +645,7 @@ declare global {
     __onPermissionRequest?: (request: PermissionRequest) => void;
     __onHistoryList?: (list: HistorySessionMeta[]) => void;
     __onHistoryDeleteResult?: (result: HistoryDeleteResultPayload) => void;
+    __onHistorySearchResult?: (result: HistorySearchResultPayload) => void;
     __onConversationReplayLoaded?: (payload: ConversationReplayLoadedPayload) => void;
     __onAttachmentsAdded?: (chatId: string, files: ChatAttachment[]) => void;
     __onConversationTranscriptSaved?: (payload: ConversationTranscriptSavedPayload) => void;

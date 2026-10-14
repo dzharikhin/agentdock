@@ -1,7 +1,19 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ACPBridge } from '../../utils/bridge';
 import { formatDate } from '../../utils/formatDate';
 import type { AgentOption, HistorySessionMeta } from '../../types/chat';
+
+const MIN_TEXT_QUERY_LENGTH = 3;
+/** Keeps the text search fast however long the history is; older conversations match only by title. */
+const TEXT_SEARCH_CONVERSATIONS = 200;
+const TEXT_SEARCH_DELAY_MS = 200;
+
+/** A finished text search: the conversations it covered, and the snippets of those with a match. */
+interface TextSearch {
+  query: string;
+  searched: Set<string>;
+  snippets: Record<string, string>;
+}
 
 function getItemAgents(item: HistorySessionMeta): string[] {
   return item.allAdapterNames && item.allAdapterNames.length > 0
@@ -99,15 +111,77 @@ export function useHistoryPanelController(
     ? agent
     : null;
 
-  const filteredHistoryList = useMemo(() => {
+  const { titleMatches, otherItems } = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
-    if (agentFilter === null && !query && group === null) return historyList;
-    return historyList.filter((item) =>
+    const items = agentFilter === null && group === null ? historyList : historyList.filter((item) =>
       (agentFilter === null || getItemAgents(item).includes(agentFilter)) &&
-      (group === null || (item.group ?? '') === group) &&
-      item.title.toLowerCase().includes(query)
+      (group === null || (item.group ?? '') === group)
     );
+    if (!query) return { titleMatches: items, otherItems: [] };
+    const matches = (item: HistorySessionMeta) => item.title.toLowerCase().includes(query);
+    return { titleMatches: items.filter(matches), otherItems: items.filter((item) => !matches(item)) };
   }, [historyList, agentFilter, searchQuery, group]);
+
+  // After a pause in the typing, searches the text of the most recent conversations without a title match;
+  // its matches follow the title matches.
+  const textQuery = searchQuery.trim().replace(/\s+/g, ' ');
+  const tooShort = textQuery.length < MIN_TEXT_QUERY_LENGTH;
+  const candidateIds = tooShort
+    ? []
+    : otherItems.slice(0, TEXT_SEARCH_CONVERSATIONS).map((item) => item.conversationId);
+  const textQueryRef = useRef(textQuery);
+  textQueryRef.current = textQuery;
+  const sentSearchRef = useRef<{ query: string; searched: Set<string> } | null>(null);
+  const [textSearch, setTextSearch] = useState<TextSearch | null>(null);
+
+  // Matches start a word, so a longer query can match only where its beginning did; besides those conversations,
+  // only the ones not searched yet need a search.
+  const previous = textSearch && textQuery.startsWith(textSearch.query) ? textSearch : null;
+  const pendingIds = candidateIds.filter((id) =>
+    !previous?.searched.has(id) || (previous.query !== textQuery && id in previous.snippets));
+  const isTextSearching = pendingIds.length > 0;
+  // While searching, the last matches stay listed, so the list does not flicker.
+  const snippets = candidateIds.length === 0 ? null
+    : isTextSearching ? textSearch?.snippets ?? null
+    : previous!.query === textQuery ? previous!.snippets : {};
+
+  // A new search starts afresh, so it finds what the conversations gained since.
+  useEffect(() => {
+    if (tooShort) setTextSearch(null);
+  }, [tooShort]);
+
+  useEffect(() => ACPBridge.onHistorySearchResult((e) => {
+    const { query, snippets: found } = e.detail.result;
+    const sent = sentSearchRef.current;
+    if (query !== textQueryRef.current || query !== sent?.query) return;
+    // Searching the new candidates of the same query keeps its earlier matches.
+    setTextSearch((prev) => ({
+      query,
+      searched: sent.searched,
+      snippets: prev?.query === query ? { ...prev.snippets, ...found } : found,
+    }));
+  }), []);
+
+  const projectPath = historyList[0]?.projectPath ?? '';
+  const candidateKey = candidateIds.join('\n');
+  const pendingKey = pendingIds.join('\n');
+  useEffect(() => {
+    if (!pendingKey) return;
+    const timer = window.setTimeout(() => {
+      sentSearchRef.current = { query: textQuery, searched: new Set(candidateKey.split('\n')) };
+      ACPBridge.searchHistoryConversations(projectPath, pendingKey.split('\n'), textQuery);
+    }, TEXT_SEARCH_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [projectPath, candidateKey, pendingKey, textQuery]);
+
+  const filteredHistoryList = useMemo(
+    () => snippets ? [...titleMatches, ...otherItems.filter((item) => snippets[item.conversationId])] : titleMatches,
+    [titleMatches, otherItems, snippets]
+  );
+  // Updated once the search finishes, so the count does not flicker.
+  const resultCountRef = useRef(filteredHistoryList.length);
+  if (!isTextSearching) resultCountRef.current = filteredHistoryList.length;
+  const resultCount = resultCountRef.current;
 
   const selectedCount = selectedConversationIds.length;
   const filteredConversationIds = filteredHistoryList
@@ -182,6 +256,9 @@ export function useHistoryPanelController(
     adapterDisplay,
     uniqueAgentsInHistory,
     filteredHistoryList,
+    snippets,
+    isTextSearching,
+    resultCount,
     selectedCount,
     filteredConversationIds,
     areAllFilteredSelected,

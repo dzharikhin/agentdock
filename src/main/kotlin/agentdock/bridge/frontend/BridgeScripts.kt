@@ -31,6 +31,7 @@ internal object BridgeScripts {
                 '__onChangesState', '__onFileChangeStats', '__onConversationTranscriptSaved',
                 '__onConversationReplayLoaded', '__onAdapterDeleted', '__onFilesResult',
                 '__onFileIconResult', '__onLocalImageResult', '__onThemeChanged', '__onHistoryList', '__onHistoryDeleteResult',
+                '__onHistorySearchResult',
                 '__onAssistantActivity',
                 '__onMcpServers', '__onMcpStatus', '__onPromptLibrary', '__onSystemInstructions',
                 '__onAudioTranscriptionFeature', '__onAudioTranscriptionResult',
@@ -106,6 +107,7 @@ internal object BridgeScripts {
             window.__deleteHistoryConversations = function(payload) { invoke('deleteHistoryConversations', JSON.stringify(payload)); };
             window.__updateHistoryConversation = function(payload) { invoke('updateHistoryConversation', JSON.stringify(payload)); };
             window.__renameHistoryGroup = function(payload) { invoke('renameHistoryGroup', JSON.stringify(payload)); };
+            window.__searchHistoryConversations = function(payload) { invoke('searchHistoryConversations', JSON.stringify(payload)); };
 
             window.__loadMcpServers = function() { invoke('loadMcpServers', ''); };
             window.__saveMcpServers = function(json) { invoke('saveMcpServers', json); };

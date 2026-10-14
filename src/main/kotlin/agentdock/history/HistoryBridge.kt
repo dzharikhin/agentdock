@@ -48,6 +48,19 @@ class HistoryBridge(
     )
 
     @Serializable
+    private data class SearchHistoryPayload(
+        val projectPath: String,
+        val conversationIds: List<String>,
+        val query: String
+    )
+
+    @Serializable
+    private data class SearchHistoryResultPayload(
+        val query: String,
+        val snippets: Map<String, String>
+    )
+
+    @Serializable
     private data class DeleteHistoryResultPayload(
         val success: Boolean,
         val requestedConversationIds: List<String>,
@@ -184,6 +197,25 @@ class HistoryBridge(
                         }
                     }
                     sendJsError("Error during conversation update: ${e.message}")
+                }
+            }
+        }
+
+        host.register("searchHistoryConversations") { payload ->
+            if (payload.isBlank()) return@register
+
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val request = permissiveJson.decodeFromString<SearchHistoryPayload>(payload)
+                    val snippets = HistoryReplayStore.searchConversations(
+                        canonicalHistoryProjectPath(request.projectPath),
+                        request.conversationIds,
+                        request.query
+                    )
+                    val result = permissiveJson.encodeToString(SearchHistoryResultPayload(request.query, snippets))
+                    host.eval("if(window.__onHistorySearchResult) window.__onHistorySearchResult(JSON.parse(${result.jsStringLiteral()}));")
+                } catch (e: Exception) {
+                    sendJsError("Error during history search: ${e.message}")
                 }
             }
         }

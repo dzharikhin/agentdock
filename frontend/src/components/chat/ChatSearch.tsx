@@ -32,8 +32,10 @@ const MIN_QUERY_LENGTH = 2;
 const iconButtonClassName = 'p-1 text-foreground-secondary hover:text-foreground transition-colors '
   + `disabled:pointer-events-none disabled:opacity-40 ${chatFocusClassName}`;
 
-function searchPattern(query: string): RegExp {
-  return new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+/** Case-insensitive; `wordStart` matches only where a word starts. */
+export function searchPattern(query: string, wordStart = false): RegExp {
+  const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return wordStart ? new RegExp(`(?<![\\p{L}\\p{N}])${escaped}`, 'giu') : new RegExp(escaped, 'gi');
 }
 
 // Ranges of the pattern matches in the text of an element, including matches split across text nodes.

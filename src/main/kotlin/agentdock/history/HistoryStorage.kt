@@ -60,6 +60,12 @@ internal object HistoryStorage {
         return File(ensureProjectConversationsDir(projectPath), "$safeConversationId.transcript.txt")
     }
 
+    /** The conversation's user and assistant text, one message per line, which the history search reads. */
+    fun conversationSearchTextFile(projectPath: String, conversationId: String): File {
+        val safeConversationId = requireSafeConversationId(conversationId)
+        return File(ensureProjectConversationsDir(projectPath), "$safeConversationId.search.txt")
+    }
+
     internal fun requireSafeConversationId(conversationId: String): String {
         val clean = conversationId.trim()
         require(conversationIdPattern.matches(clean)) {
