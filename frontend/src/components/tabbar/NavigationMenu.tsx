@@ -13,7 +13,7 @@ interface NavigationMenuProps extends OpenChatListProps {
   onNewTabWithAgent: (agentId: string) => void;
   onCloseMenu: () => void;
   onOpenHistory: () => void;
-  onOpenManagement: () => void;
+  onOpenLastSettings: () => void;
 }
 
 export function NavigationMenu({
@@ -23,7 +23,7 @@ export function NavigationMenu({
   onNewTabWithAgent,
   onCloseMenu,
   onOpenHistory,
-  onOpenManagement,
+  onOpenLastSettings,
   ...props
 }: NavigationMenuProps) {
   const { agents } = props;
@@ -65,7 +65,7 @@ export function NavigationMenu({
       <OpenChatList {...props} onAction={onCloseMenu} />
       <div className="h-px bg-border my-1 mx-2" />
       <SectionRow label="Settings"icon={<Settings size={14} aria-hidden="true" />}
-        onClick={() => { onOpenManagement(); onCloseMenu(); }} />
+        onClick={() => { onOpenLastSettings(); onCloseMenu(); }} />
     </div>
   );
 }

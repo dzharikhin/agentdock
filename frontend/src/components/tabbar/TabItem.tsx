@@ -1,6 +1,5 @@
-import { Clock, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { AgentOption, ChatTab } from '../../types/chat';
-import { ChatSpinnerIcon } from '../chat/ChatLoadingIndicator';
 import { Tooltip } from '../chat/shared/Tooltip';
 import { getTabIcon } from './TabIcons';
 import { TabTitleInput } from './TabTitleInput';
@@ -135,15 +134,11 @@ export function TabItem({
       {hasWarning ? (
         <span className="relative z-10 mx-0.5 h-2 w-2 flex-shrink-0 rounded-full bg-warning" />
       ) : hasProcessing ? (
-        <span className="relative z-10 mx-0.5 flex shrink-0 text-foreground-secondary">
-          <ChatSpinnerIcon size={14} />
-        </span>
+        <span className="relative z-10 mx-0.5 h-2 w-2 flex-shrink-0 rounded-full bg-foreground-secondary animate-pulse" />
       ) : hasQueued ? (
         <Tooltip variant="minimal" placement="bottom" content="Queued prompts"
           className="relative z-10 mx-0.5 shrink-0 cursor-default">
-          <span role="img" aria-label="Queued prompts" className="flex text-foreground-secondary">
-            <Clock size={14} aria-hidden="true" />
-          </span>
+          <span role="img" aria-label="Queued prompts" className="block h-2 w-2 rounded-full border border-foreground-secondary" />
         </Tooltip>
       ) : hasUnread ? (
         <span className="relative z-10 mx-0.5 h-2 w-2 flex-shrink-0 rounded-full bg-sky-500" />

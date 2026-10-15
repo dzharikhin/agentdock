@@ -164,14 +164,14 @@ export function Sidebar({
             tabUi={navigationProps.tabUi ?? {}}
           />
         </nav>
-        {/* Opens the section popup at Service Providers. */}
+        {/* Opens the section popup at the last section opened other than the history. */}
         <div className="shrink-0 px-2 pb-2 text-ide-small">
           <div className="mb-1.5 mt-1 border-t border-border" />
           <div className={`${sidebarRowClassName(false)} h-8`}>
             <button
               type="button"
               data-section-opener
-              onClick={navigationProps.onOpenManagement}
+              onClick={navigationProps.onOpenLastSettings}
               className={rowButtonClassName}
             >
               <Settings size={14} aria-hidden="true" className="shrink-0" />

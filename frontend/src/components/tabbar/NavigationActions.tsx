@@ -47,7 +47,7 @@ export function getNavigationActions({
 }: NavigationActionsProps): NavigationAction[] {
   const isDev = !!(window as any).__IS_DEV;
   return [
-    { type: 'management', label: 'Service Providers', icon: <ManagementTabIcon />, onClick: onOpenManagement },
+    { type: 'management', label: 'Agents', icon: <ManagementTabIcon />, onClick: onOpenManagement },
     { type: 'general', label: 'General', icon: <GeneralTabIcon />, onClick: () => onOpenSettings('general') },
     { type: 'appearance', label: 'Appearance', icon: <AppearanceTabIcon />, onClick: () => onOpenSettings('appearance') },
     { type: 'shortcuts', label: 'Shortcuts', icon: <ShortcutsTabIcon />, onClick: () => onOpenSettings('shortcuts') },

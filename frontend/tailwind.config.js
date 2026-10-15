@@ -84,6 +84,10 @@ export default {
       fontFamily: {
         mono: ['var(--ide-code-font-family)', 'monospace'],
       },
+      // Deeper than Tailwind's default .5, so the grey activity dots visibly pulse.
+      keyframes: {
+        pulse: { '50%': { opacity: '.2' } },
+      },
     },
   },
   plugins: [

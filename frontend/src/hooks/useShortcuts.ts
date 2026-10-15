@@ -39,7 +39,7 @@ export function useKeyDown(handler: (event: KeyboardEvent) => boolean, enabled =
 }
 
 // Once the chat has rendered as active, so the arrow keys scroll its messages.
-const focusChatOutput = () => requestAnimationFrame(() => {
+export const focusChatOutput = () => requestAnimationFrame(() => {
   document.querySelector<HTMLElement>('[data-active-chat-output]')?.focus({ preventScroll: true });
 });
 
@@ -51,11 +51,12 @@ interface AppShortcutsOptions {
   onNewChat: () => void;
   onCloseChat: (id: string) => void;
   onOpenSection: (section: SectionType) => void;
+  onOpenSettings: () => void;
 }
 
 // The shortcuts that work outside the chats: chat numbers, a new chat, closing the active one, the history and Settings.
 export function useAppShortcuts({
-  chats, activeChatId, onSelectChat, onNewChat, onCloseChat, onOpenSection,
+  chats, activeChatId, onSelectChat, onNewChat, onCloseChat, onOpenSection, onOpenSettings,
 }: AppShortcutsOptions) {
   useKeyDown((event) => {
     const chatNumber = chatNumberShortcut(event);
@@ -72,7 +73,7 @@ export function useAppShortcuts({
     } else if (isShortcut(event, 'history')) {
       onOpenSection('history');
     } else if (isShortcut(event, 'manage')) {
-      onOpenSection('management');
+      onOpenSettings();
     } else {
       return false;
     }

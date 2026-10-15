@@ -63,7 +63,7 @@ export function EmptyStateView({
           <div className="relative my-auto flex w-full flex-col items-center text-center">
             {runnableAgents.length > 0 ? (
               <>
-                <div className="text-ide-medium mb-8 mx-4">Select an AI agent to start a new chat</div>
+                <div className="text-ide-medium mb-8 mx-4">Start a new chat</div>
 
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   {runnableAgents.map((agent) => (
@@ -86,7 +86,8 @@ export function EmptyStateView({
                 {recentChats.length > 0 ? (
                   <div className="mt-12 w-[380px] max-w-full text-left text-ide-small">
                     <div className="mb-2 flex items-center gap-2 px-2">
-                      Continue a chat
+                      <div className="h-px flex-1 bg-border" />
+                      or continue a chat
                       <div className="h-px flex-1 bg-border" />
                     </div>
                     {recentChats.map((item) => (
@@ -122,7 +123,7 @@ export function EmptyStateView({
                   className="rounded-[3px] text-link hover:underline focus:outline-none
                     focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
                 >
-                  Service Providers
+                  Agents
                 </button>{' '}
                 to start a new chat.
               </p>

@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { Clock, EllipsisVertical, Pencil, Pin, SquareTerminal, Trash2, X } from 'lucide-react';
+import { EllipsisVertical, Pencil, Pin, SquareTerminal, Trash2, X } from 'lucide-react';
 import { conversationKeyOf } from '../../types/chat';
 import type { AgentOption, ChatTab, HistorySessionMeta, TabUiFlags } from '../../types/chat';
 import { ACPBridge } from '../../utils/bridge';
+import { focusChatOutput } from '../../hooks/useShortcuts';
 import ConfirmationModal from '../ConfirmationModal';
 import { PopupMenu, popupMenuActions } from '../ui/PopupMenu';
 import { Tooltip } from '../chat/shared/Tooltip';
-import { ChatSpinnerIcon } from '../chat/ChatLoadingIndicator';
 import { getTabIcon } from './TabIcons';
 import { TabTitleInput } from './TabTitleInput';
 import { useTabReordering } from './useTabReordering';
@@ -42,25 +42,25 @@ export function ChatStatusIndicator({ flags, tooltipPlacement, className }: {
   tooltipPlacement?: 'top' | 'bottom';
   className: string;
 }) {
-  const box = `flex h-3.5 w-3.5 shrink-0 items-center justify-center self-center ${className}`;
-  if (flags?.warning) return <span className={box}><span className="h-2 w-2 rounded-full bg-warning" /></span>;
-  if (flags?.processing) return <span className={`${box} text-foreground-secondary`}><ChatSpinnerIcon size={14} /></span>;
+  const box = 'flex h-3.5 w-3.5 shrink-0 items-center justify-center self-center';
+  if (flags?.warning) return <span className={`${box} ${className}`}><span className="h-2 w-2 rounded-full bg-warning" /></span>;
+  if (flags?.processing) return <span className={`${box} ${className}`}><span className="h-2 w-2 rounded-full bg-foreground-secondary animate-pulse" /></span>;
   if (flags?.queued) {
     return (
       <Tooltip variant="minimal" placement={tooltipPlacement} content="Queued prompts"
         className={`shrink-0 self-center cursor-default ${className}`}>
-        <span data-open-chat-status role="img" aria-label="Queued prompts" className="flex text-foreground-secondary">
-          <Clock size={14} aria-hidden="true" />
+        <span data-open-chat-status role="img" aria-label="Queued prompts" className={box}>
+          <span className="h-2 w-2 rounded-full border border-foreground-secondary" />
         </span>
       </Tooltip>
     );
   }
-  if (flags?.unread) return <span className={box}><span className="h-2 w-2 rounded-full bg-sky-500" /></span>;
+  if (flags?.unread) return <span className={`${box} ${className}`}><span className="h-2 w-2 rounded-full bg-sky-500" /></span>;
   return null;
 }
 
 /**
- * The header names the listed chats and offers "Close all" once more than one chat is open. Pinned chats always show
+ * The header names the listed chats and offers "Close all" while any chat is open. Pinned chats always show
  * the pin (unpinning them) before the status indicator; closed ones have no close button. In the sidebar rows can be
  * reordered by dragging, and pinning, renaming, moving to a group, opening in the terminal and deleting sit in a row
  * menu; in the tab bar menu (`onAction` given, closing the menu), where a nested menu would be awkward, pin and rename
@@ -116,7 +116,7 @@ export function OpenChatList({
     <div className={sidebar ? undefined : 'mb-1'}>
       <div className="flex min-h-7 items-center pl-3.5 pr-3 text-ide-small text-[var(--ide-Label-disabledForeground)]">
         <span className="min-w-0 flex-1 truncate">{heading}</span>
-        {openCount > 1 ? (
+        {openCount > 0 ? (
           <Tooltip variant="minimal" placement="bottom" content="Close all">
             <button
               type="button"
@@ -181,9 +181,11 @@ export function OpenChatList({
               ) : (
                 <>
                   <button
-                    onClick={() => {
+                    onClick={(event) => {
                       if (shouldSuppressClick(tab.id)) return;
                       onSelectTab(tab.id);
+                      // Not on a double click's second click, so the focus stays in the rename input it opens.
+                      if (sidebar && event.detail < 2) focusChatOutput();
                       onAction?.();
                     }}
                     className={rowButtonClassName}

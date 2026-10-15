@@ -126,9 +126,9 @@ export default function HistoryPanel({
     historyLoaded,
     group
   );
-  // Opening the history starts a search.
+  // Opening the history starts a search, except from the section popup sidebar, which focuses the list.
   useEffect(() => {
-    if (isActive) searchInputRef.current?.focus();
+    if (isActive && !document.activeElement?.closest('[data-section-nav]')) searchInputRef.current?.focus();
   }, [isActive]);
 
   const [renderLimit, setRenderLimit] = useState(RENDER_BATCH);
@@ -150,8 +150,8 @@ export default function HistoryPanel({
   const hasOpenPendingChat =tabs.some((tab) => pendingDeleteIds.includes(conversationKeyOf(tab)));
   const filterActive = agent !== null || group !== null;
   const selectedItems = historyList.filter((item) => selectedConversationIds.includes(item.conversationId));
-  // Pins all once any is unpinned, otherwise unpins all.
-  const pinSelected = selectedItems.some((item) => !item.pinned);
+  // Pins all once any is unpinned or none is selected, otherwise unpins all.
+  const pinSelected = selectedItems.length === 0 || selectedItems.some((item) => !item.pinned);
 
   return (
     <div className="flex min-h-0 w-full flex-col bg-background text-foreground">

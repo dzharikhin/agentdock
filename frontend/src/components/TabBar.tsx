@@ -41,6 +41,8 @@ export interface TabBarProps {
   noRunnableAgents: boolean;
   onOpenHistory: () => void;
   onOpenManagement: () => void;
+  /** "Settings": the last section opened other than the history. */
+  onOpenLastSettings: () => void;
   onOpenDesignSystem: () => void;
   onOpenMcp: () => void;
   onOpenCustomAcp: () => void;
@@ -68,7 +70,7 @@ export default function TabBar({
   agents,
   noRunnableAgents,
   onOpenHistory,
-  onOpenManagement,
+  onOpenLastSettings,
   sidebarPosition = 'left',
   onUseSidebar,
 }: TabBarProps) {
@@ -233,7 +235,7 @@ export default function TabBar({
               onRenameTab={onRenameTab}
               onCloseMenu={() => setMenuOpen(false)}
               onOpenHistory={onOpenHistory}
-              onOpenManagement={onOpenManagement}
+              onOpenLastSettings={onOpenLastSettings}
             />
           )}
         </div>

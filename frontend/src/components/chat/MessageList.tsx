@@ -172,7 +172,7 @@ function MessageList({
       return { visibleMessages: messages, hiddenCount: 0, hiddenPromptCount: 0 };
     }
 
-    const SYMBOL_LIMIT = 15000;
+    const SYMBOL_LIMIT = 20000;
     
     // Safely estimate block size without counting base64 media
     const getBlockSize = (block: RichContentBlock): number => {

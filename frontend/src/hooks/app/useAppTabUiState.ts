@@ -190,6 +190,7 @@ export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRef
     const flags = Object.values(tabUi);
     if (flags.some((f) => f.warning)) return 'warning';
     if (flags.some((f) => f.unread && !f.processing && !f.queued)) return 'unread';
+    if (flags.some((f) => f.processing)) return 'processing';
     return '';
   }, [tabUi]);
 

@@ -24,6 +24,8 @@ import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.wm.ex.ToolWindowManagerListener
 import com.intellij.ui.BadgeIconSupplier
+import com.intellij.ui.IconManager
+import com.intellij.ui.JBColor
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
@@ -72,6 +74,7 @@ class AgentDockUiHost(
 
     private var toolWindow: ToolWindow? = null
     private val badgeIcons = BadgeIconSupplier(AgentDockFileType.getIcon())
+    private val processingIcon = IconManager.getInstance().withIconBadge(badgeIcons.originalIcon, JBColor.GRAY)
     /** The plugin icon with the open chats' dot, or `null`; the editor tab may read it off the EDT. */
     @Volatile
     var attentionIcon: Icon? = null
@@ -175,11 +178,12 @@ class AgentDockUiHost(
 
     /**
      * Mirrors the open chats' dot on the tool window button and the editor tab: `warning` while one waits for a
-     * permission, `unread` while one has an unread reply, anything else clears it.
+     * permission, `processing` while one is replying, `unread` while one has an unread reply, anything else clears it.
      */
     fun setAttention(level: String) {
         val icon = when (level) {
             "warning" -> badgeIcons.warningIcon
+            "processing" -> processingIcon
             "unread" -> badgeIcons.infoIcon
             else -> null
         }
@@ -373,8 +377,6 @@ class AgentDockUiHost(
                 ) {
                     return false
                 }
-
-                if (e.keyCode == KeyEvent.VK_WINDOWS) return true
 
                 if (e.isControlDown && !e.isAltDown && !e.isMetaDown && e.isZoomShortcut()) {
                     if (e.id == KeyEvent.KEY_PRESSED) {

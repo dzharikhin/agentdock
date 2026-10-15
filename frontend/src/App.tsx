@@ -143,6 +143,7 @@ function App() {
     handleNewTab,
     handleOpenHistory,
     openSection,
+    openSettings,
     closeActiveSection,
     handleUserMessageSent,
     handleAssistantActivity,
@@ -194,6 +195,7 @@ function App() {
     noRunnableAgents: agentAvailabilityResolved && runnableAgents.length === 0,
     onOpenHistory: () => openSection('history'),
     onOpenManagement: () => openSection('management'),
+    onOpenLastSettings: openSettings,
     onOpenDesignSystem: () => openSection('design'),
     onOpenMcp: () => openSection('mcp'),
     onOpenCustomAcp: () => openSection('custom-acp'),
@@ -212,6 +214,7 @@ function App() {
     onNewChat: handleNewTab,
     onCloseChat: handleCloseTab,
     onOpenSection: openSection,
+    onOpenSettings: openSettings,
   });
 
   function setSidebarLayoutEnabled(enabled: boolean) {
@@ -337,6 +340,7 @@ function App() {
         })}
         activeSection={activeSection}
         compact={compactSections}
+        sidebarLayout={sidebarEnabled}
         historyGroupNav={historyGroupNav}
         onClose={closeActiveSection}
       >

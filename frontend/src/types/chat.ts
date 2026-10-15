@@ -211,7 +211,7 @@ export interface DropdownOption {
   subOptions?: DropdownOption[];
 }
 
-export type AttentionLevel = 'warning' | 'unread' | '';
+export type AttentionLevel = 'warning' | 'processing' | 'unread' | '';
 
 export interface TabUiFlags {
   unread: boolean;

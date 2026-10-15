@@ -73,6 +73,7 @@ export function HistoryListItem({
   const conversationId = item.conversationId;
   // In the order last used, the current agent last.
   const itemAgents = item.allAdapterNames?.length ? item.allAdapterNames : [item.adapterName];
+  const previousAgents = itemAgents.filter((agentId) => agentId !== item.adapterName);
   const mainAgent = agents.find((agent) => agent.id === item.adapterName);
   const canOpenCli = !isOpen && !!mainAgent?.cliResumeAvailable;
   const canDelete = item.deletable !== false;
@@ -85,11 +86,13 @@ export function HistoryListItem({
         <div
           role="button"
           tabIndex={isEditing ? -1 : 0}
-          className="flex min-w-0 flex-1 flex-col justify-center pt-0.5 pb-1.5 cursor-pointer rounded-[4px]
+          className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] content-center gap-x-2 pt-0.5 pb-1.5 cursor-pointer rounded-[4px]
             focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
           onClick={() => { if (!isEditing) activate(); }}
           onKeyDown={(event) => handleHistoryRowKeyDown(event, isEditing, activate)}
         >
+          {/* The current agent before the title; the previous ones lead the details below it. */}
+          <span className="flex self-center pt-0.5 pb-1 opacity-80">{getAgentIcon(item.adapterName, agents)}</span>
           {isEditing ? (
             <div className="flex">
               <TabTitleInput
@@ -105,15 +108,17 @@ export function HistoryListItem({
               <span className="truncate">
                 <HighlightedText text={item.title} pattern={query ? searchPattern(query) : null} />
               </span>
-              <ChatStatusIndicator flags={status} className="ml-2 -translate-y-px" />
+              <ChatStatusIndicator flags={status} className="ml-1" />
             </div>
           )}
-          <div className="flex items-center gap-2 text-xs text-foreground-secondary">
-            <span className="flex shrink-0 items-center gap-1.5 opacity-80">
-              {itemAgents.map((agentId) => (
-                <span key={agentId} className="flex">{getAgentIcon(agentId, agents, 'h-3.5 w-3.5')}</span>
-              ))}
-            </span>
+          <div className="col-start-2 flex items-center gap-2 text-xs text-foreground-secondary">
+            {previousAgents.length > 0 ? (
+              <span className="flex shrink-0 items-center gap-1.5 opacity-80">
+                {previousAgents.map((agentId) => (
+                  <span key={agentId} className="flex">{getAgentIcon(agentId, agents, 'h-3.5 w-3.5')}</span>
+                ))}
+              </span>
+            ) : null}
             <span>{formatDate(item.updatedAt)}</span>
             {conversationLength || item.modelId ? <span className="opacity-50">&bull;</span> : null}
             {conversationLength ? <span>{conversationLength}</span> : null}
@@ -126,11 +131,11 @@ export function HistoryListItem({
             ) : null}
           </div>
           {snippet ? (
-            <div className="mt-0.5 line-clamp-2 text-xs text-foreground-secondary">
+            <div className="col-start-2 mt-0.5 line-clamp-2 text-xs text-foreground-secondary">
               <HighlightedText text={snippet} pattern={searchPattern(query.replace(/\s+/g, ' '), true)} />
             </div>
           ) : null}
-          {deleteError ? <div className="mt-1 text-xs text-error">{deleteError}</div> : null}
+          {deleteError ? <div className="col-start-2 mt-1 text-xs text-error">{deleteError}</div> : null}
         </div>
 
         <div className="flex shrink-0 items-center self-stretch relative z-10 ml-2" onClick={(e) => e.stopPropagation()}>

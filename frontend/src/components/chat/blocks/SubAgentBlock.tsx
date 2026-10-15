@@ -53,7 +53,7 @@ export const SubAgentBlock: React.FC<Props> = ({ block }) => {
         </div>
         <div className="flex-shrink-0 flex items-center gap-2">
           {(isPending || isError) && (
-            <div className={`w-2.5 h-2.5 rounded-full ${isPending ? 'bg-warning animate-pulse' : 'bg-error'}`}/>
+            <div className={`w-2.5 h-2.5 rounded-full ${isPending ? 'bg-foreground-secondary animate-pulse' : 'bg-error'}`}/>
           )}
           <div className={`transition-transform duration-200 text-editor-fg opacity-50 ${isExpanded ? 'rotate-90' : ''}`}>
             <ChevronRight size={14} />

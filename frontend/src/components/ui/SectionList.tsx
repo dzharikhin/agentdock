@@ -20,7 +20,7 @@ export function SectionRowButton({ label, className = '', ...props }: { label: s
 export type RowStatus = 'loading' | 'connected' | 'error';
 
 const STATUS_VISUALS: Record<RowStatus, { dotClass: string; label: string }> = {
-  loading: { dotClass: 'bg-warning animate-pulse', label: 'Checking…' },
+  loading: { dotClass: 'bg-foreground-secondary animate-pulse', label: 'Checking…' },
   connected: { dotClass: 'bg-success', label: 'Reachable' },
   error: { dotClass: 'bg-error', label: 'Error' },
 };
