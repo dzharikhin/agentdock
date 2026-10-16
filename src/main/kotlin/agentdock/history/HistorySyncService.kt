@@ -320,19 +320,18 @@ internal object HistorySyncService {
 
         backgroundScope.launch {
             try {
-                val deleted = SessionListDeleteSupport.deleteSession(
-                    projectPath = projectPath,
-                    adapterName = adapterName,
-                    sessionId = sessionId,
-                    sourceFilePath = sourceFilePath
-                )
+                val deleted = runCatching {
+                    SessionListDeleteSupport.deleteSession(
+                        projectPath = projectPath,
+                        adapterName = adapterName,
+                        sessionId = sessionId,
+                        sourceFilePath = sourceFilePath
+                    )
+                }.getOrDefault(false)
+                // A session that cannot be deleted yet, e.g. while its agent is not running, stays listed for the next sync.
                 if (deleted) {
                     HistoryStorage.removeEphemeralSession(projectPath, adapterName, sessionId)
-                } else {
-                    log.warn("Failed to delete ephemeral history session $adapterName:$sessionId")
                 }
-            } catch (e: Exception) {
-                log.warn("Error while deleting ephemeral history session $adapterName:$sessionId", e)
             } finally {
                 ephemeralDeletionJobs.remove(jobKey)
             }

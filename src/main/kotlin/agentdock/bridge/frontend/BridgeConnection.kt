@@ -10,6 +10,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.platform.project.projectId
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -41,6 +42,13 @@ internal class BridgeConnection(
     /** Commands are queued rather than launched one coroutine each, so the backend sees them in the order the user caused them. */
     private val outbox = Channel<Pair<String, String>>(Channel.UNLIMITED)
 
+    /**
+     * Completed by the backend's first acknowledgement. The backend registers the command handlers
+     * only when the UI attaches, so a command that overtook the attachment was silently dropped and
+     * the page waited for its settings forever.
+     */
+    private val attached = CompletableDeferred<Unit>()
+
     fun open() {
         val local = local
         if (local != null) {
@@ -67,6 +75,7 @@ internal class BridgeConnection(
                 AgentDockRpcApi.getInstance()
                     .uiMessages(project.projectId())
                     .collect { batch ->
+                        attached.complete(Unit)
                         // The backend emits an empty acknowledgement after the flow is attached.
                         // Only then is the connection genuinely back and it is safe to reload the
                         // UI so its normal ready handshake reconstructs state.
@@ -87,6 +96,7 @@ internal class BridgeConnection(
     }
 
     private suspend fun sendRemote() {
+        attached.await()
         for ((command, payload) in outbox) {
             try {
                 AgentDockRpcApi.getInstance().invokeCommand(project.projectId(), command, payload)

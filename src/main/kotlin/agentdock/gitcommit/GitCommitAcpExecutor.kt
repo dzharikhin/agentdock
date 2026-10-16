@@ -11,7 +11,6 @@ import com.agentclientprotocol.model.RequestPermissionOutcome
 import com.agentclientprotocol.model.RequestPermissionResponse
 import com.agentclientprotocol.model.SessionId
 import com.agentclientprotocol.model.SessionUpdate
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -46,7 +45,6 @@ internal class GitCommitAcpExecutor(
     private val acpService: AcpClientService = AcpClientService.getInstance(project)
 ) {
     companion object {
-        private val log = Logger.getInstance(GitCommitAcpExecutor::class.java)
         private const val GENERATION_TIMEOUT_MS = 120_000L
     }
 
@@ -151,16 +149,12 @@ internal class GitCommitAcpExecutor(
             val adapterId = adapterInfo.id
             if (!sessionId.isNullOrBlank()) {
                 acpService.scope.launch {
-                    runCatching {
+                    // A session that cannot be deleted yet stays registered and the history sync retries it.
+                    val deleted = runCatching {
                         AgentDockHistoryService.deleteSessionImmediately(projectBasePath, sessionId, adapterId)
-                    }.onSuccess { deleted ->
-                        if (deleted) {
-                            AgentDockHistoryService.removeEphemeralSession(projectBasePath, adapterId, sessionId)
-                        } else {
-                            log.warn("Failed to delete ephemeral git commit history session $adapterId:$sessionId")
-                        }
-                    }.onFailure { error ->
-                        log.warn("Error while deleting ephemeral git commit history session $adapterId:$sessionId", error)
+                    }.getOrDefault(false)
+                    if (deleted) {
+                        AgentDockHistoryService.removeEphemeralSession(projectBasePath, adapterId, sessionId)
                     }
                 }
             }

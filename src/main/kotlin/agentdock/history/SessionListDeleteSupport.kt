@@ -55,8 +55,12 @@ internal object SessionListDeleteSupport {
         }
 
         return when (adapterName) {
-            "cursor-cli" -> deleteCursorSession(sourceFilePath)
-            "github-copilot-cli" -> deleteGithubCopilotSession(sourceFilePath)
+            // These sessions are only files, so they are deleted without the agent, and finding none means nothing is left to delete.
+            "cursor-cli", "github-copilot-cli" -> {
+                val path = sourceFilePath?.takeIf { it.isNotBlank() }
+                    ?: resolveSourceFilePath(projectPath, adapterName, sessionId)
+                path.isBlank() || File(path).parentFile?.let(::deleteHistoryDirectoryIfExists) == true
+            }
             "kilo" -> runCatching {
                 runAgentHistoryCliCommand("kilo", projectPath, listOf("session", "delete", sessionId))
             }.isSuccess
@@ -182,11 +186,6 @@ internal object SessionListDeleteSupport {
         }?.absolutePath.orEmpty()
     }
 
-    private fun deleteGithubCopilotSession(sourceFilePath: String?): Boolean {
-        val sessionDir = sourceFilePath?.takeIf { it.isNotBlank() }?.let { File(it).parentFile } ?: return false
-        return deleteHistoryDirectoryIfExists(sessionDir)
-    }
-
     private fun resolveCursorSourceFilePath(projectPath: String, sessionId: String): String {
         val files = findMatchingHistoryFiles(resolveHistoryPathTemplate("~/.cursor/chats/{projectHashMd5}/*/store.db", projectPath))
         val chatFile = files.firstOrNull { file ->
@@ -197,10 +196,5 @@ internal object SessionListDeleteSupport {
 
         val acpSessionDb = File(System.getProperty("user.home"), ".cursor/acp-sessions/$sessionId/store.db")
         return if (acpSessionDb.exists()) acpSessionDb.absolutePath else ""
-    }
-
-    private fun deleteCursorSession(sourceFilePath: String?): Boolean {
-        val sessionDir = sourceFilePath?.takeIf { it.isNotBlank() }?.let { File(it).parentFile } ?: return false
-        return deleteHistoryDirectoryIfExists(sessionDir)
     }
 }

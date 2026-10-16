@@ -11,15 +11,7 @@ object AgentDockHistoryService {
         val cleanSessionId = sessionId.trim()
         if (cleanProjectPath.isBlank() || cleanAdapterName.isBlank() || cleanSessionId.isBlank()) return
 
-        val existing = HistoryStorage.readEphemeralSessions(cleanProjectPath)
-        if (existing.any { it.adapterName == cleanAdapterName && it.sessionId == cleanSessionId }) return
-        HistoryStorage.writeEphemeralSessions(
-            cleanProjectPath,
-            existing + EphemeralSessionEntry(
-                sessionId = cleanSessionId,
-                adapterName = cleanAdapterName
-            )
-        )
+        HistoryStorage.addEphemeralSession(cleanProjectPath, cleanAdapterName, cleanSessionId)
     }
 
     fun removeEphemeralSession(projectPath: String?, adapterName: String, sessionId: String) {

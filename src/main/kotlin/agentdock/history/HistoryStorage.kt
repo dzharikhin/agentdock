@@ -10,6 +10,9 @@ import java.io.File
 internal object HistoryStorage {
     private val conversationIdPattern = Regex("[A-Za-z0-9_-]{1,256}")
 
+    /** Sync deletes ephemeral sessions in parallel; without this each read-modify-write overwrote the others' removals. */
+    private val ephemeralSessionsLock = Any()
+
     private data class StoredProjectIndex(
         val text: String,
         val conversations: MutableList<HistoryConversationIndexEntry>
@@ -143,7 +146,15 @@ internal object HistoryStorage {
         }.getOrElse { mutableListOf() }
     }
 
-    fun writeEphemeralSessions(projectPath: String, entries: List<EphemeralSessionEntry>) {
+    fun addEphemeralSession(projectPath: String, adapterName: String, sessionId: String) {
+        synchronized(ephemeralSessionsLock) {
+            val existing = readEphemeralSessions(projectPath)
+            if (existing.any { it.adapterName == adapterName && it.sessionId == sessionId }) return
+            writeEphemeralSessions(projectPath, existing + EphemeralSessionEntry(sessionId = sessionId, adapterName = adapterName))
+        }
+    }
+
+    private fun writeEphemeralSessions(projectPath: String, entries: List<EphemeralSessionEntry>) {
         if (projectPath.isBlank()) return
         val file = ephemeralSessionsFile(projectPath)
         if (entries.isEmpty()) {
@@ -158,8 +169,10 @@ internal object HistoryStorage {
     fun removeEphemeralSession(projectPath: String, adapterName: String, sessionId: String) {
         val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
         if (cleanProjectPath.isBlank() || adapterName.isBlank() || sessionId.isBlank()) return
-        val remaining = readEphemeralSessions(cleanProjectPath)
-            .filterNot { it.adapterName == adapterName && it.sessionId == sessionId }
-        writeEphemeralSessions(cleanProjectPath, remaining)
+        synchronized(ephemeralSessionsLock) {
+            val remaining = readEphemeralSessions(cleanProjectPath)
+                .filterNot { it.adapterName == adapterName && it.sessionId == sessionId }
+            writeEphemeralSessions(cleanProjectPath, remaining)
+        }
     }
 }

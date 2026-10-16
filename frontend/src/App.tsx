@@ -19,6 +19,7 @@ import type { GlobalSettings } from './types/chat';
 const SIDEBAR_ANIMATION_MS = 200;
 /** From this content width `app-wide:` widens side padding and the chat prompt navigation. */
 const WIDE_CONTENT_MIN_WIDTH_PX = 720;
+const SETTINGS_RETRY_MS = 2000;
 
 function App() {
   const { isWide, isIslandsTheme, viewportWidth } = useAppLayout();
@@ -96,11 +97,18 @@ function App() {
       setSettingsLoaded(true);
     };
 
+    // A lost request or reply would leave the UI empty until a restart, so the request repeats until the settings arrive.
+    let retryTimer: number | undefined;
     const cleanup = ACPBridge.onGlobalSettings((e) => {
+      window.clearInterval(retryTimer);
       applyGlobalSettings(e.detail?.payload);
     });
 
-    const requestSettings = () => ACPBridge.loadGlobalSettings();
+    const requestSettings = () => {
+      window.clearInterval(retryTimer);
+      retryTimer = window.setInterval(ACPBridge.loadGlobalSettings, SETTINGS_RETRY_MS);
+      ACPBridge.loadGlobalSettings();
+    };
 
     if (window.__settingsBridgeReady) {
       requestSettings();
@@ -110,6 +118,7 @@ function App() {
 
     return () => {
       cleanup();
+      window.clearInterval(retryTimer);
       window.removeEventListener('settings-bridge-ready', requestSettings);
     };
   }, []);
