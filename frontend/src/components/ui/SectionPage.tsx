@@ -18,7 +18,7 @@ export function SectionPage({ toolbar, onAdd, padding = 'px-5 pb-8 pt-3', childr
   return (
     <div className="flex min-h-0 flex-col">
       {toolbar}
-      <div className="min-h-0 overflow-y-auto">
+      <div data-section-scroll tabIndex={-1} className="min-h-0 overflow-y-auto focus:outline-none">
         <div className={`flex flex-col ${padding}`}>
           {onAdd ? (
             <div className="flex justify-end pb-4">

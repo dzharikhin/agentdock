@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useChatSession, UseChatSessionOptions } from '../../hooks/useChatSession';
 import { useFileChanges } from '../../hooks/useFileChanges';
+import { isShortcut, useKeyDown } from '../../hooks/useShortcuts';
 import { FileChangeSummary, Message, UndoFileResultPayload } from '../../types/chat';
 import { acquireJcefLivePromptRepaint } from '../../utils/jcefHostRepaint';
 import {
@@ -260,6 +261,12 @@ export default function ChatSessionView({
     return acquireJcefLivePromptRepaint();
   }, [isActive, isHistoryReplaying, status]);
 
+  useKeyDown((event) => {
+    if (!isSending || !isShortcut(event, 'cancelPrompt')) return false;
+    handleStop();
+    return true;
+  }, isActive);
+
   const handleAgentChange = useAgentHandoffRequest({
     conversationId,
     selectedAgentId,
@@ -327,6 +334,7 @@ export default function ChatSessionView({
             isHistoryReplaying={isHistoryReplaying}
             onForkFromMessage={handleForkFromMessage}
             scrollToBottomOnInitialMessages={Boolean(initialMessages?.length) && !historySession}
+            isActive={isActive}
             footer={<>
         <FileChangesPanel
           hasPluginEdits={hasPluginEdits}

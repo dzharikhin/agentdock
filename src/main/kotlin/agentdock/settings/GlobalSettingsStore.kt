@@ -47,6 +47,7 @@ object GlobalSettingsStore {
             userMessageBackgroundStyle = normalizeUserMessageBackgroundStyle(settings.userMessageBackgroundStyle),
             userMessageCustomColor = settings.userMessageCustomColor.takeIf { Regex("#[0-9a-fA-F]{6}").matches(it) } ?: "#193d70",
             sidebarPosition = normalizeSidebarPosition(settings.sidebarPosition),
+            shortcuts = normalizeShortcuts(settings.shortcuts),
             audioTranscription = normalizeAudioTranscriptionSettings(settings.audioTranscription),
             gitCommitGeneration = settings.gitCommitGeneration.copy(
                 adapterId = settings.gitCommitGeneration.adapterId.trim(),
@@ -65,6 +66,8 @@ object GlobalSettingsStore {
     fun isGitCommitGenerationEnabled(): Boolean = gitCommitGenerationEnabled
 
     fun areAudioNotificationsEnabled(): Boolean = load().audioNotificationsEnabled
+
+    fun isSystemInstructionsEnabled(): Boolean = load().systemInstructionsEnabled
 
     fun userMessageBackgroundStyle(): String = normalizeUserMessageBackgroundStyle(load().userMessageBackgroundStyle)
 
@@ -138,4 +141,21 @@ object GlobalSettingsStore {
 
     private fun normalizeSidebarPosition(position: String?): String =
         if (position?.trim()?.lowercase() == "right") "right" else "left"
+
+    // One letter each, not a text editing one and not taken by an earlier action.
+    private fun normalizeShortcuts(shortcuts: ShortcutSettings): ShortcutSettings {
+        val used = mutableSetOf<String>()
+        fun letter(value: String) = value.trim().uppercase()
+            .takeIf { it.length == 1 && it[0] in 'A'..'Z' && it !in "ACVXYZ" && used.add(it) }
+            .orEmpty()
+        return shortcuts.copy(
+            search = letter(shortcuts.search),
+            newChat = letter(shortcuts.newChat),
+            closeChat = letter(shortcuts.closeChat),
+            history = letter(shortcuts.history),
+            manage = letter(shortcuts.manage),
+            focusInput = letter(shortcuts.focusInput),
+            cancelPrompt = letter(shortcuts.cancelPrompt)
+        )
+    }
 }

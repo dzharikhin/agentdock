@@ -12,6 +12,8 @@ interface UserMessageProps {
   onImageClick: (src: string) => void;
   promptNumber?: number;
   onElementChange?: (id: string, element: HTMLDivElement | null) => void;
+  // Expands a long prompt that holds the current search match.
+  forceExpanded?: boolean;
 }
 
 export function formatPromptTime(timestamp?: number): string | null {
@@ -46,7 +48,29 @@ export function formatPromptTime(timestamp?: number): string | null {
   }
 }
 
-export const UserMessage = memo(({ message, onImageClick, promptNumber, onElementChange }: UserMessageProps) => {
+function splitBlocks(message: Message) {
+  const inline: RichContentBlock[] = [];
+  const trailing: RichContentBlock[] = [];
+  if (message.blocks) {
+    message.blocks.forEach(b => {
+      if (b.type === 'file' || (b.type === 'image' && (b as ImageBlock).isInline === false)) {
+        trailing.push(b);
+      } else {
+        inline.push(b);
+      }
+    });
+  }
+  return { inline, trailing };
+}
+
+// Text in render order, which the chat search covers.
+export function userMessageTexts(message: Message): string[] {
+  const { inline } = splitBlocks(message);
+  if (inline.length === 0) return [message.content];
+  return inline.filter((block): block is TextBlock => block.type === 'text').map((block) => block.text);
+}
+
+export const UserMessage = memo(({ message, onImageClick, promptNumber, onElementChange, forceExpanded = false }: UserMessageProps) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLargeContent, setIsLargeContent] = useState(false);
   const [contentHeight, setContentHeight] = useState<number | undefined>(undefined);
@@ -76,6 +100,10 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
   }, [message.content, message.blocks]);
 
   useEffect(() => {
+    if (forceExpanded) setIsExpanded(true);
+  }, [forceExpanded]);
+
+  useEffect(() => {
     if (!copied) return;
     const timer = window.setTimeout(() => setCopied(false), 1400);
     return () => window.clearTimeout(timer);
@@ -89,22 +117,7 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
     }
   };
 
-  const getBlocks = () => {
-    const inline: RichContentBlock[] = [];
-    const trailing: RichContentBlock[] = [];
-    if (message.blocks) {
-      message.blocks.forEach(b => {
-        if (b.type === 'file' || (b.type === 'image' && (b as ImageBlock).isInline === false)) {
-          trailing.push(b);
-        } else {
-          inline.push(b);
-        }
-      });
-    }
-    return { inline, trailing };
-  };
-
-  const { inline, trailing } = getBlocks();
+  const { inline, trailing } = splitBlocks(message);
 
   const handleOpenFile = (path: string, startLine?: number) => {
     openFile(path, startLine ? startLine - 1 : undefined);
@@ -144,12 +157,16 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
                 />
               );
             }
-            return <span className="cursor-text" key={idx}>{block.type === 'text' ? (block as TextBlock).text : ''}</span>;
+            return (
+              <span className="cursor-text" key={idx} data-search-text={block.type === 'text' || undefined}>
+                {block.type === 'text' ? (block as TextBlock).text : ''}
+              </span>
+            );
           })}
         </div>
       );
     }
-    return <div className="whitespace-pre-wrap">{message.content}</div>;
+    return <div className="whitespace-pre-wrap" data-search-text>{message.content}</div>;
   };
 
   const renderTrailingAttachments = () => {
@@ -189,9 +206,9 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
   };
 
   return (
-    <div ref={(element) => onElementChange?.(message.id, element)} className="flex flex-col mb-8">
-      <div className="flex justify-end relative">
-        <div className="user-message-bubble bg-accent rounded-[6px] group max-w-[80%] px-4 pt-3 pb-2 text-foreground"
+    <div ref={(element) => onElementChange?.(message.id, element)} data-message-id={message.id} className="flex flex-col">
+      <div className="group relative ml-auto flex max-w-[80%] flex-col items-end">
+        <div className="user-message-bubble bg-accent rounded-[12px] group max-w-full px-4 pt-3 pb-4 text-foreground"
           style={{backgroundColor: 'var(--user-message-bg)',}}
         >
           <div>
@@ -216,8 +233,8 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
 
             {renderTrailingAttachments()}
 
-            <div className={`mt-2 flex items-center gap-3 ${showCollapseToggle ? 'justify-between' : 'justify-end'}`}>
-              {showCollapseToggle && (
+            {showCollapseToggle && (
+              <div className="mt-2 flex">
                 <button type="button" onClick={toggleExpanded}
                   className="inline-flex items-center gap-1 text-xs text-foreground hover:underline
                     focus-visible:rounded-[4px] focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)] focus-visible:outline-none"
@@ -225,27 +242,31 @@ export const UserMessage = memo(({ message, onImageClick, promptNumber, onElemen
                   {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   <span>{isExpanded ? 'Show less' : 'Show more'}</span>
                 </button>
-              )}
-
-              <div className="flex items-center gap-1.5 text-xs text-foreground opacity-80">
-                {promptNumber !== undefined && <span>{`#${promptNumber}`}</span>}
-                {promptNumber !== undefined && formattedTime && <span aria-hidden="true">•</span>}
-                {formattedTime && <span>{formattedTime}</span>}
-                {(promptNumber !== undefined || formattedTime) && <span aria-hidden="true">•</span>}
-                <Tooltip variant="minimal" content={copied ? 'Copied' : 'Copy prompt'}>
-                  <button
-                    type="button" onClick={handleCopy}
-                    aria-label={copied ? 'Prompt copied' : 'Copy prompt'}
-                    className="inline-flex items-center rounded-[4px] hover:text-foreground focus:outline-none
-                      focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)]
-                      focus-visible:outline-offset-2 relative top-px"
-                  >
-                    {copied ? <Check size={12} /> : <Copy size={12} />}
-                  </button>
-                </Tooltip>
               </div>
-            </div>
+            )}
           </div>
+        </div>
+
+        {/* The text is dimmed through its colour, not opacity, so the copy button can brighten to full foreground on hover. */}
+        {/* The App root sets --user-message-details-opacity to 0 when the details are shown only on hover. */}
+        <div className="flex items-center pr-2 pt-2 pb-2.5 gap-2 text-xs
+          text-[color-mix(in_srgb,var(--ide-Label-foreground),transparent_20%)]
+          opacity-[var(--user-message-details-opacity,1)] transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+          {promptNumber !== undefined && <span>{`#${promptNumber}`}</span>}
+          {promptNumber !== undefined && formattedTime && <span aria-hidden="true">•</span>}
+          {formattedTime && <span>{formattedTime}</span>}
+          {(promptNumber !== undefined || formattedTime) && <span aria-hidden="true">•</span>}
+          <Tooltip variant="minimal" content={copied ? 'Copied' : 'Copy prompt'}>
+            <button
+              type="button" onClick={handleCopy}
+              aria-label={copied ? 'Prompt copied' : 'Copy prompt'}
+              className="inline-flex items-center rounded-[4px] hover:text-foreground focus:outline-none
+                focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)]
+                focus-visible:outline-offset-2 relative top-px"
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+            </button>
+          </Tooltip>
         </div>
       </div>
     </div>

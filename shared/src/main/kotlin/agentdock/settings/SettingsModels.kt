@@ -54,6 +54,37 @@ data class AudioTranscriptionSettings(
     val providers: Map<String, AudioTranscriptionProviderSettings> = emptyMap()
 )
 
+object AudioOutputProviders {
+    const val NONE = "none"
+    const val SYSTEM = "system"
+    const val GPT_SPEECH = "gpt-speech"
+    const val GEMINI_SPEECH = "gemini-speech"
+}
+
+@Serializable
+data class AudioOutputProviderSettings(
+    val apiKey: String = "",
+    val voice: String = ""
+)
+
+@Serializable
+data class AudioOutputSettings(
+    val provider: String = AudioOutputProviders.SYSTEM,
+    val providers: Map<String, AudioOutputProviderSettings> = emptyMap()
+)
+
+@Serializable
+data class SpeechRequest(
+    val requestId: String,
+    val chunks: List<String> = emptyList()
+)
+
+@Serializable
+data class SpeechResultPayload(
+    val requestId: String,
+    val error: String? = null
+)
+
 @Serializable
 data class GitCommitGenerationSettings(
     val enabled: Boolean = false,
@@ -63,6 +94,22 @@ data class GitCommitGenerationSettings(
     val instructions: String = ""
 )
 
+/** Ctrl/Cmd shortcuts that override the IDE ones while the plugin has focus; an empty letter leaves the IDE one. */
+@Serializable
+data class ShortcutSettings(
+    val search: String = "F",
+    val newChat: String = "",
+    val closeChat: String = "",
+    val history: String = "H",
+    val manage: String = "",
+    val focusInput: String = "",
+    val cancelPrompt: String = "",
+    /** Ctrl/Cmd+1…9 open the chats in the order they are listed. */
+    val tabNumbers: Boolean = false
+) {
+    val letters: List<String> get() = listOf(search, newChat, closeChat, history, manage, focusInput, cancelPrompt)
+}
+
 @Serializable
 data class GlobalSettings(
     val audioNotificationsEnabled: Boolean = true,
@@ -71,12 +118,20 @@ data class GlobalSettings(
     val userMessageBackgroundStyle: String = "default",
     val userMessageCustomColor: String = "#193d70",
     val audioTranscription: AudioTranscriptionSettings = AudioTranscriptionSettings(),
+    val audioOutput: AudioOutputSettings = AudioOutputSettings(),
     val gitCommitGeneration: GitCommitGenerationSettings = GitCommitGenerationSettings(),
+    val systemInstructionsEnabled: Boolean = false,
     val quotaWidgetEnabled: Boolean = false,
     val openInEditor: Boolean = true,
     val promptNavigationHoverOnly: Boolean = true,
+    val userMessageDetailsHoverOnly: Boolean = false,
     val sidebarEnabled: Boolean = true,
-    val sidebarPosition: String = "left"
+    val sidebarPosition: String = "left",
+    /** The history groups are listed under "Chat History" in the section popup. */
+    val historyGroupsExpanded: Boolean = false,
+    /** Switching the mode restores the model last used in it, and switching the model restores its last effort. */
+    val rememberModelAndEffort: Boolean = false,
+    val shortcuts: ShortcutSettings = ShortcutSettings()
 )
 
 @Serializable

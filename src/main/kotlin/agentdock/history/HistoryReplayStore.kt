@@ -19,6 +19,52 @@ internal object HistoryReplayStore {
     fun writeConversationData(projectPath: String, conversationId: String, data: ConversationReplayData) {
         val file = HistoryStorage.conversationDataFile(projectPath, conversationId)
         file.atomicWriteText(HistoryStorage.json.encodeToString(data))
+        // Otherwise the search rebuilds it, as it is older than the data.
+        runCatching { writeSearchText(HistoryStorage.conversationSearchTextFile(projectPath, conversationId), data) }
+    }
+
+    /**
+     * The first of each conversation's messages where a word starts with the query, as a snippet keyed by the
+     * conversation id. Rebuilds missing or outdated search text from the conversation data.
+     */
+    fun searchConversations(projectPath: String, conversationIds: List<String>, query: String): Map<String, String> {
+        val pattern = Regex("(?<![\\p{L}\\p{N}])${Regex.escape(query)}", RegexOption.IGNORE_CASE)
+        return conversationIds.mapNotNull { conversationId ->
+            runCatching {
+                val searchFile = HistoryStorage.conversationSearchTextFile(projectPath, conversationId)
+                val dataFile = HistoryStorage.conversationDataFile(projectPath, conversationId)
+                val dataModified = dataFile.lastModified()
+                if (searchFile.lastModified() < dataModified) {
+                    writeSearchText(searchFile, readConversationData(dataFile) ?: return@runCatching null)
+                    // Data written meanwhile stays newer, so the next search rebuilds again.
+                    searchFile.setLastModified(dataModified)
+                }
+                searchFile.useLines { lines ->
+                    lines.firstNotNullOfOrNull { line -> pattern.find(line)?.let { snippet(line, it.range.first) } }
+                }?.let { conversationId to it }
+            }.getOrNull()
+        }.toMap()
+    }
+
+    private fun writeSearchText(file: File, data: ConversationReplayData) {
+        val messages = data.sessions.flatMap { session ->
+            session.prompts.flatMap { prompt -> prompt.blocks + prompt.events }
+        }.mapNotNull { block ->
+            if ((block["type"] as? JsonPrimitive)?.content != "text") return@mapNotNull null
+            (block["text"] as? JsonPrimitive)?.content?.replace(whitespace, " ")?.trim()?.ifEmpty { null }
+        }
+        file.atomicWriteText(messages.joinToString("\n"))
+    }
+
+    private val whitespace = Regex("\\s+")
+
+    /** Up to 200 characters of the line, starting a little before the match. */
+    private fun snippet(line: String, matchStart: Int): String {
+        var start = (matchStart - 40).coerceAtLeast(0)
+        var end = (start + 200).coerceAtMost(line.length)
+        if (start > 0 && line[start].isLowSurrogate()) start++
+        if (end < line.length && line[end - 1].isHighSurrogate()) end--
+        return (if (start > 0) "…" else "") + line.substring(start, end) + (if (end < line.length) "…" else "")
     }
 
     fun copyPromptPrefix(data: ConversationReplayData, promptCount: Int): ConversationReplayData {
@@ -90,6 +136,7 @@ internal object HistoryReplayStore {
     }
 
     fun deleteConversationReplay(projectPath: String, conversationId: String): Boolean {
+        deleteHistoryFileIfExists(HistoryStorage.conversationSearchTextFile(projectPath, conversationId))
         return deleteHistoryFileIfExists(HistoryStorage.conversationDataFile(projectPath, conversationId))
     }
 
@@ -124,7 +171,7 @@ internal object HistoryReplayStore {
         }
 
         writeConversationData(projectPath, cleanTargetConversationId, ConversationReplayData(sessions = mergedSessions))
-        deleteHistoryFileIfExists(sourceFile)
+        deleteConversationReplay(projectPath, cleanSourceConversationId)
     }
 
     private fun normalizeReplayPrompt(prompt: ConversationPromptReplayEntry): ConversationPromptReplayEntry {

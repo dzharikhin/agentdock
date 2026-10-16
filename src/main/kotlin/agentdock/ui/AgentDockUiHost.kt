@@ -23,6 +23,9 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.openapi.wm.ex.ToolWindowManagerListener
+import com.intellij.ui.BadgeIconSupplier
+import com.intellij.ui.IconManager
+import com.intellij.ui.JBColor
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.jcef.JBCefApp
 import com.intellij.ui.jcef.JBCefBrowser
@@ -35,8 +38,11 @@ import java.awt.AWTEvent
 import java.awt.BorderLayout
 import java.awt.FlowLayout
 import java.awt.KeyboardFocusManager
+import java.awt.event.ComponentAdapter
+import java.awt.event.ComponentEvent
 import java.awt.event.KeyEvent
 import java.awt.dnd.DropTarget
+import javax.swing.Icon
 import javax.swing.JComponent
 import javax.swing.JLabel
 import javax.swing.JPanel
@@ -67,6 +73,12 @@ class AgentDockUiHost(
     private val editorSurfaces = LinkedHashSet<JPanel>()
 
     private var toolWindow: ToolWindow? = null
+    private val badgeIcons = BadgeIconSupplier(AgentDockFileType.getIcon())
+    private val processingIcon = IconManager.getInstance().withIconBadge(badgeIcons.originalIcon, JBColor.GRAY)
+    /** The plugin icon with the open chats' dot, or `null`; the editor tab may read it off the EDT. */
+    @Volatile
+    var attentionIcon: Icon? = null
+        private set
     private var browserStarted = false
     private var browser: JBCefBrowser? = null
     private var bridge: FrontendBridge? = null
@@ -91,7 +103,6 @@ class AgentDockUiHost(
     }
 
     init {
-        homePanel.add(loadingPanel, BorderLayout.CENTER)
         FrontendSettings.addListener(settingsListener)
         // The settings may have arrived before this service was created.
         if (FrontendSettings.received) settingsListener(FrontendSettings.current, FrontendSettings.current)
@@ -116,7 +127,8 @@ class AgentDockUiHost(
         this.toolWindow = toolWindow
         val content = ContentFactory.getInstance().createContent(homePanel, "", false)
         toolWindow.contentManager.addContent(content)
-        startBrowser()
+        // The tool window stays empty until the saved settings say the UI belongs there.
+        if (openInEditor == false) startBrowser()
     }
 
     fun show(afterShow: (() -> Unit)? = null) {
@@ -126,7 +138,7 @@ class AgentDockUiHost(
                 afterShow?.invoke()
                 return
             }
-        if (openInEditor == true && toolWindow != null) {
+        if (openInEditor == true) {
             redirectToEditor(window, afterShow)
             return
         }
@@ -164,6 +176,25 @@ class AgentDockUiHost(
         }
     }
 
+    /**
+     * Mirrors the open chats' dot on the tool window button and the editor tab: `warning` while one waits for a
+     * permission, `processing` while one is replying, `unread` while one has an unread reply, anything else clears it.
+     */
+    fun setAttention(level: String) {
+        val icon = when (level) {
+            "warning" -> badgeIcons.warningIcon
+            "processing" -> processingIcon
+            "unread" -> badgeIcons.infoIcon
+            else -> null
+        }
+        if (icon === attentionIcon) return
+        attentionIcon = icon
+        // [toolWindow] is bound only once the tool window has been shown, which a UI restored in an editor tab skips.
+        (toolWindow ?: ToolWindowManager.getInstance(project).getToolWindow(TOOL_WINDOW_ID))
+            ?.setIcon(icon ?: badgeIcons.originalIcon)
+        FileEditorManager.getInstance(project).updateFilePresentation(virtualFile)
+    }
+
     fun preferredFocusComponent(): JComponent = browser?.component ?: liveContent ?: homePanel
 
     private fun applyOpenInEditor(enabled: Boolean) {
@@ -173,9 +204,12 @@ class AgentDockUiHost(
         // Moves only a UI that is showing in the other place; one restored in the right place stays put.
         if (enabled) {
             if (window.isVisible) redirectToEditor(window)
-        } else if (isEditorTabOpen()) {
-            closeEditorTab()
-            window.activate(null, true)
+        } else {
+            startBrowser()
+            if (isEditorTabOpen()) {
+                closeEditorTab()
+                window.activate(null, true)
+            }
         }
     }
 
@@ -219,6 +253,7 @@ class AgentDockUiHost(
     private fun startBrowser() {
         if (browserStarted) return
         browserStarted = true
+        moveContentTo(currentSurface())
         ApplicationManager.getApplication().executeOnPooledThread {
             var startupError: Exception? = null
             val supported = try {
@@ -277,15 +312,15 @@ class AgentDockUiHost(
 
             Disposer.register(this, browser)
             Disposer.register(this, bridge)
-            installBrowserChrome(browser, bridge)
             showStatus(browser.component)
+            installBrowserChrome(browser, bridge)
         } catch (e: Exception) {
             showStatus(JLabel("Error initializing browser: ${e.message}"))
         }
     }
 
     private fun installBrowserChrome(browser: JBCefBrowser, bridge: FrontendBridge) {
-        loadContent(browser)
+        loadWhenSized(browser)
 
         val connection = ApplicationManager.getApplication().messageBus.connect(browser)
         connection.subscribe(LafManagerListener.TOPIC, LafManagerListener {
@@ -293,6 +328,19 @@ class AgentDockUiHost(
             bridge.eval("if(window.__onThemeChanged) window.__onThemeChanged();")
             val theme = (if (IdeTheme.isDarkTheme()) "dark" else "light").jsStringLiteral()
             bridge.eval("window.__agentDockInvoke && window.__agentDockInvoke('themeChanged', $theme);")
+        })
+    }
+
+    /** Loads the page only once the browser has its size in its surface, so the UI never starts at a size it does not have. */
+    private fun loadWhenSized(browser: JBCefBrowser) {
+        val component = browser.component
+        if (component.width > 0) return loadContent(browser)
+        component.addComponentListener(object : ComponentAdapter() {
+            override fun componentResized(e: ComponentEvent) {
+                if (component.width == 0) return
+                component.removeComponentListener(this)
+                loadContent(browser)
+            }
         })
     }
 
@@ -330,8 +378,6 @@ class AgentDockUiHost(
                     return false
                 }
 
-                if (e.keyCode == KeyEvent.VK_WINDOWS) return true
-
                 if (e.isControlDown && !e.isAltDown && !e.isMetaDown && e.isZoomShortcut()) {
                     if (e.id == KeyEvent.KEY_PRESSED) {
                         applyZoomShortcut(e.keyCode)
@@ -368,6 +414,7 @@ private fun KeyEvent.shouldGoDirectlyToJcef(): Boolean {
         return false
     }
     if (isAltGraphDown) return keyChar != KeyEvent.CHAR_UNDEFINED
+    if (isPluginShortcut()) return true
     if (isAltDown || isMetaDown) return false
     if (isControlDown) return isTextControlShortcut()
 
@@ -421,6 +468,20 @@ private fun KeyEvent.isTextControlShortcut(): Boolean {
         KeyEvent.VK_RIGHT,
         KeyEvent.VK_HOME,
         KeyEvent.VK_END -> true
+        else -> false
+    }
+}
+
+// Ctrl/Cmd plus a letter set in the shortcut settings, or a digit when those are on; F3 and Shift+F3 move between
+// the chat search matches.
+private fun KeyEvent.isPluginShortcut(): Boolean {
+    if (isAltDown) return false
+    if (keyCode == KeyEvent.VK_F3) return !isControlDown && !isMetaDown
+    if (isShiftDown || isControlDown == isMetaDown) return false
+    val shortcuts = FrontendSettings.current.shortcuts
+    return when (keyCode) {
+        in KeyEvent.VK_A..KeyEvent.VK_Z -> keyCode.toChar().toString() in shortcuts.letters
+        in KeyEvent.VK_1..KeyEvent.VK_9 -> shortcuts.tabNumbers
         else -> false
     }
 }

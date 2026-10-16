@@ -84,21 +84,23 @@ export default {
       fontFamily: {
         mono: ['var(--ide-code-font-family)', 'monospace'],
       },
+      // Deeper than Tailwind's default .5, so the grey activity dots visibly pulse.
+      keyframes: {
+        pulse: { '50%': { opacity: '.2' } },
+      },
     },
   },
   plugins: [
     function({ addUtilities, addVariant }) {
       addVariant('chat-max-400', '@container chat-input (max-width: 400px)');
       addVariant('chat-max-600', '@container chat-input (max-width: 600px)');
-      // A section popup content too narrow for the buttons beside the text, and then for the agent icons.
+      // A section popup content too narrow for the buttons beside the text.
       addVariant('section-medium', '@container section (max-width: 450px)');
-      addVariant('section-narrow', '@container section (max-width: 300px)');
       addVariant('app-wide', '#app-content[data-wide] &');
       // A row is revealed while hovered, while it holds focus, and while one of its popup menus is open.
       const revealed = [':hover', ':focus-within', ':has([aria-haspopup][aria-expanded=true])'];
       addVariant('reveal', revealed.map((state) => `&${state}`));
       addVariant('group-reveal', revealed.map((state) => `.group${state} &`));
-      // Tint over the element's own background, leaving its content untouched: lighter in dark themes, darker in light.
       const tint = (percent) => ({
         'background-image': `linear-gradient(color-mix(in srgb, var(--ide-Label-foreground) ${percent}, transparent) 0 0)`,
       });

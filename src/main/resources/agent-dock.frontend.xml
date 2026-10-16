@@ -10,6 +10,7 @@
         <toolWindow id="Agent Dock" icon="/icons/agent_dock_toolwindow.svg" anchor="right"
                     factoryClass="agentdock.AgentDockToolWindowFactory"/>
         <fileEditorProvider id="agent-dock-ui" implementation="agentdock.ui.AgentDockFileEditorProvider"/>
+        <fileIconProvider implementation="agentdock.ui.AgentDockFileIconProvider"/>
         <statusBarWidgetFactory id="AgentDockQuotaWidget" implementation="agentdock.ui.AgentDockQuotaWidgetFactory"/>
     </extensions>
 

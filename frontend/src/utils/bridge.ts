@@ -4,6 +4,7 @@ import {
   AudioTranscriptionResultPayload,
   BridgeOperationResultPayload,
   ChatAttachment,
+  ConfigLinks,
   ContinueConversationPayload,
   ConversationTranscriptSavedPayload,
   FileChangeOperation,
@@ -36,6 +37,7 @@ import {
   GlobalSettingsEvent,
   HistoryDeleteResultEvent,
   HistoryListEvent,
+  HistorySearchResultEvent,
   McpServersEvent,
   McpStatusEvent,
   CustomAcpConfigsEvent,
@@ -45,6 +47,7 @@ import {
   PromptLibraryEvent,
   SessionIdEvent,
   SessionConfigOptionsEvent,
+  SpeechResultEvent,
   StatusEvent,
   SystemInstructionsEvent,
   ToolCallBridgeEvent,
@@ -260,6 +263,10 @@ export const ACPBridge = {
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.HISTORY_DELETE_RESULT, { detail: { result } }));
     };
 
+    window.__onHistorySearchResult = (result) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.HISTORY_SEARCH_RESULT, { detail: { result } }));
+    };
+
     window.__onUndoResult = (chatId, result) => {
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.UNDO_RESULT, { detail: { chatId, result } }));
     };
@@ -318,6 +325,10 @@ export const ACPBridge = {
 
     window.__onAudioRecordingState = (payload) => {
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.AUDIO_RECORDING_STATE, { detail: { payload } }));
+    };
+
+    window.__onSpeechResult = (payload) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.SPEECH_RESULT, { detail: { payload } }));
     };
 
     window.__onGlobalSettings = (payload) => {
@@ -382,8 +393,8 @@ export const ACPBridge = {
     window.__requestAdapters?.(adapterIdToRefresh);
   },
 
-  rememberAgentConfigOption: (adapterId: string, configId: string, value: string) => {
-    window.__rememberAgentConfigOption?.(adapterId, configId, value);
+  rememberAgentConfigOptions: (adapterId: string, configValues: Record<string, string>, links?: ConfigLinks) => {
+    window.__rememberAgentConfigOptions?.(adapterId, configValues, links);
   },
 
   startAgent: (conversationId: string, adapterId?: string, configValues?: Record<string, string>) => {
@@ -472,14 +483,27 @@ export const ACPBridge = {
     window.__deleteHistoryConversations?.({ projectPath, conversationIds });
   },
 
-  /** Sets the user's title and/or the pinned flag of a conversation in the history index. */
-  updateHistoryConversation: (
+  /** Sets the user's title, the pinned flag and/or the group (empty: ungrouped) of conversations in the history index. */
+  updateHistoryConversations: (
     projectPath: string,
-    conversationId: string,
-    changes: { newTitle?: string; pinned?: boolean }
+    conversationIds: string[],
+    changes: { newTitle?: string; pinned?: boolean; archived?: boolean; group?: string }
   ) => {
-    window.__updateHistoryConversation?.({ projectPath, conversationId, ...changes });
+    window.__updateHistoryConversations?.({ projectPath, conversationIds, ...changes });
   },
+
+  /** Moves the group's conversations to `newGroup`; an empty one ungroups them. */
+  renameHistoryGroup: (projectPath: string, group: string, newGroup: string) => {
+    window.__renameHistoryGroup?.({ projectPath, group, newGroup });
+  },
+
+  /** Answered by `onHistorySearchResult` with the conversations having a word that starts with the query. */
+  searchHistoryConversations: (projectPath: string, conversationIds: string[], query: string) => {
+    window.__searchHistoryConversations?.({ projectPath, conversationIds, query });
+  },
+
+  onHistorySearchResult: (callback: (e: CustomEvent<HistorySearchResultEvent>) => void) =>
+    onBridgeEvent(EVENT_NAMES.HISTORY_SEARCH_RESULT, callback),
 
   updateSessionMetadata: (payload: SessionMetadataUpdatePayload) => {
     window.__updateSessionMetadata?.(payload);
@@ -769,6 +793,16 @@ export const ACPBridge = {
   },
 
   onAudioRecordingState: (callback: (e: CustomEvent<AudioRecordingStateEvent>) => void) => onBridgeEvent(EVENT_NAMES.AUDIO_RECORDING_STATE, callback),
+
+  startSpeech: (requestId: string, chunks: string[]) => {
+    window.__startSpeech?.(JSON.stringify({ requestId, chunks }));
+  },
+
+  stopSpeech: (requestId: string) => {
+    window.__stopSpeech?.(requestId);
+  },
+
+  onSpeechResult: (callback: (e: CustomEvent<SpeechResultEvent>) => void) => onBridgeEvent(EVENT_NAMES.SPEECH_RESULT, callback),
 
   loadGlobalSettings: () => {
     window.__loadGlobalSettings?.();

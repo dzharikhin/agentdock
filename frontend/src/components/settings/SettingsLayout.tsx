@@ -2,21 +2,12 @@ import { ReactNode } from 'react';
 import { Checkbox } from '../ui/Checkbox';
 
 interface SettingsSectionProps {
-  title: string;
   children: ReactNode;
   compact?: boolean;
 }
 
-export function SettingsSection({ title, children, compact = false }: SettingsSectionProps) {
-  return (
-    <section>
-      <div className='mb-3 flex items-center gap-2'>
-        <span className='shrink-0 text-ide-regular text-foreground'>{title}</span>
-        <span className='h-px flex-1 bg-border' />
-      </div>
-      <div className={`flex flex-col ${compact ? 'gap-3' : 'gap-4'} pl-4`}>{children}</div>
-    </section>
-  );
+export function SettingsSection({ children, compact = false }: SettingsSectionProps) {
+  return <section className={`flex flex-col ${compact ? 'gap-3' : 'gap-4'}`}>{children}</section>;
 }
 
 const descriptionClass = 'text-ide-small text-foreground-secondary';

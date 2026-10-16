@@ -13,6 +13,8 @@ interface TooltipProps {
   onShow?: () => void;
 }
 
+let hideActiveTooltip: (() => void) | undefined;
+
 function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
 }
@@ -60,7 +62,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
     setOffset(0);
     updatePosition();
     timerRef.current = setTimeout(() => {
-      if (!triggerRef.current?.matches(':hover') || !document.hasFocus()) return;
+      if (!triggerRef.current?.matches(':hover')) return;
       onShow?.();
       setVisible(true);
     }, delay);
@@ -91,6 +93,8 @@ export const Tooltip: React.FC<TooltipProps> = ({
 
   useEffect(() => {
     if (!visible) return;
+    hideActiveTooltip?.();
+    hideActiveTooltip = handleMouseLeave;
     const handlePointerMove = (event: PointerEvent) => {
       if (!triggerRef.current?.contains(event.target as Node | null)) handleMouseLeave();
     };
@@ -98,6 +102,7 @@ export const Tooltip: React.FC<TooltipProps> = ({
     window.addEventListener('scroll', handleMouseLeave, true);
     window.addEventListener('blur', handleMouseLeave);
     return () => {
+      if (hideActiveTooltip === handleMouseLeave) hideActiveTooltip = undefined;
       window.removeEventListener('pointermove', handlePointerMove, true);
       window.removeEventListener('scroll', handleMouseLeave, true);
       window.removeEventListener('blur', handleMouseLeave);

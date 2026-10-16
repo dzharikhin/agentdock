@@ -12,7 +12,7 @@ interface Props {
 export const ContentBlockRenderer: React.FC<Props> = ({ block, onImageClick }) => {
   switch (block.type) {
     case 'text':
-      return <MarkdownMessage content={block.text} enableCodeCopy />;
+      return <MarkdownMessage content={block.text} enableCodeCopy searchable />;
     case 'tool_call':
       return <SubAgentBlock block={block} />;
     case 'plan':

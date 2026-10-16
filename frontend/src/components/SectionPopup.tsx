@@ -1,4 +1,4 @@
-import { useEffect, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Tooltip } from './chat/shared/Tooltip';
 import { ModalContainerContext } from './ConfirmationModal';
@@ -6,6 +6,7 @@ import { iconButtonClassName } from './LayoutControls';
 import type { SectionType } from '../types/chat';
 import type { NavigationAction } from './tabbar/NavigationActions';
 import { rowButtonClassName, sidebarRowClassName } from './tabbar/rows';
+import { HistoryGroupNav, type HistoryGroupNavProps } from './history/HistoryGroupNav';
 
 interface SectionPopupProps {
   /** Listed in a sidebar that switches between them. */
@@ -13,6 +14,10 @@ interface SectionPopupProps {
   activeSection: SectionType | null;
   /** The sidebar shows only icons, named in tooltips, and the title bar names the open section. */
   compact: boolean;
+  /** No tab bar above the content, so the top gap is the same as the bottom one. */
+  sidebarLayout: boolean;
+  /** Lists the history groups under "Chat History" once there is one, unless `compact`. */
+  historyGroupNav: HistoryGroupNavProps;
   onClose: () => void;
   children: ReactNode;
 }
@@ -44,16 +49,26 @@ const clampOffset = (dialog: HTMLElement | null, { x, y }: Offset): Offset => {
  * outside it closes it and still acts there, except on `[data-section-opener]` controls, which switch the section
  * instead; Esc inside it closes it too. Row menus portaled out of it count as inside. It stays mounted while closed so cached sections keep their state.
  */
-export function SectionPopup({ sections, activeSection, compact, onClose, children }: SectionPopupProps) {
+export function SectionPopup({ sections, activeSection, compact, sidebarLayout, historyGroupNav, onClose, children }: SectionPopupProps) {
   const [dialog, setDialog] = useState<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState<Offset>({ x: 0, y: 0 });
   const open = activeSection !== null;
   const action = sections.find((section) => section.type === activeSection);
   const label = action?.label;
 
+  // Once the section has rendered, so the arrow keys scroll it, unless it has focused one of its controls.
+  const focusSection = () => requestAnimationFrame(() => {
+    const content = contentRef.current;
+    if (!content || content.contains(document.activeElement)) return;
+    const scroller = Array.from(content.querySelectorAll<HTMLElement>('[data-section-scroll]'))
+      .find((element) => element.offsetParent !== null);
+    (scroller ?? dialog)?.focus({ preventScroll: true });
+  });
+
   useEffect(() => {
     if (!open) return;
-    dialog?.focus();
+    if (!dialog?.contains(document.activeElement)) focusSection();
     // Capture phase, so presses whose handlers stop propagation count too.
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target as Element;
@@ -84,7 +99,8 @@ export function SectionPopup({ sections, activeSection, compact, onClose, childr
   return (
     <div
       className={`pointer-events-none absolute inset-0 z-50 flex items-start justify-center px-4
-        pt-[clamp(1.5rem,10vh,4rem)] pb-[clamp(1.5rem,10vh,2rem)] ${open ? 'visible' : 'invisible'}`}
+        ${sidebarLayout ? 'pt-[clamp(1.5rem,10vh,2rem)]' : 'pt-[clamp(1.5rem,10vh,4rem)]'} pb-[clamp(1.5rem,10vh,2rem)]
+        ${open ? 'visible' : 'invisible'}`}
     >
       <div
         ref={setDialog}
@@ -102,7 +118,8 @@ export function SectionPopup({ sections, activeSection, compact, onClose, childr
       >
         <nav
           aria-label="Sections"
-          className="flex w-max shrink-0 flex-col overflow-y-auto border-r border-border px-2 pb-2 text-ide-small"
+          data-section-nav
+          className="flex w-max max-w-[240px] shrink-0 flex-col overflow-y-auto border-r border-border px-2 pb-2 text-ide-small"
         >
           {/* Drags like the title bar. */}
           <div className="h-[44px] shrink-0 select-none" onPointerDown={startDrag} />
@@ -111,7 +128,10 @@ export function SectionPopup({ sections, activeSection, compact, onClose, childr
             const button = (
               <button
                 type="button"
-                onClick={section.onClick}
+                onClick={() => {
+                  section.onClick();
+                  focusSection();
+                }}
                 className={`${rowButtonClassName} ${compact ? 'justify-center' : 'pr-4'}`}
                 aria-label={compact ? section.label : undefined}
                 aria-current={active ? 'page' : undefined}
@@ -121,13 +141,24 @@ export function SectionPopup({ sections, activeSection, compact, onClose, childr
               </button>
             );
             return (
-              <div key={section.type} className={`${sidebarRowClassName(active)} mb-0.5 h-8 ${compact ? 'w-8' : ''}`}>
-                {compact ? (
-                  <Tooltip variant="minimal" placement="right" content={section.label} className="flex flex-1">
-                    {button}
-                  </Tooltip>
-                ) : button}
-              </div>
+              <Fragment key={section.type}>
+                {/* The history is a different kind of section than the ones above it. */}
+                {section.type === 'history' ? <div className="mb-1.5 mt-1 h-px shrink-0 bg-border" /> : null}
+                {section.type === 'history' && !compact && historyGroupNav.groups.length > 0 ? (
+                  <HistoryGroupNav section={section} active={active} {...historyGroupNav} onSelect={(group) => {
+                    historyGroupNav.onSelect(group);
+                    focusSection();
+                  }} />
+                ) : (
+                  <div className={`${sidebarRowClassName(active)} mb-0.5 h-8 ${compact ? 'w-8' : ''}`}>
+                    {compact ? (
+                      <Tooltip variant="minimal" placement="right" content={section.label} className="flex flex-1">
+                        {button}
+                      </Tooltip>
+                    ) : button}
+                  </div>
+                )}
+              </Fragment>
             );
           })}
         </nav>
@@ -147,7 +178,7 @@ export function SectionPopup({ sections, activeSection, compact, onClose, childr
               </button>
             </Tooltip>
           </div>
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col [container-type:inline-size] [container-name:section]">
+          <div ref={contentRef} className="flex min-h-0 min-w-0 flex-1 flex-col [container-type:inline-size] [container-name:section]">
             {children}
           </div>
         </div>

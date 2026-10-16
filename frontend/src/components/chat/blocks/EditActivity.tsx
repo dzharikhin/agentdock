@@ -174,11 +174,7 @@ export const EditActivity: React.FC<Props> = ({ entry, isActivePrompt }) => {
   }, [entry.content, entry.title, entry.locations]);
   const { additions, deletions } = useMemo(() => countEditChanges(entry), [entry.content]);
 
-  const fileName = useMemo(() => {
-    if (!diffData?.filePath) return 'File Edit';
-    const parts = diffData.filePath.split(/[\\/]/);
-    return parts[parts.length - 1];
-  }, [diffData?.filePath]);
+  const fileName = (entry.locations?.[0]?.path || diffData?.filePath)?.split(/[\\/]/).pop();
   const showInline = !diffData?.tooLarge;
 
   const handleOpenFile = () => {
@@ -200,7 +196,9 @@ export const EditActivity: React.FC<Props> = ({ entry, isActivePrompt }) => {
 
   return (
     <ExpandableActivity icon={<Pencil size={13} className="flex-shrink-0" />} status={entry.status} isActivePrompt={isActivePrompt}
-      label={<>Edited <InlineButton onClick={handleOpenFile} className="hover:underline">{fileName}</InlineButton></>}
+      label={fileName
+        ? <>Edited <InlineButton onClick={handleOpenFile} className="hover:underline">{fileName}</InlineButton></>
+        : isFinished ? 'Edited file' : 'Editing file...'}
       trailing={<>
         <LineChanges additions={additions} deletions={deletions} className="ml-0.5" />
         {diffData && isFinished && (

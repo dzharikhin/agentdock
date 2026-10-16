@@ -21,7 +21,9 @@ data class SessionMeta(
     val updatedAt: Long = Instant.now().toEpochMilli(),
     val deletable: Boolean = true,
     val allAdapterNames: List<String> = emptyList(),
-    val pinned: Boolean = false
+    val pinned: Boolean = false,
+    val archived: Boolean = false,
+    val group: String? = null
 )
 
 data class SessionChangesData(
@@ -115,6 +117,9 @@ internal data class HistoryConversationIndexEntry(
     val title: String = "",
     val titleUserSet: Boolean = false,
     val pinned: Boolean = false,
+    val archived: Boolean = false,
+    /** The user's group of the conversation; `null` while ungrouped. */
+    val group: String? = null,
     val promptCount: Int? = null,
     val transcriptPath: String? = null,
     val usedAdapterNames: List<String> = emptyList(),

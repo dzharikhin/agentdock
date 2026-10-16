@@ -122,9 +122,13 @@ object IdeTheme {
         val blueHighlightUserMessageBackground =
             if (isDark) Color(0x19, 0x3d, 0x70) else Color(0xe0, 0xf0, 0xff)
         val blueUserMessageBackground = if (isDark) Color(0x25, 0x32, 0x4d) else Color(225, 235, 253, 220)
-        val defaultUserMessageBackground = if (isDark) Color(100, 100, 100, 65) else Color(100, 100, 100, 30)
 
         sb.append("  --ide-background-secondary: ${toCssColor(secondaryBackground)};\n")
+        // The chat background with its hue and saturation kept, lighter in dark themes and darker in light. Brightness is
+        // shifted, not scaled, so pure black and white change too.
+        val chatBackgroundHsb = Color.RGBtoHSB(baseBackground.red, baseBackground.green, baseBackground.blue, null)
+        val defaultUserMessageBackground = Color(Color.HSBtoRGB(chatBackgroundHsb[0], chatBackgroundHsb[1],
+            (chatBackgroundHsb[2] + if (isDark) 0.06f else -0.06f).coerceIn(0f, 1f)))
         sb.append("  --ide-user-message-default-bg: ${toCssColor(defaultUserMessageBackground)};\n")
         sb.append("  --ide-user-message-blue-highlight-bg: ${toCssColor(blueHighlightUserMessageBackground)};\n")
         sb.append("  --ide-user-message-blue-bg: ${toCssColor(blueUserMessageBackground)};\n")

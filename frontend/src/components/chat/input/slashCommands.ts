@@ -25,14 +25,17 @@ export function buildAgentSlashItems(commands: AvailableCommand[]): SlashCommand
 export function buildPromptLibrarySlashItems(prompts: PromptLibraryItem[]): SlashCommandItem[] {
   return prompts
     .filter((prompt) => prompt.name.trim() && (prompt.prompt.trim() || prompt.attachments?.length))
-    .map((prompt) => ({
-      id: prompt.id,
-      name: prompt.name.trim(),
-      description: prompt.prompt.trim().replace(/\[image-[a-z0-9-]+]/g, '[image]').replace(/\[code-ref-[a-z0-9-]+]/g, '[file]') || prompt.attachments?.[0]?.name || '',
-      insertText: prompt.prompt,
-      displayPrefix: '',
-      attachments: prompt.attachments ?? [],
-    }));
+    .map((prompt) => {
+      const name = prompt.name.trim();
+      return {
+        id: prompt.id,
+        name: name.replace(/^\/+/, ''),
+        description: prompt.prompt.trim().replace(/\[image-[a-z0-9-]+]/g, '[image]').replace(/\[code-ref-[a-z0-9-]+]/g, '[file]') || prompt.attachments?.[0]?.name || '',
+        insertText: prompt.prompt,
+        displayPrefix: name.startsWith('/') ? '/' : '',
+        attachments: prompt.attachments ?? [],
+      };
+    });
 }
 
 export interface SlashMenuLayout {

@@ -95,6 +95,8 @@ internal object HistoryConversationIndexService {
             },
             titleUserSet = mergedConversation?.titleUserSet ?: false,
             pinned = mergedConversation?.pinned ?: false,
+            archived = mergedConversation?.archived ?: false,
+            group = mergedConversation?.group,
             promptCount = promptCountForConversation(
                 projectPath = cleanProjectPath,
                 conversationId = cleanConversationId,
@@ -243,27 +245,39 @@ internal object HistoryConversationIndexService {
         return true
     }
 
-    /** Renames the conversation (a user-set title) and/or pins or unpins it; `null` leaves that property unchanged. */
+    /**
+     * Renames the conversations (a user-set title), pins or unpins them, archives or unarchives them and/or moves them
+     * to a group, a blank one leaving them ungrouped; `null` leaves that property unchanged.
+     */
     @Synchronized
-    fun updateConversation(projectPath: String?, conversationId: String, newTitle: String?, pinned: Boolean?): Boolean {
+    fun updateConversations(
+        projectPath: String?,
+        conversationIds: List<String>,
+        newTitle: String?,
+        pinned: Boolean?,
+        archived: Boolean?,
+        group: String?
+    ): Boolean {
         val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
-        val cleanConversationId = runCatching {
-            HistoryStorage.requireSafeConversationId(conversationId)
+        val cleanConversationIds = runCatching {
+            conversationIds.mapTo(hashSetOf(), HistoryStorage::requireSafeConversationId)
         }.getOrElse { return false }
         val normalizedTitle = newTitle?.trim()
-        if (cleanProjectPath.isBlank() || cleanConversationId.isBlank() || normalizedTitle?.isBlank() == true) return false
+        if (cleanProjectPath.isBlank() || cleanConversationIds.isEmpty() || normalizedTitle?.isBlank() == true) return false
 
         val indexFile = HistoryStorage.ensureProjectIndexFile(cleanProjectPath)
         val existing = HistoryStorage.readProjectIndex(indexFile)
         var updated = false
 
         val rewritten = existing.map { conversation ->
-            if (conversation.id == cleanConversationId) {
+            if (conversation.id in cleanConversationIds) {
                 updated = true
                 conversation.copy(
                     title = normalizedTitle ?: conversation.title,
                     titleUserSet = conversation.titleUserSet || normalizedTitle != null,
-                    pinned = pinned ?: conversation.pinned
+                    pinned = pinned ?: conversation.pinned,
+                    archived = archived ?: conversation.archived,
+                    group = if (group == null) conversation.group else group.trim().ifBlank { null }
                 )
             } else {
                 conversation
@@ -274,6 +288,23 @@ internal object HistoryConversationIndexService {
             HistoryStorage.writeProjectIndex(indexFile, rewritten)
         }
         return updated
+    }
+
+    /** Moves the group's conversations to `newGroup`, renaming or merging the group; a blank one ungroups them. */
+    @Synchronized
+    fun renameGroup(projectPath: String?, group: String, newGroup: String): Boolean {
+        val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
+        if (cleanProjectPath.isBlank() || group.isBlank()) return false
+
+        val indexFile = HistoryStorage.ensureProjectIndexFile(cleanProjectPath)
+        val existing = HistoryStorage.readProjectIndex(indexFile)
+        val target = newGroup.trim().ifBlank { null }
+        if (existing.none { it.group == group }) return false
+        HistoryStorage.writeProjectIndex(
+            indexFile,
+            existing.map { conversation -> if (conversation.group == group) conversation.copy(group = target) else conversation }
+        )
+        return true
     }
 
     private fun mergeIndexConversations(
@@ -313,6 +344,8 @@ internal object HistoryConversationIndexService {
             },
             titleUserSet = left.titleUserSet || right.titleUserSet,
             pinned = left.pinned || right.pinned,
+            archived = left.archived || right.archived,
+            group = left.group ?: right.group,
             promptCount = mergePromptCounts(left.promptCount, right.promptCount),
             transcriptPath = when {
                 !left.transcriptPath.isNullOrBlank() -> left.transcriptPath

@@ -115,7 +115,7 @@ export function CustomAcpView() {
       <SectionPage onAdd={() => { setEditingId(null); setForm(emptyForm()); }}>
         {configs.length === 0 ? (
           <SectionEmptyState icon={Bot} title="No custom ACP agents configured">
-            Add a custom ACP configuration to use it as a service provider. Some plugin features may be unavailable if the ACP adapter does not support the corresponding ACP methods.
+            Add an ACP agent configuration to use the agent in chats and manage it under Agents. Some plugin features may be unavailable if the agent does not support the corresponding ACP methods.
           </SectionEmptyState>
         ) : null}
 

@@ -56,6 +56,8 @@ internal data class AdapterPayload(
     val availableReasoningEfforts: List<AdapterReasoningEffortPayload>,
     val configOptions: List<AcpConfigOption>,
     val configOptionsByModel: Map<String, List<AcpConfigOption>> = emptyMap(),
+    val modelByMode: Map<String, String> = emptyMap(),
+    val effortByModel: Map<String, String> = emptyMap(),
     val downloaded: Boolean? = null,
     val downloadedKnown: Boolean = false,
     val downloadPath: String = "",

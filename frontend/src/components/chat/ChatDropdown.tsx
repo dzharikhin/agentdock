@@ -1,6 +1,7 @@
 import { KeyboardEvent, RefObject, useState, useRef, useEffect } from 'react';
 import { DropdownOption } from '../../types/chat';
 import { Tooltip } from './shared/Tooltip';
+import { chosenMenuItemClassName } from '../ui/PopupMenu';
 
 export default function ChatDropdown({
   containerRef,
@@ -292,7 +293,7 @@ export default function ChatDropdown({
         <div ref={popupRef} className={`absolute mb-[4px] z-[100] w-max rounded-md border border-border bg-background-secondary px-1 py-0.5 
           ${direction === 'up' ? 'bottom-full mb-2 left-0' : 'top-full mt-2 left-0'}`}
         >
-          <div className="flex flex-col overflow-y-auto" style={{ maxHeight: dynamicMaxHeight }} onScroll={() => {
+          <div className="group/menu flex flex-col overflow-y-auto" style={{ maxHeight: dynamicMaxHeight }} onScroll={() => {
               if (hoveredOptionId && popupRef.current) {
                 const el = popupRef.current.querySelector(`[data-option-id="${hoveredOptionId}"]`);
                 if (el) {
@@ -353,10 +354,9 @@ export default function ChatDropdown({
                         setHoveredOptionId(null);
                       }}
                       className={`flex items-center w-full my-0.5 pl-2 pr-3 min-h-8 text-left transition-colors 
-                        rounded min-w-[70px] outline-none 
-                        focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)] 
-                        ${option.id === value && !subValue ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent hover:text-accent-foreground'
-                      }`}
+                        rounded min-w-[70px] outline-none hover:bg-accent hover:text-accent-foreground
+                        focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)]
+                        ${option.id === value && !subValue ? chosenMenuItemClassName : 'text-foreground'}`}
                     >
                       {renderIcon(option, "w-4 h-4 mr-2 flex-shrink-0")}
                       {renderOptionText(option)}
@@ -383,7 +383,7 @@ export default function ChatDropdown({
           </div>
 
           {hoveredOption?.subOptions && (
-            <div className={`absolute mb-[4px] left-full z-[101] ml-1 w-max rounded-md border border-border
+            <div className={`group/menu absolute mb-[4px] left-full z-[101] ml-1 w-max rounded-md border border-border
               bg-background-secondary px-1 py-0.5
               chat-max-600:left-0 chat-max-600:ml-0 chat-max-600:mb-0 ${hoveredOption.className ?? ''}`}
               style={{[subMenuPosition.prop]: subMenuPosition.offset, minWidth: subMenuPosition.minWidth, maxWidth: subMenuPosition.maxWidth}}
@@ -402,8 +402,8 @@ export default function ChatDropdown({
                         setOpen(false);
                         setHoveredOptionId(null);
                       }}
-                      className={`flex items-center w-full my-0.5 pl-2 pr-3 min-h-8 text-left transition-colors rounded outline-none focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)] ${
-                        sub.id === (subValues?.[hoveredOption.id] ?? (hoveredOption.id === value ? subValue : undefined)) ? 'bg-accent text-accent-foreground' : 'text-foreground hover:bg-accent hover:text-accent-foreground'
+                      className={`flex items-center w-full my-0.5 pl-2 pr-3 min-h-8 text-left transition-colors rounded outline-none hover:bg-accent hover:text-accent-foreground focus-visible:shadow-[inset_0_0_0_1px_var(--ide-Button-default-focusColor)] ${
+                        sub.id === (subValues?.[hoveredOption.id] ?? (hoveredOption.id === value ? subValue : undefined)) ? chosenMenuItemClassName : 'text-foreground'
                       }`}
                     >
                       {renderIcon(sub, "w-4 h-4 mr-2 flex-shrink-0")}

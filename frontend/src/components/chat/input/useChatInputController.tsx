@@ -10,6 +10,7 @@ import {openFile} from '../../../utils/openFile';
 import {useSlashCommands} from '../../../hooks/useSlashCommands';
 import {applySlashCommandToEditor, buildAgentSlashItems, buildPromptLibrarySlashItems,} from './slashCommands';
 import {useFileMentions} from '../../../hooks/useFileMentions';
+import {isShortcut, useKeyDown} from '../../../hooks/useShortcuts';
 import {ImageNode} from './ImageNode';
 import {CodeReferenceNode} from './CodeReferenceNode';
 import {ChatInputProps} from './chatInputState';
@@ -24,6 +25,7 @@ export function useChatInputController({
   onAttachmentsChange,
   customHeight = 180,
   autoFocus = false,
+  isActive = false,
 }: ChatInputProps) {
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const inputRootRef = useRef<HTMLDivElement>(null);
@@ -113,7 +115,7 @@ export function useChatInputController({
         icon: <Bookmark className="w-4 h-4" />,
         subOptions: promptLibrarySlashItems.map((prompt) => ({
           id: prompt.id,
-          label: prompt.name,
+          label: `${prompt.displayPrefix}${prompt.name}`,
           description: prompt.description,
         })),
       });
@@ -122,17 +124,21 @@ export function useChatInputController({
     return options;
   }, [agentSlashItems, promptLibrarySlashItems]);
 
+  const focusEditor = () => {
+    editorContainerRef.current?.querySelector<HTMLElement>('[contenteditable="true"]')?.focus();
+  };
+
   useEffect(() => {
     if (!autoFocus) return;
-    const focusEditor = () => {
-      const editable = editorContainerRef.current?.querySelector('[contenteditable="true"]') as HTMLElement | null;
-      if (editable) {
-        editable.focus();
-      }
-    };
     const raf = requestAnimationFrame(focusEditor);
     return () => cancelAnimationFrame(raf);
   }, [autoFocus, composerLoadRevision, conversationId]);
+
+  useKeyDown((event) => {
+    if (!isShortcut(event, 'focusInput')) return false;
+    focusEditor();
+    return true;
+  }, isActive);
 
   const {
     commands: slashCommands,

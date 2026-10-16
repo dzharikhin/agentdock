@@ -8,7 +8,6 @@ import {
   PanelRightClose,
   PanelRightOpen,
   PanelTop,
-  Settings,
   SquareArrowDownLeft,
 } from 'lucide-react';
 import type { GlobalSettings } from '../types/chat';
@@ -95,17 +94,6 @@ export function SidebarLayoutMenu({
     >
       {popupMenuActions(items)}
     </PopupMenu>
-  );
-}
-
-/** Opens the section popup at Service Providers. */
-export function SidebarManageButton({ onClick, className }: { onClick: () => void; className: string }) {
-  return (
-    <Tooltip variant="minimal" placement="bottom" content="Manage" className={`flex ${className}`}>
-      <button type="button" data-section-opener onClick={onClick} className={iconButtonClassName} aria-label="Manage">
-        <Settings size={16} aria-hidden="true" />
-      </button>
-    </Tooltip>
   );
 }
 

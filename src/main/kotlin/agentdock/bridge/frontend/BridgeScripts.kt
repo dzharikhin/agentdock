@@ -31,10 +31,11 @@ internal object BridgeScripts {
                 '__onChangesState', '__onFileChangeStats', '__onConversationTranscriptSaved',
                 '__onConversationReplayLoaded', '__onAdapterDeleted', '__onFilesResult',
                 '__onFileIconResult', '__onLocalImageResult', '__onThemeChanged', '__onHistoryList', '__onHistoryDeleteResult',
+                '__onHistorySearchResult',
                 '__onAssistantActivity',
                 '__onMcpServers', '__onMcpStatus', '__onPromptLibrary', '__onSystemInstructions',
                 '__onAudioTranscriptionFeature', '__onAudioTranscriptionResult',
-                '__onAudioRecordingState', '__onGlobalSettings'
+                '__onAudioRecordingState', '__onSpeechResult', '__onGlobalSettings'
             ];
             callbacks.forEach(function(name) {
                 window[name] = window[name] || function() {};
@@ -48,8 +49,8 @@ internal object BridgeScripts {
             window.__requestAdapters = function(adapterIdToRefresh) {
                 invoke('listAdapters', adapterIdToRefresh || '');
             };
-            window.__rememberAgentConfigOption = function(adapterId, configId, value) {
-                invoke('rememberConfigOption', JSON.stringify({ adapterId: adapterId, configValues: { [configId]: value } }));
+            window.__rememberAgentConfigOptions = function(adapterId, configValues, links) {
+                invoke('rememberConfigOption', JSON.stringify(Object.assign({ adapterId: adapterId, configValues: configValues }, links)));
             };
             window.__startAgent = function(chatId, adapterId, configValues, requestId) {
                 invoke('startAgent', JSON.stringify({ requestId: (requestId || ''), chatId: chatId, adapterId: (adapterId || ''), configValues: (configValues || {}) }));
@@ -104,7 +105,9 @@ internal object BridgeScripts {
             window.__requestHistoryList = function(projectPath) { invoke('requestHistoryList', projectPath); };
             window.__syncHistoryList = function(projectPath) { invoke('syncHistoryList', projectPath); };
             window.__deleteHistoryConversations = function(payload) { invoke('deleteHistoryConversations', JSON.stringify(payload)); };
-            window.__updateHistoryConversation = function(payload) { invoke('updateHistoryConversation', JSON.stringify(payload)); };
+            window.__updateHistoryConversations = function(payload) { invoke('updateHistoryConversations', JSON.stringify(payload)); };
+            window.__renameHistoryGroup = function(payload) { invoke('renameHistoryGroup', JSON.stringify(payload)); };
+            window.__searchHistoryConversations = function(payload) { invoke('searchHistoryConversations', JSON.stringify(payload)); };
 
             window.__loadMcpServers = function() { invoke('loadMcpServers', ''); };
             window.__saveMcpServers = function(json) { invoke('saveMcpServers', json); };
@@ -132,8 +135,12 @@ internal object BridgeScripts {
             window.__stopAudioRecording = function(payload) { invoke('stopAudioRecording', payload); };
             window.__cancelAudioTranscription = function(payload) { invoke('cancelAudioTranscription', payload); };
             window.__cancelAudioRecording = function(ownerId) { invoke('cancelAudioRecording', ownerId || ''); };
+            window.__startSpeech = function(payload) { invoke('startSpeech', payload); };
+            window.__stopSpeech = function(requestId) { invoke('stopSpeech', requestId || ''); };
             window.__agentDockPlaySound = function(sound) { invoke('playSound', sound); };
             window.__requestHostRepaint = function(reason) { invoke('repaint', reason || ''); };
+            window.__readUiVisibility = function() { invoke('readUiVisibility', ''); };
+            window.__setAttentionBadge = function(level) { invoke('setAttentionBadge', level || ''); };
 
             window.__settingsBridgeReady = true;
             window.dispatchEvent(new CustomEvent('settings-bridge-ready'));

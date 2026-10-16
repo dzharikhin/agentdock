@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AgentOption,
+  ConfigLinks,
   ConfigOption,
   SessionConfigOptionsPayload,
 } from '../../types/chat';
@@ -33,6 +34,56 @@ const optionsForModel = (options: ConfigOption[], byModel: Record<string, Config
   const model = findOption(options, 'model');
   // A cached model catalog must not replace the session's current model list.
   return (byModel?.[modelId] ?? options).map((option) => model && option.id === model.id ? model : option);
+};
+
+const rememberModelAndEffort = () =>
+  ACPBridge.getGlobalSettingsSnapshot()?.settings?.rememberModelAndEffort === true;
+
+type ModeModelEffort = { mode: string; model: string; effort: string };
+
+// The values to select and the links to remember when the mode, model or effort changes
+// while the mode remembers its model and the model its effort; undefined for other options.
+const linkedChange = (
+  options: ConfigOption[],
+  byModel: Record<string, ConfigOption[]> | undefined,
+  links: ConfigLinks,
+  current: ModeModelEffort,
+  configId: string,
+  value: string,
+) => {
+  const model = findOption(options, 'model');
+  const currentOptions = optionsForModel(options, byModel, current.model);
+  const mode = findOption(currentOptions, 'mode');
+  const next = { ...current };
+  if (configId === mode?.id) {
+    next.mode = value;
+    const savedModel = links.modelByMode?.[value];
+    if (model && accepts(model, savedModel)) next.model = savedModel!;
+  } else if (configId === model?.id) {
+    next.model = value;
+  } else if (configId === findReasoningEffortOption(currentOptions)?.id) {
+    next.effort = value;
+  } else {
+    return undefined;
+  }
+  const effort = findReasoningEffortOption(optionsForModel(options, byModel, next.model));
+  const savedEffort = links.effortByModel?.[next.model];
+  if (next.model !== current.model && effort && accepts(effort, savedEffort)) next.effort = savedEffort!;
+
+  const values = { [configId]: value };
+  if (model && next.model !== current.model) values[model.id] = next.model;
+  if (effort && next.effort !== current.effort) values[effort.id] = next.effort;
+  const pair = (key: string, item: string): Record<string, string> => (key && item ? { [key]: item } : {});
+  return {
+    values,
+    links: {
+      modelByMode: { ...pair(current.mode, current.model), ...pair(next.mode, next.model) },
+      effortByModel: {
+        ...pair(current.model, current.effort),
+        ...pair(next.model, effort ? resolveValue(effort, next.effort) : ''),
+      },
+    },
+  };
 };
 
 const EMPTY_SELECTION: Record<string, string> = {};
@@ -70,16 +121,11 @@ export function useAgentRuntimeOptions({
     ? resolveValue(modelOption, modelValue ?? initialModelValue)
     : '';
 
-  const effectiveOptions = useMemo(() => optionsForModel(
-    options,
-    sessionConfigOptions?.configOptionsByModel ?? effectiveSelectedAgent?.configOptionsByModel,
-    selectedModelId,
-  ), [
-    effectiveSelectedAgent?.configOptionsByModel,
-    options,
-    selectedModelId,
-    sessionConfigOptions?.configOptionsByModel,
-  ]);
+  const configOptionsByModel = sessionConfigOptions?.configOptionsByModel ?? effectiveSelectedAgent?.configOptionsByModel;
+  const effectiveOptions = useMemo(
+    () => optionsForModel(options, configOptionsByModel, selectedModelId),
+    [configOptionsByModel, options, selectedModelId]
+  );
   const configValues = useMemo(() => Object.fromEntries(effectiveOptions
     .filter((option) => option.type !== 'select' || option.options.length > 0)
     .map((option) => {
@@ -151,12 +197,20 @@ export function useAgentRuntimeOptions({
     remember = false,
   ) => {
     if (!targetAgentId) return;
-    if (remember) ACPBridge.rememberAgentConfigOption(targetAgentId, configId, value);
+    const linked = targetAgentId === sessionAgentId && rememberModelAndEffort()
+      ? linkedChange(options, configOptionsByModel, effectiveSelectedAgent ?? {}, {
+        mode: selectedModeId,
+        model: selectedModelId,
+        effort: selectedReasoningEffortId,
+      }, configId, value)
+      : undefined;
+    const values = linked?.values ?? { [configId]: value };
+    if (remember) ACPBridge.rememberAgentConfigOptions(targetAgentId, values, linked?.links);
     setSelectedByAgent((current) => ({
       ...current,
       [targetAgentId]: {
         ...current[targetAgentId],
-        [configId]: value,
+        ...values,
       },
     }));
   };

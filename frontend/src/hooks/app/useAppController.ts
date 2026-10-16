@@ -77,6 +77,7 @@ export function useAppController() {
   const [activeTabId, setActiveTabId] = useState<string>('');
   const [activeSection, setActiveSection] = useState<SectionType | null>(null);
   const [mountedSections, setMountedSections] = useState<SectionType[]>([]);
+  const settingsSectionRef = useRef<SectionType>('management');
   const { availableAgents, adaptersResolved, lastStableNewTabAgentIdRef } = useAvailableAgents();
   const agentAvailabilityResolved = useMemo(
     () => adaptersResolved && availableAgents.every((agent) => agent.downloadedKnown === true),
@@ -188,7 +189,7 @@ export function useAppController() {
       setChats((prev) => prev.map((item) => (
         item.id === tabId ? { ...item, title } : item
       )));
-      ACPBridge.updateHistoryConversation(projectPath, conversationId, { newTitle: title });
+      ACPBridge.updateHistoryConversations(projectPath, [conversationId], { newTitle: title });
       return;
     }
 
@@ -207,7 +208,7 @@ export function useAppController() {
       const conversationId = conversationKeyOf(tab);
       const projectPath = historyConversationIndex.get(conversationId)?.projectPath;
       if (!projectPath) return;
-      ACPBridge.updateHistoryConversation(projectPath, conversationId, { newTitle: tab.pendingTitle });
+      ACPBridge.updateHistoryConversations(projectPath, [conversationId], { newTitle: tab.pendingTitle });
       flushedTabIds.add(tab.id);
     });
     if (flushedTabIds.size === 0) return;
@@ -453,9 +454,13 @@ export function useAppController() {
   }, [activateChat, initTabUi, runnableAgents, tabSessionState]);
 
   const openSection = useCallback((type: SectionType) => {
+    if (type !== 'history' && type !== 'archive') settingsSectionRef.current = type;
     setMountedSections((current) => current.includes(type) ? current : [...current, type]);
     setActiveSection(type);
   }, []);
+
+  // "Settings" reopens the last section opened other than the history.
+  const openSettings = useCallback(() => openSection(settingsSectionRef.current), [openSection]);
 
   const closeActiveSection = useCallback(() => setActiveSection(null), []);
 
@@ -597,6 +602,7 @@ export function useAppController() {
     handleNewTab,
     handleOpenHistory,
     openSection,
+    openSettings,
     closeActiveSection,
     handleUserMessageSent,
     handleAssistantActivity,

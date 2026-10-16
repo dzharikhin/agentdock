@@ -8,7 +8,6 @@ export const WHISPER = 'whisper-transcription';
 export interface TranscriptionProviderDefinition {
   value: string;
   label: string;
-  chatLabel?: string;
   apiKeyLabel?: string;
   apiKeyPlaceholder?: string;
   apiKeyUrl?: string;
@@ -23,7 +22,6 @@ export const transcriptionProviders: TranscriptionProviderDefinition[] = [
   {
     value: GPT_TRANSCRIBER,
     label: 'GPT Transcriber',
-    chatLabel: 'Transcribe voice input in chat with OpenAI GPT Transcriber',
     apiKeyLabel: 'OpenAI API key',
     apiKeyPlaceholder: 'sk-...',
     apiKeyUrl: 'https://platform.openai.com/api-keys',
@@ -32,14 +30,13 @@ export const transcriptionProviders: TranscriptionProviderDefinition[] = [
   {
     value: GEMINI_TRANSCRIBER,
     label: 'Gemini 3.5 Transcribe',
-    chatLabel: 'Transcribe voice input in chat with Google Gemini 3.5 Transcribe',
     apiKeyLabel: 'Google Gemini API key',
     apiKeyPlaceholder: 'AIza...',
     apiKeyUrl: 'https://aistudio.google.com/app/apikey',
     pricingDescription: 'Free tier available with limited quotas. Paid: ~$0.005/audio minute',
   },
   ...(isWindowsClient
-    ? [{ value: WHISPER, label: 'Whisper', chatLabel: 'Transcribe voice input in chat with Whisper' }]
+    ? [{ value: WHISPER, label: 'Whisper' }]
     : []),
 ];
 
@@ -52,10 +49,10 @@ export function normalizeAudioTranscriptionProvider(provider: string | undefined
     : AUDIO_TRANSCRIPTION_NONE;
 }
 
-export const transcriptionProviderOptions: DropdownOption[] = transcriptionProviders.map(({ value, label }) => ({
-  value,
-  label,
-}));
+/** The engines to choose from once voice input is enabled. */
+export const transcriptionProviderOptions: DropdownOption[] = transcriptionProviders
+  .filter(({ value }) => value !== AUDIO_TRANSCRIPTION_NONE)
+  .map(({ value, label }) => ({ value, label }));
 
 export const transcriptionLanguageOptions: DropdownOption[] = [
   { value: 'auto', label: 'auto' },

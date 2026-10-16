@@ -352,6 +352,7 @@ internal object HistorySyncService {
             val conversationId = when {
                 name.endsWith(".json") -> name.removeSuffix(".json")
                 name.endsWith(".transcript.txt") -> name.removeSuffix(".transcript.txt")
+                name.endsWith(".search.txt") -> name.removeSuffix(".search.txt")
                 else -> return@forEach
             }
             if (conversationId !in referencedIds) {
@@ -393,7 +394,9 @@ internal object HistorySyncService {
                     allAdapterNames = visibleAdapterNames.ifEmpty {
                         visibleSessions.map { it.adapterName }.distinct()
                     },
-                    pinned = conversation.pinned
+                    pinned = conversation.pinned,
+                    archived = conversation.archived,
+                    group = conversation.group
                 )
             }.sortedWith(compareByDescending<SessionMeta> { it.pinned }.thenByDescending { it.updatedAt })
     }

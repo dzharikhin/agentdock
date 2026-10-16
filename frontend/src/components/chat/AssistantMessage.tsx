@@ -1,10 +1,12 @@
-import { memo, useCallback, useEffect, useState, type MouseEvent } from 'react';
+import { memo, useCallback, useEffect, useId, type MouseEvent } from 'react';
 import type { ExploringBlock, Message, RichContentBlock, TextBlock, ToolCallBlock } from '../../types/chat';
 import { MarkdownMessage } from './MarkdownMessage';
 import { ContentBlockRenderer } from './blocks/ContentBlockRenderer';
 import { WorkingBlock } from './blocks/WorkingBlock';
 import { Tooltip } from './shared/Tooltip';
-import { Check, Copy, GitFork } from 'lucide-react';
+import { PopupMenu, popupMenuActions, type PopupMenuAction } from '../ui/PopupMenu';
+import { stopSpeech, toggleSpeech, useSpeechState } from '../audio/speechOutput';
+import { Copy, EllipsisVertical, GitFork, Square, Volume2, VolumeX } from 'lucide-react';
 
 interface AssistantMessageProps {
   message: Message;
@@ -51,6 +53,15 @@ function isWorkBlock(block: RichContentBlock | undefined): block is ExploringBlo
     || (block?.type === 'tool_call' && ['edit', 'delete', 'move'].includes(block.entry.kind ?? ''));
 }
 
+// Markdown sources of the main text in render order, which the chat search covers.
+export function assistantMessageTexts(message: Message): string[] {
+  if (message.contentBlocks?.length) return message.contentBlocks.filter(isTextBlock).map((block) => block.text);
+  if (message.blocks?.length) {
+    return message.blocks.filter((block) => !(block.type === 'image' && block.data)).map((block) => (block as any).text || '');
+  }
+  return message.content ? [message.content] : [];
+}
+
 function groupAssistantBlocks(blocks: RichContentBlock[]) {
   const groups: Array<{ key: string; block: RichContentBlock; work?: Array<ExploringBlock | ToolCallBlock> }> = [];
 
@@ -71,26 +82,32 @@ function groupAssistantBlocks(blocks: RichContentBlock[]) {
 }
 
 export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessage, agentIconPath, isActivePrompt = false, onFork }: AssistantMessageProps) => {
-  const [copied, setCopied] = useState(false);
   const contentBlocks = message.contentBlocks?.length ? message.contentBlocks : message.blocks;
   const copyText = contentBlocks?.length
     ? contentBlocks.filter(isTextBlock).map((block) => block.text).join('\n\n')
     : message.content;
+  // Replayed history reuses message ids across chats, so speech belongs to this mounted message.
+  const speechId = useId();
+  const speechState = useSpeechState(speechId);
+  const speechLabel = speechState.status === 'speaking' ? 'Stop reading'
+    : speechState.status === 'error' ? `Reading aloud failed: ${speechState.error}` : 'Read aloud';
 
-  useEffect(() => {
-    if (!copied) return;
-    const timer = window.setTimeout(() => setCopied(false), 1400);
-    return () => window.clearTimeout(timer);
-  }, [copied]);
+  useEffect(() => () => stopSpeech(speechId), [speechId]);
 
-  const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(copyText);
-      setCopied(true);
-    } catch {
-      setCopied(false);
-    }
-  };
+  // The menu opens upwards, so the most used action comes last, next to the button.
+  const actions: PopupMenuAction[] = [
+    ...(onFork ? [{ label: 'Fork from here', icon: <GitFork size={12} aria-hidden="true" />, onClick: onFork }] : []),
+    ...(copyText && speechState.status !== 'unavailable' ? [{
+      label: speechState.status === 'speaking' ? 'Stop reading' : 'Read aloud',
+      icon: speechState.status === 'speaking' ? <Square size={12} aria-hidden="true" /> : <Volume2 size={12} aria-hidden="true" />,
+      onClick: () => toggleSpeech(speechId, copyText),
+    }] : []),
+    ...(copyText ? [{
+      label: 'Copy response',
+      icon: <Copy size={12} aria-hidden="true" />,
+      onClick: () => { navigator.clipboard.writeText(copyText).catch(() => {}); },
+    }] : []),
+  ];
 
   const renderContent = () => {
     if (message.contentBlocks && message.contentBlocks.length > 0) {
@@ -123,7 +140,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
                 </div>
               );
             }
-            return <MarkdownMessage key={idx} content={(block as any).text || ''} />;
+            return <MarkdownMessage key={idx} content={(block as any).text || ''} searchable />;
           })}
         </div>
       );
@@ -131,7 +148,7 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
 
     return (
       <div className="[&>.markdown-body]:my-0">
-        {message.content ? <MarkdownMessage content={message.content} /> : null}
+        {message.content ? <MarkdownMessage content={message.content} searchable /> : null}
       </div>
     );
   };
@@ -163,16 +180,16 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
   const hasMetaTooltip = tooltipRows.length > 0;
 
   const agentBadge = agentIconPath ? (
-    <img src={agentIconPath} alt={message.agentName || 'Agent'} className="w-4 h-4 opacity-60 hover:opacity-80"/>
+    <img src={agentIconPath} alt={message.agentName || 'Agent'} className="w-4 h-4 opacity-80 hover:opacity-100"/>
   ) : (
     <div className="w-4 h-4 rounded bg-background-secondary border border-border flex items-center justify-center
-      text-[9px] font-semibold uppercase opacity-60 hover:opacity-80">
+      text-[9px] font-semibold uppercase opacity-80 hover:opacity-100">
       {(message.agentName || '?').slice(0, 1)}
     </div>
   );
 
   return (
-    <div className={hasFollowingMessage ? 'mb-8' : ''}>
+    <div data-message-id={message.id} className={hasFollowingMessage ? 'mt-4 mb-8' : 'mt-4'}>
       <div className="break-words text-foreground" onClick={handleReplyImageClick}>
         {renderContent()}
       </div>
@@ -192,37 +209,46 @@ export const AssistantMessage = memo(({ message, onImageClick, hasFollowingMessa
               ) : (message.agentName || 'Agent')}
           >
             <button type="button" aria-label={`${message.agentName || 'Agent'} details`}
-              className="inline-flex h-4 w-4 items-center justify-center rounded-[4px] cursor-help focus:outline-none
+              className="flex h-4 w-4 items-center justify-center rounded-[4px] cursor-help focus:outline-none
                 focus-visible:outline focus-visible:outline-1 focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-0"
             >
               {agentBadge}
             </button>
           </Tooltip>
-          {onFork && (
-            <Tooltip content="Fork from here" variant="minimal">
-              <button
-                type="button"
-                className="inline-flex mx-0.5 h-4 w-4 items-center justify-center rounded text-foreground-secondary
-                hover:bg-hover hover:text-foreground focus-visible:outline focus-visible:outline-1
-                focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-0"
-                onClick={onFork}
-                aria-label="Fork from here"
-              >
-                <GitFork size={14} />
-              </button>
-            </Tooltip>
+          {actions.length > 0 && (
+            <PopupMenu
+              placement="top"
+              renderTrigger={(trigger) => (
+                <Tooltip content="Actions" variant="minimal">
+                  <button
+                    type="button"
+                    aria-label="Actions"
+                    {...trigger}
+                    className="flex -my-1 h-5 w-5 items-center justify-center rounded text-foreground-secondary
+                    hover:bg-hover hover:text-foreground focus-visible:outline focus-visible:outline-1
+                    focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-0"
+                  >
+                    <EllipsisVertical size={14} />
+                  </button>
+                </Tooltip>
+              )}
+            >
+              {popupMenuActions(actions)}
+            </PopupMenu>
           )}
-          {copyText && (
-            <Tooltip content={copied ? 'Copied' : 'Copy response'} variant="minimal">
+          {/* Reading aloud stays stoppable, and its failure visible, without opening the menu. */}
+          {copyText && (speechState.status === 'speaking' || speechState.status === 'error') && (
+            <Tooltip content={speechLabel} variant="minimal">
               <button
                 type="button"
-                className="inline-flex mx-0.5 h-4 w-4 items-center justify-center rounded text-foreground-secondary
+                className={`flex mx-0.5 h-4 w-4 items-center justify-center rounded
                 hover:bg-hover hover:text-foreground focus-visible:outline focus-visible:outline-1
-                focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-0"
-                onClick={handleCopy}
-                aria-label={copied ? 'Response copied' : 'Copy response'}
+                focus-visible:outline-[var(--ide-Button-default-focusColor)] focus-visible:outline-offset-0
+                ${speechState.status === 'error' ? 'text-error' : 'text-foreground-secondary'}`}
+                onClick={() => toggleSpeech(speechId, copyText)}
+                aria-label={speechLabel}
               >
-                {copied ? <Check size={13} /> : <Copy size={13} />}
+                {speechState.status === 'speaking' ? <Square size={12} /> : <VolumeX size={14} />}
               </button>
             </Tooltip>
           )}

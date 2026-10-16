@@ -34,9 +34,31 @@ class HistoryBridge(
     @Serializable
     private data class UpdateHistoryPayload(
         val projectPath: String,
-        val conversationId: String,
+        val conversationIds: List<String>,
         val newTitle: String? = null,
-        val pinned: Boolean? = null
+        val pinned: Boolean? = null,
+        val archived: Boolean? = null,
+        val group: String? = null
+    )
+
+    @Serializable
+    private data class RenameHistoryGroupPayload(
+        val projectPath: String,
+        val group: String,
+        val newGroup: String
+    )
+
+    @Serializable
+    private data class SearchHistoryPayload(
+        val projectPath: String,
+        val conversationIds: List<String>,
+        val query: String
+    )
+
+    @Serializable
+    private data class SearchHistoryResultPayload(
+        val query: String,
+        val snippets: Map<String, String>
     )
 
     @Serializable
@@ -147,7 +169,7 @@ class HistoryBridge(
             }
         }
 
-        host.register("updateHistoryConversation") { payload ->
+        host.register("updateHistoryConversations") { payload ->
             if (payload.isBlank()) return@register
 
             scope.launch(Dispatchers.Default) {
@@ -155,11 +177,13 @@ class HistoryBridge(
                 try {
                     val request = permissiveJson.decodeFromString<UpdateHistoryPayload>(payload)
                     failedRequest = request
-                    val success = AgentDockHistoryService.updateConversation(
+                    val success = AgentDockHistoryService.updateConversations(
                         request.projectPath,
-                        request.conversationId,
+                        request.conversationIds,
                         request.newTitle,
-                        request.pinned
+                        request.pinned,
+                        request.archived,
+                        request.group
                     )
                     val history = AgentDockHistoryService.getHistoryList(request.projectPath)
                     pushHistoryList(permissiveJson.encodeToString(history))
@@ -175,6 +199,40 @@ class HistoryBridge(
                         }
                     }
                     sendJsError("Error during conversation update: ${e.message}")
+                }
+            }
+        }
+
+        host.register("searchHistoryConversations") { payload ->
+            if (payload.isBlank()) return@register
+
+            scope.launch(Dispatchers.IO) {
+                try {
+                    val request = permissiveJson.decodeFromString<SearchHistoryPayload>(payload)
+                    val snippets = HistoryReplayStore.searchConversations(
+                        canonicalHistoryProjectPath(request.projectPath),
+                        request.conversationIds,
+                        request.query
+                    )
+                    val result = permissiveJson.encodeToString(SearchHistoryResultPayload(request.query, snippets))
+                    host.eval("if(window.__onHistorySearchResult) window.__onHistorySearchResult(JSON.parse(${result.jsStringLiteral()}));")
+                } catch (e: Exception) {
+                    sendJsError("Error during history search: ${e.message}")
+                }
+            }
+        }
+
+        host.register("renameHistoryGroup") { payload ->
+            if (payload.isBlank()) return@register
+
+            scope.launch(Dispatchers.Default) {
+                try {
+                    val request = permissiveJson.decodeFromString<RenameHistoryGroupPayload>(payload)
+                    val success = AgentDockHistoryService.renameGroup(request.projectPath, request.group, request.newGroup)
+                    pushHistoryList(permissiveJson.encodeToString(AgentDockHistoryService.getHistoryList(request.projectPath)))
+                    if (!success) sendJsError("Failed to rename group")
+                } catch (e: Exception) {
+                    sendJsError("Error during group rename: ${e.message}")
                 }
             }
         }

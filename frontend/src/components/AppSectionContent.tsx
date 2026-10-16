@@ -1,4 +1,4 @@
-import type { AgentOption, ChatTab, HistorySessionMeta, SectionType } from '../types/chat';
+import type { AgentOption, ChatTab, HistorySessionMeta, SectionType, TabUiFlags } from '../types/chat';
 import { AgentManagementView } from './AgentManagement';
 import { DesignSystemView } from './DesignSystem';
 import HistoryPanel from './HistoryPanel';
@@ -14,8 +14,11 @@ interface AppSectionContentProps {
   isActive: boolean;
   availableAgents: AgentOption[];
   tabs: ChatTab[];
+  tabUi: Record<string, TabUiFlags>;
   historyList: HistorySessionMeta[];
   historyLoaded: boolean;
+  historyGroup: string | null;
+  onHistoryGroupChange: (group: string | null) => void;
   hasOpenConversationsForAdapter: (adapterId: string) => boolean;
   onUpdateAgent: (adapterId: string) => void;
   onOpenHistory: Parameters<typeof HistoryPanel>[0]['onOpenSession'];
@@ -26,8 +29,11 @@ export function AppSectionContent({
   isActive,
   availableAgents,
   tabs,
+  tabUi,
   historyList,
   historyLoaded,
+  historyGroup,
+  onHistoryGroupChange,
   hasOpenConversationsForAdapter,
   onUpdateAgent,
   onOpenHistory,
@@ -43,13 +49,17 @@ export function AppSectionContent({
         />
       )}
       {section === 'design' && <DesignSystemView />}
-      {section === 'history' && (
+      {(section === 'history' || section === 'archive') && (
         <HistoryPanel
           availableAgents={availableAgents}
           tabs={tabs}
+          tabUi={tabUi}
           historyList={historyList}
           historyLoaded={historyLoaded}
+          archived={section === 'archive'}
           isActive={isActive}
+          group={historyGroup}
+          onGroupChange={onHistoryGroupChange}
           onOpenSession={onOpenHistory}
         />
       )}
@@ -57,7 +67,9 @@ export function AppSectionContent({
       {section === 'custom-acp' && <CustomAcpView />}
       {section === 'prompt-library' && <PromptLibraryView />}
       {section === 'system-instructions' && <SystemInstructionsView />}
-      {section === 'settings' && <SettingsView />}
+      {(section === 'general' || section === 'appearance' || section === 'shortcuts') && (
+        <SettingsView section={section} />
+      )}
     </SectionFrame>
   );
 }

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { History } from 'lucide-react';
+import { History, Settings } from 'lucide-react';
 import { isAgentRunnable } from '../types/chat';
 import type { GlobalSettings } from '../types/chat';
 import { clampSidebarWidth, MIN_SIDEBAR_WIDTH } from '../hooks/app/useAppLayout';
 import { TabBarProps } from './TabBar';
-import { SidebarLayoutMenu, SidebarManageButton, SidebarVisibilityButton } from './LayoutControls';
+import { SidebarLayoutMenu, SidebarVisibilityButton } from './LayoutControls';
 import { rowButtonClassName, sidebarRowClassName } from './tabbar/rows';
 import { NewChatSplitButton } from './tabbar/NewChatSplitButton';
 import { OpenChatList } from './tabbar/OpenChatList';
@@ -133,10 +133,6 @@ export function Sidebar({
               openInEditor={openInEditor}
               onToggleOpenInEditor={onToggleOpenInEditor}
             />
-            <SidebarManageButton
-              onClick={navigationProps.onOpenManagement}
-              className={position === 'right' ? 'mr-auto' : 'ml-auto'}
-            />
           </div>
           {!noRunnableAgents ? (
             <NewChatSplitButton
@@ -168,6 +164,21 @@ export function Sidebar({
             tabUi={navigationProps.tabUi ?? {}}
           />
         </nav>
+        {/* Opens the section popup at the last section opened other than the history. */}
+        <div className="shrink-0 px-2 pb-2 text-ide-small">
+          <div className="mb-1.5 mt-1 border-t border-border" />
+          <div className={`${sidebarRowClassName(false)} h-8`}>
+            <button
+              type="button"
+              data-section-opener
+              onClick={navigationProps.onOpenLastSettings}
+              className={rowButtonClassName}
+            >
+              <Settings size={14} aria-hidden="true" className="shrink-0" />
+              <span className="truncate">Settings</span>
+            </button>
+          </div>
+        </div>
         <div
           role="separator"
           aria-label="Resize sidebar"

@@ -322,9 +322,13 @@ internal fun AcpBridge.installAdapterQueries() {
     }
 
     host.register("rememberConfigOption") { payload ->
-        val parsed = parseStartRequestPayload(payload)
-        parsed.adapterId?.takeIf { parsed.configValues.isNotEmpty() }?.let { adapterId ->
-            AcpAgentPreferencesStore.rememberConfigOptions(adapterId, parsed.configValues)
+        parseRememberConfigPayload(payload)?.takeIf { it.configValues.isNotEmpty() }?.let { parsed ->
+            AcpAgentPreferencesStore.rememberConfigOptions(
+                parsed.adapterId,
+                parsed.configValues,
+                parsed.modelByMode,
+                parsed.effortByModel
+            )
             pushAdapters()
         }
     }
