@@ -115,7 +115,7 @@ export function useChatInputController({
         icon: <Bookmark className="w-4 h-4" />,
         subOptions: promptLibrarySlashItems.map((prompt) => ({
           id: prompt.id,
-          label: prompt.name,
+          label: `${prompt.displayPrefix}${prompt.name}`,
           description: prompt.description,
         })),
       });
