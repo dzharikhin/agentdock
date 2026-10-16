@@ -155,6 +155,8 @@ export interface AgentOption {
   availableReasoningEfforts?: ReasoningEffortOption[];
   configOptions?: ConfigOption[];
   configOptionsByModel?: Record<string, ConfigOption[]>;
+  modelByMode?: Record<string, string>;
+  effortByModel?: Record<string, string>;
   downloaded?: boolean;
   downloadedKnown?: boolean;
   downloadPath?: string;
@@ -187,6 +189,8 @@ export interface AgentOption {
   cliResumeAvailable?: boolean;
   custom?: boolean;
 }
+
+export type ConfigLinks = Pick<AgentOption, 'modelByMode' | 'effortByModel'>;
 
 export function isAgentRunnable(agent: AgentOption): boolean {
   return agent.downloaded === true;
@@ -568,6 +572,7 @@ export interface GlobalSettings {
   sidebarEnabled: boolean;
   sidebarPosition: 'left' | 'right';
   historyGroupsExpanded: boolean;
+  rememberModelAndEffort: boolean;
   shortcuts: ShortcutSettings;
 }
 
@@ -593,7 +598,11 @@ declare global {
       configValues?: Record<string, string>
     ) => void;
     __requestAdapters?: (adapterIdToRefresh?: string) => void;
-    __rememberAgentConfigOption?: (adapterId: string, configId: string, value: string) => void;
+    __rememberAgentConfigOptions?: (
+      adapterId: string,
+      configValues: Record<string, string>,
+      links?: ConfigLinks
+    ) => void;
     __notifyReady?: () => void;
     __respondPermission?: (requestId: string, decision: string) => void;
     __cancelPrompt?: (conversationId: string, requestId?: string) => void;

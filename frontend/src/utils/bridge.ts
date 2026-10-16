@@ -4,6 +4,7 @@ import {
   AudioTranscriptionResultPayload,
   BridgeOperationResultPayload,
   ChatAttachment,
+  ConfigLinks,
   ContinueConversationPayload,
   ConversationTranscriptSavedPayload,
   FileChangeOperation,
@@ -392,8 +393,8 @@ export const ACPBridge = {
     window.__requestAdapters?.(adapterIdToRefresh);
   },
 
-  rememberAgentConfigOption: (adapterId: string, configId: string, value: string) => {
-    window.__rememberAgentConfigOption?.(adapterId, configId, value);
+  rememberAgentConfigOptions: (adapterId: string, configValues: Record<string, string>, links?: ConfigLinks) => {
+    window.__rememberAgentConfigOptions?.(adapterId, configValues, links);
   },
 
   startAgent: (conversationId: string, adapterId?: string, configValues?: Record<string, string>) => {

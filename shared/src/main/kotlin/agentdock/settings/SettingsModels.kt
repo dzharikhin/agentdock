@@ -129,6 +129,8 @@ data class GlobalSettings(
     val sidebarPosition: String = "left",
     /** The history groups are listed under "Chat History" in the section popup. */
     val historyGroupsExpanded: Boolean = false,
+    /** Switching the mode restores the model last used in it, and switching the model restores its last effort. */
+    val rememberModelAndEffort: Boolean = false,
     val shortcuts: ShortcutSettings = ShortcutSettings()
 )
 

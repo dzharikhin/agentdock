@@ -21,6 +21,13 @@ internal data class ParsedBlocksPayload(
     val configValues: Map<String, String>
 )
 
+internal data class ParsedRememberConfigPayload(
+    val adapterId: String,
+    val configValues: Map<String, String>,
+    val modelByMode: Map<String, String>,
+    val effortByModel: Map<String, String>
+)
+
 internal data class ParsedCancelPayload(
     val requestId: String?,
     val chatId: String?
@@ -53,6 +60,19 @@ internal fun parseStartRequestPayload(payload: String): ParsedStartPayload {
         val adapterId = obj["adapterId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
         ParsedStartPayload(requestId, chatId, adapterId, parseConfigValues(obj))
     } catch (_: Exception) { ParsedStartPayload(null, null, null, emptyMap()) }
+}
+
+internal fun parseRememberConfigPayload(payload: String): ParsedRememberConfigPayload? {
+    return try {
+        val obj = Json.parseToJsonElement(payload.trim()).jsonObject
+        val adapterId = obj["adapterId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: return null
+        ParsedRememberConfigPayload(
+            adapterId = adapterId,
+            configValues = parseConfigValues(obj),
+            modelByMode = parseConfigValues(obj, "modelByMode"),
+            effortByModel = parseConfigValues(obj, "effortByModel")
+        )
+    } catch (_: Exception) { null }
 }
 
 internal fun parseConversationLoadPayload(payload: String): Triple<String?, String?, String?> {
@@ -145,8 +165,8 @@ internal fun parseBlocksPayload(payload: String): ParsedBlocksPayload {
     } catch (_: Exception) { ParsedBlocksPayload(null, null, emptyList(), emptyList(), null, null, emptyMap()) }
 }
 
-private fun parseConfigValues(payload: JsonObject): Map<String, String> =
-    (payload["configValues"] as? JsonObject).orEmpty().mapNotNull { (id, value) ->
+private fun parseConfigValues(payload: JsonObject, key: String = "configValues"): Map<String, String> =
+    (payload[key] as? JsonObject).orEmpty().mapNotNull { (id, value) ->
         val normalizedId = id.trim()
         val normalizedValue = (value as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
         if (normalizedId.isEmpty() || normalizedValue.isEmpty()) null else normalizedId to normalizedValue

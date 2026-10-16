@@ -114,6 +114,7 @@ function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undef
       sidebarEnabled: payload?.settings?.sidebarEnabled ?? true,
       sidebarPosition: payload?.settings?.sidebarPosition === 'right' ? 'right' : 'left',
       historyGroupsExpanded: payload?.settings?.historyGroupsExpanded ?? false,
+      rememberModelAndEffort: payload?.settings?.rememberModelAndEffort ?? false,
       shortcuts: { ...DEFAULT_SHORTCUTS, ...payload?.settings?.shortcuts }
     }
   };

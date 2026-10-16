@@ -49,8 +49,8 @@ internal object BridgeScripts {
             window.__requestAdapters = function(adapterIdToRefresh) {
                 invoke('listAdapters', adapterIdToRefresh || '');
             };
-            window.__rememberAgentConfigOption = function(adapterId, configId, value) {
-                invoke('rememberConfigOption', JSON.stringify({ adapterId: adapterId, configValues: { [configId]: value } }));
+            window.__rememberAgentConfigOptions = function(adapterId, configValues, links) {
+                invoke('rememberConfigOption', JSON.stringify(Object.assign({ adapterId: adapterId, configValues: configValues }, links)));
             };
             window.__startAgent = function(chatId, adapterId, configValues, requestId) {
                 invoke('startAgent', JSON.stringify({ requestId: (requestId || ''), chatId: chatId, adapterId: (adapterId || ''), configValues: (configValues || {}) }));

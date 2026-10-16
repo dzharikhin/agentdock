@@ -1,10 +1,12 @@
-import { ReactNode, RefObject } from 'react';
+import { ReactNode, RefObject, useEffect, useState } from 'react';
 import {
   AlarmClockOff,
   CornerDownLeft,
   Clock,
   Ellipsis,
   Keyboard as KeyboardIcon,
+  Link2,
+  Link2Off,
   ListPlus,
   Plus,
   SendHorizontal,
@@ -21,6 +23,7 @@ import { ContextUsageIndicator } from '../shared/ContextUsageIndicator';
 import { Tooltip } from '../shared/Tooltip';
 import { AdapterUsageLifecycleProvider } from '../../../hooks/useAdapterUsage';
 import { findReasoningEffortOption } from '../../../utils/configOptions';
+import { ACPBridge } from '../../../utils/bridge';
 
 interface ChatInputControlsProps {
   containerRef: RefObject<HTMLDivElement>;
@@ -102,6 +105,12 @@ export function ChatInputControls({
   hasAttachments = false,
 }: ChatInputControlsProps) {
   const hasInput = !!inputValue.trim() || hasAttachments;
+  const [rememberModelAndEffort, setRememberModelAndEffort] = useState(
+    () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.rememberModelAndEffort ?? false
+  );
+  useEffect(() => ACPBridge.onGlobalSettings((e) => {
+    setRememberModelAndEffort(e.detail?.payload?.settings?.rememberModelAndEffort ?? false);
+  }), []);
   const fastModeOption = additionalConfigOptions.find((option) => {
     if ((option.id !== 'fast' && option.id !== 'fast-mode') || option.type !== 'select' || option.options.length !== 2) return false;
     const values = option.options.map((value) => value.value);
@@ -222,6 +231,7 @@ export function ChatInputControls({
             'schedule-send': scheduleEnabled ? 'on' : 'off',
             'send-mode': sendMode,
             approvals: approvalMode,
+            'remember-model-and-effort': rememberModelAndEffort ? 'on' : 'off',
             ...Object.fromEntries(additionalConfigOptions.map((option) => [option.id, option.currentValue])),
           }}
           options={[
@@ -257,6 +267,19 @@ export function ChatInputControls({
                   description: 'Automatically approve tool requests when a normal approve option is available',
                   icon: <ShieldCheck className="w-4 h-4" />,
                 },
+              ],
+            },
+            {
+              id: 'remember-model-and-effort',
+              label: 'Remember',
+              subOptions: [
+                {
+                  id: 'on',
+                  label: 'Model & effort',
+                  description: "Auto-selects the mode's last model and the model's last effort",
+                  icon: <Link2 className="w-4 h-4" />,
+                },
+                { id: 'off', label: 'Off', icon: <Link2Off className="w-4 h-4" /> },
               ],
             },
             ...additionalConfigOptions.filter((option) => hasSelectedAgent || !narrowOnlyOptions.includes(option)).map((option) => {
@@ -298,6 +321,10 @@ export function ChatInputControls({
               localStorage.setItem('chat-send-mode', subId);
             } else if (parentId === 'approvals') {
               onApprovalModeChange(subId as ApprovalMode);
+            } else if (parentId === 'remember-model-and-effort') {
+              const settings = ACPBridge.getGlobalSettingsSnapshot()?.settings;
+              setRememberModelAndEffort(subId === 'on');
+              if (settings) ACPBridge.saveGlobalSettings({ ...settings, rememberModelAndEffort: subId === 'on' });
             } else {
               onConfigOptionChange(parentId, subId);
             }
