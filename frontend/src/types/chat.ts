@@ -718,5 +718,7 @@ declare global {
     __onGlobalSettings?: (payload: GlobalSettingsPayload) => void;
     __onAdapterDeleted?: (adapterId: string) => void;
     __settingsBridgeReady?: boolean;
+    // Injected into the HTML by AssetLoader.kt.
+    __pluginVersion?: string;
   }
 }

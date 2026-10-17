@@ -195,7 +195,7 @@ export function OpenChatList({
                     <span className="flex items-center justify-center">
                       {getTabIcon(tab, agents)}
                     </span>
-                    <span className="min-w-0 flex-1 truncate" onDoubleClick={() => setRenamingTabId(tab.id)}>{tab.title}</span>
+                    <span className="min-w-0 flex-1 truncate pr-1 group-reveal:pr-0" onDoubleClick={() => setRenamingTabId(tab.id)}>{tab.title}</span>
                   </button>
                   {sidebar ? (
                     <PopupMenu

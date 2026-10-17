@@ -12,8 +12,9 @@ export const sidebarRowClassName = (active: boolean) => `relative flex items-str
 /** Row in the tab bar menu: tinted as in the sidebar. */
 export const menuRowClassName = (active: boolean) => `mx-2 mb-0.5 ${sidebarRowClassName(active)}`;
 
-/** Main button of a row. */
-export const rowButtonClassName = `flex min-h-8 min-w-0 flex-1 items-center gap-2 px-2 text-left ${rowFocusClassName}`;
+/** Main button of a row; its text spans sit 1px lower to look centered, its icons and their `flex` spans do not. */
+export const rowButtonClassName = `flex min-h-8 min-w-0 flex-1 items-center gap-2 px-2 text-left
+  [&>span:not(.flex)]:translate-y-px ${rowFocusClassName}`;
 
 interface RowActionProps {
   label: string;

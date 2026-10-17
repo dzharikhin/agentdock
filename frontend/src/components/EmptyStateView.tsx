@@ -90,15 +90,20 @@ export function EmptyStateView({
                       or continue a chat
                       <div className="h-px flex-1 bg-border" />
                     </div>
-                    {recentChats.map((item) => (
-                      <div key={item.conversationId} className={`${sidebarRowClassName(false)} mb-0.5`}>
-                        <button type="button" onClick={() => onOpenChat(item)} className={rowButtonClassName}>
-                          {getAgentIcon(item.adapterName, agents)}
-                          <span className="flex-1 truncate">{item.title}</span>
-                          <span className="shrink-0 text-foreground-secondary">{formatDate(item.updatedAt)}</span>
-                        </button>
-                      </div>
-                    ))}
+                    {/* Columns shared by the rows, so the titles end before the widest date. `grid` overrides the rows' `flex`. */}
+                    <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-2">
+                      {recentChats.map((item) => (
+                        <div key={item.conversationId}
+                          className={`${sidebarRowClassName(false)} col-span-full mb-0.5 grid grid-cols-subgrid`}>
+                          <button type="button" onClick={() => onOpenChat(item)}
+                            className={`${rowButtonClassName} col-span-full grid grid-cols-subgrid`}>
+                            {getAgentIcon(item.adapterName, agents)}
+                            <span className="truncate">{item.title}</span>
+                            <span className="text-right text-foreground-secondary">{formatDate(item.updatedAt)}</span>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                     {recentChats.length < historyCount ? (
                       <button
                         type="button"

@@ -1,5 +1,7 @@
 package agentdock
 
+import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.extensions.PluginId
 import java.nio.charset.StandardCharsets
 
 /**
@@ -49,6 +51,8 @@ object AssetLoader {
 
             val fontFaceCss = generateFontFaceCss(resourceClass)
 
+            val pluginVersion = PluginManagerCore.getPlugin(PluginId.getId("agentdock"))?.version.orEmpty()
+
             val injection = """
                 <style>
                 $fontFaceCss
@@ -57,6 +61,7 @@ object AssetLoader {
                 <style id="ide-theme-style">
                 $themeCss
                 </style>
+                <script>window.__pluginVersion = "$pluginVersion";</script>
                 <script type="module">
                 $jsContent
                 </script>
