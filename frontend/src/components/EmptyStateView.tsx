@@ -2,6 +2,7 @@ import { Bot } from 'lucide-react';
 import type { AgentOption, HistorySessionMeta } from '../types/chat';
 import { formatDate } from '../utils/formatDate';
 import { sanitizeSvg } from '../utils/sanitizeHtml';
+import { Button } from './ui/Button';
 import { LoadingSpinner } from './ui/LoadingSpinner';
 import { Tooltip } from './chat/shared/Tooltip';
 import { getAgentIcon } from './tabbar/TabIcons';
@@ -119,19 +120,11 @@ export function EmptyStateView({
                 ) : null}
               </>
             ) : (
-              <p className="mx-4 max-w-[340px]">
-                Install at least one AI agent from{' '}
-                <button
-                  type="button"
-                  data-section-opener
-                  onClick={onOpenManagement}
-                  className="rounded-[3px] text-link hover:underline focus:outline-none
-                    focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-                >
-                  Agents
-                </button>{' '}
-                to start a new chat.
-              </p>
+              <>
+                <div className="text-ide-medium mb-2 mx-4">No AI agents installed</div>
+                <p className="mb-6 mx-4 text-foreground-secondary">Install at least one agent through the plugin to start a chat.</p>
+                <Button variant="primary" data-section-opener onClick={onOpenManagement}>Install Agents</Button>
+              </>
             )}
           </div>
         </div>

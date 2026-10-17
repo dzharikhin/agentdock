@@ -126,7 +126,7 @@ export function SectionPopup({ sections, activeSection, compact, sidebarLayout, 
             <line x1="7.5" y1="8" x2="8.5" y2="4" />
             <polyline points="10.5,4 12.5,6 10.5,8" />
           </svg>
-          <span className="-translate-y-px truncate text-ide-regular text-foreground-secondary">
+          <span className="-translate-y-px truncate text-ide-small text-foreground-secondary">
             v{window.__pluginVersion}{compact && label ? ` – ${label}` : ''}
           </span>
           <Tooltip variant="minimal" placement="bottom" content="Close" className="ml-auto flex">

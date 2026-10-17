@@ -2,6 +2,8 @@ import { ReactNode, useContext, useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { ModalContainerContext } from '../ConfirmationModal';
+import { iconButtonClassName } from '../LayoutControls';
+import { Tooltip } from '../chat/shared/Tooltip';
 
 interface FormDialogProps {
   isOpen: boolean;
@@ -61,7 +63,7 @@ export function FormDialog({
         aria-labelledby={titleId}
         tabIndex={-1}
         className="relative flex max-h-full w-full min-w-0 max-w-[400px] flex-col overflow-hidden rounded-[8px] border border-border
-          bg-background text-foreground shadow-popup"
+          bg-background text-ide-small text-foreground shadow-popup"
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             event.preventDefault();
@@ -69,18 +71,14 @@ export function FormDialog({
           }
         }}
       >
-        <div className="flex items-center justify-between px-3 py-2.5">
-
-          <div id={titleId} className="min-w-0 truncate text-foreground">{title}</div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-[4px] p-1 text-foreground-secondary transition-colors hover:bg-background-secondary hover:text-foreground focus:outline-none focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]"
-            aria-label="Close dialog"
-          >
-            <X size={15} />
-          </button>
+        {/* As the section popup title bar. */}
+        <div className="flex h-10 shrink-0 items-center justify-between gap-2 pl-3 pr-2">
+          <div id={titleId} className="min-w-0 truncate text-foreground-secondary">{title}</div>
+          <Tooltip variant="minimal" placement="bottom" content="Close" className="flex">
+            <button type="button" onClick={onClose} className={iconButtonClassName} aria-label="Close dialog">
+              <X size={16} aria-hidden="true" />
+            </button>
+          </Tooltip>
         </div>
 
         <div className="min-h-0 overflow-y-auto px-3 py-2">
