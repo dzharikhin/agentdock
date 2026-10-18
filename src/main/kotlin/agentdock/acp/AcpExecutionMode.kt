@@ -1,7 +1,10 @@
 package agentdock.acp
 
 import com.intellij.execution.configurations.GeneralCommandLine
+import java.io.File
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 internal fun quoteUnixShellArg(value: String): String =
     "'" + value.replace("'", "'\"'\"'") + "'"
@@ -9,7 +12,8 @@ internal fun quoteUnixShellArg(value: String): String =
 internal data class CommandResult(
     val exitCode: Int,
     val stdout: String,
-    val stderr: String
+    val stderr: String,
+    val timedOut: Boolean
 )
 
 internal object AcpExecutionMode {
@@ -25,24 +29,28 @@ internal object AcpExecutionMode {
         }
     }
 
+    /**
+     * Runs a short-lived command to completion. On timeout or thread interruption the whole process
+     * tree is killed; start failures and interruptions propagate to the caller. [closeStdin] = false
+     * leaves stdin open for commands that treat end of input as a request to quit.
+     */
     fun runCommand(
         command: List<String>,
-        stdin: String? = null,
+        closeStdin: Boolean = true,
         environmentOverrides: Map<String, String> = emptyMap(),
-        timeoutSeconds: Long = 30
-    ): CommandResult? {
-        return runCatching {
-            // Use the same process launcher as regular ACP processes for headless commands.
-            val commandLine = GeneralCommandLine(command)
-                .withRedirectErrorStream(false)
-                .withEnvironment(AcpProcessEnvironment.baseEnvironment() + environmentOverrides)
-            val process = commandLine.createProcess()
-
-            if (stdin != null) {
-                process.outputStream.bufferedWriter().use { writer -> writer.write(stdin) }
-            } else {
-                process.outputStream.close()
-            }
+        extraPathEntries: List<File> = emptyList(),
+        workingDirectory: File? = null,
+        redirectErrorStream: Boolean = false,
+        timeout: Duration = 30.seconds
+    ): CommandResult {
+        // Use the same process launcher as regular ACP processes for headless commands.
+        val process = GeneralCommandLine(command)
+            .withWorkDirectory(workingDirectory)
+            .withRedirectErrorStream(redirectErrorStream)
+            .withEnvironment(AcpProcessEnvironment.withPrependedPathEntries(extraPathEntries) + environmentOverrides)
+            .createProcess()
+        try {
+            if (closeStdin) process.outputStream.close()
 
             val stdout = StringBuilder()
             val stderr = StringBuilder()
@@ -57,17 +65,19 @@ internal object AcpExecutionMode {
                 }
             }.apply { isDaemon = true; start() }
 
-            val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
-            if (!finished) {
-                process.destroyForcibly()
-                outThread.join(1000)
-                errThread.join(1000)
-                CommandResult(-1, stdout.toString(), stderr.toString())
-            } else {
-                outThread.join(1000)
-                errThread.join(1000)
-                CommandResult(process.exitValue(), stdout.toString(), stderr.toString())
-            }
-        }.getOrNull()
+            val finished = process.waitFor(timeout.inWholeMilliseconds, TimeUnit.MILLISECONDS)
+            if (!finished) AcpProcessUtils.destroyProcessTree(process.toHandle())
+            outThread.join(1000)
+            errThread.join(1000)
+            return CommandResult(
+                exitCode = if (finished) process.exitValue() else -1,
+                stdout = stdout.toString(),
+                stderr = stderr.toString(),
+                timedOut = !finished
+            )
+        } catch (error: Exception) {
+            if (process.isAlive) AcpProcessUtils.destroyProcessTree(process.toHandle())
+            throw error
+        }
     }
 }

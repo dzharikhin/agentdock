@@ -53,7 +53,7 @@ object AcpAdapterPaths {
 
     internal fun isDownloaded(adapterName: String? = null): Boolean {
         val adapterInfo = getAdapterInfo(adapterName)
-        if (adapterInfo.isCustom) return isCustomExecutableAvailable(adapterInfo.customCommand.orEmpty())
+        if (adapterInfo.isCustom) return isCustomExecutableAvailable(adapterInfo)
         val runtimeDir = File(getDependenciesDir(), adapterInfo.id)
         return hasInstalledAdapterLaunch(runtimeDir, adapterInfo) &&
             isInstalledVersionSupported(adapterInfo, installedVersionFromRuntimeDir(runtimeDir, adapterInfo))
@@ -131,35 +131,16 @@ object AcpAdapterPaths {
         runtimeDir: File,
         adapterInfo: AcpAdapterConfig.AdapterInfo
     ): Boolean {
-        if (adapterInfo.isCustom) return isCustomExecutableAvailable(adapterInfo.customCommand.orEmpty())
+        if (adapterInfo.isCustom) return isCustomExecutableAvailable(adapterInfo)
         return runtimeDir.isDirectory &&
             (adapterInfo.distribution.type != AcpAdapterConfig.DistributionType.NPM ||
                 File(runtimeDir, "node_modules").isDirectory) &&
             resolveAdapterLaunchFile(runtimeDir, adapterInfo)?.isFile == true
     }
 
-    private fun isCustomExecutableAvailable(command: String): Boolean {
-        val cleanCommand = command.trim()
-        if (cleanCommand.isEmpty()) return false
-        val direct = File(cleanCommand)
-        if (direct.isAbsolute || cleanCommand.contains('/') || cleanCommand.contains('\\')) {
-            return direct.isFile
-        }
-
-        val path = System.getenv("PATH").orEmpty()
-        if (path.isBlank()) return false
-        val suffixes = if (AcpExecutionMode.isWindowsHost()) {
-            val configured = System.getenv("PATHEXT").orEmpty()
-                .split(';')
-                .map(String::trim)
-                .filter(String::isNotEmpty)
-            listOf("") + configured.ifEmpty { listOf(".EXE", ".CMD", ".BAT", ".COM") }
-        } else {
-            listOf("")
-        }
-        return path.split(File.pathSeparatorChar).any { directory ->
-            suffixes.any { suffix -> File(directory, cleanCommand + suffix).isFile }
-        }
+    private fun isCustomExecutableAvailable(adapterInfo: AcpAdapterConfig.AdapterInfo): Boolean {
+        val command = adapterInfo.customCommand.orEmpty().trim()
+        return command.isNotEmpty() && findCustomCommandFile(command, adapterInfo.environment) != null
     }
 
     private fun missingLaunchTargetError(

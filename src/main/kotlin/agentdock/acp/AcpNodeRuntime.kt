@@ -12,6 +12,7 @@ import java.net.URI
 import java.security.MessageDigest
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 internal data class AcpNodeRuntime(
     val node: String,
@@ -118,17 +119,15 @@ internal object AcpNodeRuntimeResolver {
     }
 
     private fun runWhich(nvmd: String, name: String, pathEntries: List<File>): String? {
-        val process = ProcessBuilder(nvmd, "which", name).redirectErrorStream(true)
-        applyTo(process, AcpNodeRuntime(commandName("node"), commandName("npm"), commandName("npx"), pathEntries))
-        return runCatching {
-            val started = process.start()
-            val output = started.inputStream.bufferedReader().use { it.readText() }.trim()
-            if (!started.waitFor(10, TimeUnit.SECONDS)) {
-                started.destroyForcibly()
-                return null
-            }
-            output.lines().firstOrNull { it.isNotBlank() }?.trim()?.takeIf { started.exitValue() == 0 }
-        }.getOrNull()
+        val result = runCatching {
+            AcpExecutionMode.runCommand(
+                command = listOf(nvmd, "which", name),
+                extraPathEntries = pathEntries,
+                redirectErrorStream = true,
+                timeout = 10.seconds
+            )
+        }.getOrNull()?.takeIf { it.exitCode == 0 } ?: return null
+        return result.stdout.lines().firstOrNull { it.isNotBlank() }?.trim()
     }
 
     private fun installManaged(
@@ -291,12 +290,12 @@ internal object AcpNodeRuntimeResolver {
 
     private fun versionCheck(command: String, runtime: AcpNodeRuntime): Boolean {
         return runCatching {
-            val processBuilder = ProcessBuilder(command, "--version").redirectErrorStream(true)
-            applyTo(processBuilder, runtime)
-            val process = processBuilder.start()
-            val finished = process.waitFor(15, TimeUnit.SECONDS)
-            if (!finished) process.destroyForcibly()
-            finished && process.exitValue() == 0
+            AcpExecutionMode.runCommand(
+                command = listOf(command, "--version"),
+                extraPathEntries = runtime.pathEntries,
+                redirectErrorStream = true,
+                timeout = 15.seconds
+            ).exitCode == 0
         }.getOrDefault(false)
     }
 

@@ -11,6 +11,7 @@ import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Fetches usage/quota data from different AI provider adapters.
@@ -137,11 +138,13 @@ internal object AcpUsageDataFetcher {
         ) ?: run {
             return@cachedUsage ""
         }
-        val result = AcpExecutionMode.runCommand(
-            command = command,
-            environmentOverrides = adapter.cli?.environment.orEmpty(),
-            timeoutSeconds = LOCAL_USAGE_TIMEOUT_SECONDS
-        )
+        val result = runCatching {
+            AcpExecutionMode.runCommand(
+                command = command,
+                environmentOverrides = adapter.cli?.environment.orEmpty(),
+                timeout = LOCAL_USAGE_TIMEOUT_SECONDS.seconds
+            )
+        }.getOrNull()
         if (result?.exitCode == 0) {
             normalizeAntigravityUsage(result.stdout)
         } else {
@@ -155,11 +158,13 @@ internal object AcpUsageDataFetcher {
             extraArgs = listOf("--version")
         ) ?: return false
         val minimumVersion = adapter.cli?.minimumVersion?.trim()?.takeIf { it.isNotEmpty() } ?: return false
-        val result = AcpExecutionMode.runCommand(
-            command = command,
-            environmentOverrides = adapter.cli.environment,
-            timeoutSeconds = LOCAL_USAGE_TIMEOUT_SECONDS
-        )
+        val result = runCatching {
+            AcpExecutionMode.runCommand(
+                command = command,
+                environmentOverrides = adapter.cli.environment,
+                timeout = LOCAL_USAGE_TIMEOUT_SECONDS.seconds
+            )
+        }.getOrNull()
             ?.takeIf { it.exitCode == 0 }
             ?: return false
         val version = Regex("""\b\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?\b""")

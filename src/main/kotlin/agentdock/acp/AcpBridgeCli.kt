@@ -163,6 +163,17 @@ internal fun buildAdapterCliCommandParts(
     return adapterInfo to commandParts
 }
 
+/** Runs a Windows batch-file executable through `cmd.exe /c`; other commands are returned unchanged. */
+internal fun wrapWindowsBatchCommand(commandParts: List<String>): List<String> =
+    if (
+        AcpExecutionMode.isWindowsHost() &&
+        commandParts.firstOrNull()?.let { it.endsWith(".cmd", ignoreCase = true) || it.endsWith(".bat", ignoreCase = true) } == true
+    ) {
+        listOf("cmd.exe", "/c") + commandParts
+    } else {
+        commandParts
+    }
+
 internal fun applyCliPlaceholders(values: List<String>, placeholders: Map<String, String>): List<String> {
     return values.map { value ->
         placeholders.entries.fold(value) { acc, (key, replacement) ->

@@ -8,6 +8,7 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Duration.Companion.seconds
 
 internal object AcpLoginStatus {
     private const val ANTIGRAVITY_METHOD = "antigravityAuthFile"
@@ -36,10 +37,9 @@ internal object AcpLoginStatus {
             adapterRootPath = adapterRoot,
             adapterInfo = adapterInfo.copy(args = emptyList())
         ) + listOf("--cli", "auth", "status")
-        val result = AcpExecutionMode.runCommand(
-            command = command,
-            timeoutSeconds = STATUS_TIMEOUT_SECONDS
-        ) ?: return null
+        val result = runCatching {
+            AcpExecutionMode.runCommand(command = command, timeout = STATUS_TIMEOUT_SECONDS.seconds)
+        }.getOrNull() ?: return null
         return parseClaudeCodeLoginStatus(result.stdout)
             ?: parseClaudeCodeLoginStatus(result.stderr)
     }
@@ -75,20 +75,12 @@ internal object AcpLoginStatus {
             adapterId = adapterInfo.id,
             extraArgs = args
         ) ?: return null
-        val command = if (
-            AcpExecutionMode.isWindowsHost() &&
-            commandParts.firstOrNull()?.let {
-                it.endsWith(".cmd", ignoreCase = true) || it.endsWith(".bat", ignoreCase = true)
-            } == true
-        ) {
-            listOf("cmd.exe", "/c") + commandParts
-        } else {
-            commandParts
-        }
-        val result = AcpExecutionMode.runCommand(
-            command = command,
-            timeoutSeconds = STATUS_TIMEOUT_SECONDS
-        ) ?: return null
+        val result = runCatching {
+            AcpExecutionMode.runCommand(
+                command = wrapWindowsBatchCommand(commandParts),
+                timeout = STATUS_TIMEOUT_SECONDS.seconds
+            )
+        }.getOrNull() ?: return null
         return result.stdout + "\n" + result.stderr
     }
 }

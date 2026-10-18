@@ -96,33 +96,35 @@ private fun resolveCustomWindowsCommand(
     command: String,
     environmentOverrides: Map<String, String>
 ): String {
-    if (!AcpExecutionMode.isWindowsHost()) return command
+    if (!AcpExecutionMode.isWindowsHost() || File(command).extension.isNotEmpty()) return command
+    return findCustomCommandFile(command, environmentOverrides)?.absolutePath ?: command
+}
 
-    val commandFile = File(command)
-    if (commandFile.extension.isNotEmpty()) return command
-
+/**
+ * Finds the file a custom adapter command starts, searching PATH and, for a Windows command without
+ * an extension, PATHEXT of the environment the adapter process is launched with.
+ */
+internal fun findCustomCommandFile(command: String, environmentOverrides: Map<String, String>): File? {
     val environment = AcpProcessEnvironment.baseEnvironment()
-    val pathExtensions = environmentValue(environmentOverrides, "PATHEXT")
-        ?: environmentValue(environment, "PATHEXT")
-        ?: ".COM;.EXE;.BAT;.CMD"
-    val candidates = pathExtensions
-        .split(';')
-        .map(String::trim)
-        .filter(String::isNotEmpty)
-        .map { extension -> if (extension.startsWith('.')) extension else ".$extension" }
+    val extensions = if (AcpExecutionMode.isWindowsHost() && File(command).extension.isEmpty()) {
+        (environmentValue(environmentOverrides, "PATHEXT")
+            ?: environmentValue(environment, "PATHEXT")
+            ?: ".COM;.EXE;.BAT;.CMD")
+            .split(';')
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .map { extension -> if (extension.startsWith('.')) extension else ".$extension" }
+    } else {
+        listOf("")
+    }
 
-    if (commandFile.isAbsolute || command.contains('/') || command.contains('\\')) {
-        return candidates
-            .asSequence()
-            .map { extension -> File(command + extension) }
-            .firstOrNull(File::isFile)
-            ?.absolutePath
-            ?: command
+    if (File(command).isAbsolute || command.contains('/') || command.contains('\\')) {
+        return extensions.asSequence().map { extension -> File(command + extension) }.firstOrNull(File::isFile)
     }
 
     val path = environmentValue(environmentOverrides, "PATH")
         ?: environmentValue(environment, "PATH")
-        ?: return command
+        ?: return null
     return path
         .split(File.pathSeparatorChar)
         .asSequence()
@@ -130,11 +132,9 @@ private fun resolveCustomWindowsCommand(
         .filter(String::isNotEmpty)
         .flatMap { directory ->
             val cleanDirectory = directory.removeSurrounding("\"")
-            candidates.asSequence().map { extension -> File(cleanDirectory, command + extension) }
+            extensions.asSequence().map { extension -> File(cleanDirectory, command + extension) }
         }
         .firstOrNull(File::isFile)
-        ?.absolutePath
-        ?: command
 }
 
 private fun environmentValue(environment: Map<String, String>, name: String): String? =

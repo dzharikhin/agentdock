@@ -12,7 +12,7 @@ import agentdock.utils.jsStringLiteral
 import com.intellij.openapi.diagnostic.Logger
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.seconds
 import com.agentclientprotocol.model.AuthMethod
 
 private const val RUNTIME_CHECK_MAX_ATTEMPTS = 3
@@ -427,21 +427,20 @@ internal fun AcpBridge.pushAdapters(
                             val workDir = AcpAdapterPaths.getDownloadPath(info.id)
                                 .takeIf { it.isNotBlank() }
                                 ?.let(::File)
-                            val builder = ProcessBuilder(cmd)
-                                .also { process -> if (workDir != null) process.directory(workDir) }
-                                .redirectErrorStream(true)
-                            AcpNodeRuntimeResolver.resolveAvailable()
-                                ?.let { AcpNodeRuntimeResolver.applyTo(builder, it) }
-                            val process = builder.start()
-                            val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
-                            if (!process.waitFor(10L, TimeUnit.SECONDS)) {
-                                process.destroyForcibly()
+                            val result = AcpExecutionMode.runCommand(
+                                command = cmd,
+                                extraPathEntries = AcpNodeRuntimeResolver.resolveAvailable()?.pathEntries.orEmpty(),
+                                workingDirectory = workDir,
+                                redirectErrorStream = true,
+                                timeout = 10.seconds
+                            )
+                            if (result.timedOut) {
                                 LOG.warn(
                                     "Agent version command timed out for '${info.id}' " +
                                         "(attempt $attempt/$RUNTIME_CHECK_MAX_ATTEMPTS)"
                                 )
                             } else {
-                                val version = parseAgentVersion(info.agentVersionConfig, output)
+                                val version = parseAgentVersion(info.agentVersionConfig, result.stdout.trim())
                                 if (!version.isNullOrBlank()) {
                                     agentVersionStates[info.id] = version
                                     return@runRuntimeCheckWithRetries true

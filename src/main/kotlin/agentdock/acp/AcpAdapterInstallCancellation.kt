@@ -31,12 +31,6 @@ internal class AcpAdapterInstallCancellation {
         processes.remove(process)
     }
 
-    private fun destroyProcessTree(process: Process) {
-        runCatching {
-            process.toHandle().descendants().forEach { child ->
-                runCatching { child.destroyForcibly() }
-            }
-        }
-        runCatching { process.destroyForcibly() }
-    }
+    private fun destroyProcessTree(process: Process) =
+        AcpProcessUtils.destroyProcessTrees(listOf(process.toHandle()), awaitExit = false)
 }

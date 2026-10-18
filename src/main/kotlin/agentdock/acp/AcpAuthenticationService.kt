@@ -2,12 +2,13 @@ package agentdock.acp
 
 import com.agentclientprotocol.model.AuthMethod
 import java.io.File
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object AcpAuthenticationService {
     private const val AUTH_TIMEOUT_MS = 300_000L
@@ -87,7 +88,6 @@ internal object AcpAuthenticationService {
             adapterInfo = adapterInfo.copy(args = emptyList())
         ) + adapterInfo.loginArgs
         runCommand(
-            adapterId = adapterInfo.id,
             command = command,
             workingDirectory = File(adapterRoot),
             timeoutMs = AUTH_TIMEOUT_MS,
@@ -140,7 +140,6 @@ internal object AcpAuthenticationService {
             adapterInfo = adapterInfo.copy(args = emptyList())
         ) + adapterInfo.logoutArgs
         runCommand(
-            adapterId = adapterInfo.id,
             command = command,
             workingDirectory = File(adapterRoot),
             timeoutMs = LOGOUT_TIMEOUT_MS,
@@ -160,63 +159,30 @@ internal object AcpAuthenticationService {
         return sharedProcess
     }
 
+    /** Cancelling the coroutine interrupts the command, which kills its process tree. */
     private suspend fun runCommand(
-        adapterId: String,
         command: List<String>,
         workingDirectory: File,
-        environment: Map<String, String> = emptyMap(),
         timeoutMs: Long,
         actionName: String
-    ) = withContext(Dispatchers.IO) {
-        val builder = ProcessBuilder(command)
-            .directory(workingDirectory)
-            .redirectErrorStream(true)
-        AcpProcessEnvironment.applyTo(builder)
-        AcpNodeRuntimeResolver.resolveAvailable()?.let { runtime ->
-            AcpNodeRuntimeResolver.applyTo(builder, runtime)
+    ) {
+        val result = runInterruptible(Dispatchers.IO) {
+            AcpExecutionMode.runCommand(
+                command = command,
+                closeStdin = false,
+                extraPathEntries = AcpNodeRuntimeResolver.resolveAvailable()?.pathEntries.orEmpty(),
+                workingDirectory = workingDirectory,
+                redirectErrorStream = true,
+                timeout = timeoutMs.milliseconds
+            )
         }
-        builder.environment().putAll(environment)
-
-        val process = builder.start()
-        val output = StringBuilder()
-        val drainer = Thread {
-            runCatching {
-                process.inputStream.bufferedReader().useLines { lines ->
-                    lines.forEach { output.appendLine(it) }
-                }
-            }
-        }.apply {
-            isDaemon = true
-            name = "acp-${actionName.lowercase()}-drain-$adapterId"
-            start()
-        }
-
-        try {
-            val startedAt = System.currentTimeMillis()
-            while (process.isAlive && System.currentTimeMillis() - startedAt < timeoutMs) {
-                delay(250L)
-            }
-            if (process.isAlive) {
-                AcpProcessUtils.destroyProcessTree(process.toHandle())
-                throw IllegalStateException("$actionName timed out")
-            }
-            drainer.join(1_000L)
-            val exitCode = process.exitValue()
-            if (exitCode != 0) {
-                val details = output.toString().trim().takeLast(240)
-                    .takeIf { it.isNotBlank() }
-                    ?.let { ": $it" }
-                    .orEmpty()
-                throw IllegalStateException("$actionName command failed (exit $exitCode)$details")
-            }
-        } catch (error: CancellationException) {
-            AcpProcessUtils.destroyProcessTree(process.toHandle())
-            throw error
-        } catch (error: Exception) {
-            if (process.isAlive) {
-                AcpProcessUtils.destroyProcessTree(process.toHandle())
-            }
-            throw error
+        check(!result.timedOut) { "$actionName timed out" }
+        if (result.exitCode != 0) {
+            val details = result.stdout.trim().takeLast(240)
+                .takeIf { it.isNotBlank() }
+                ?.let { ": $it" }
+                .orEmpty()
+            throw IllegalStateException("$actionName command failed (exit ${result.exitCode})$details")
         }
     }
 }
