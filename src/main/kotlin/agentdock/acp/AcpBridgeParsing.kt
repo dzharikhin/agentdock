@@ -2,6 +2,7 @@ package agentdock.acp
 
 import com.agentclientprotocol.model.*
 import agentdock.history.ForkConversationBase
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 
 internal data class ParsedStartPayload(
@@ -33,150 +34,124 @@ internal data class ParsedCancelPayload(
     val chatId: String?
 )
 
+private val bridgePayloadJson = Json { ignoreUnknownKeys = true }
+
+/** JSON fields sent with UI bridge requests; each parser reads the fields of its own request. */
+@Serializable
+private class BridgePayload(
+    val requestId: String? = null,
+    val chatId: String? = null,
+    val adapterId: String? = null,
+    val methodId: String? = null,
+    val projectPath: String? = null,
+    val conversationId: String? = null,
+    val text: String? = null,
+    val forkBase: ForkBasePayload? = null,
+    // Kept as raw JSON so one malformed value drops only that entry, not the whole request.
+    val configValues: JsonObject? = null,
+    val modelByMode: JsonObject? = null,
+    val effortByModel: JsonObject? = null
+)
+
+@Serializable
+private class ForkBasePayload(val sourceConversationId: String? = null, val promptCount: Int? = null)
+
+private fun decodeBridgePayload(payload: String): BridgePayload? =
+    runCatching { bridgePayloadJson.decodeFromString<BridgePayload>(payload.trim()) }.getOrNull()
+
+private fun String?.nonBlank(): String? = this?.takeIf { it.isNotBlank() }
+
 internal fun parseIdOnlyPayload(payload: String): String? {
     return payload.trim().takeIf { it.isNotEmpty() }
 }
 
+internal fun parseAdapterIdPayload(payload: String): String? = decodeBridgePayload(payload)?.adapterId.nonBlank()
+
 internal fun parseAdapterAuthMethodPayload(payload: String): Pair<String?, String?> {
-    val raw = payload.trim().orEmpty()
-    if (raw.isEmpty()) return null to null
-    return try {
-        val obj = Json.parseToJsonElement(raw).jsonObject
-        val adapterId = obj["adapterId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        val methodId = obj["methodId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        adapterId to methodId
-    } catch (_: Exception) {
-        null to null
-    }
+    val parsed = decodeBridgePayload(payload)
+    return parsed?.adapterId.nonBlank() to parsed?.methodId.nonBlank()
 }
 
 internal fun parseStartRequestPayload(payload: String): ParsedStartPayload {
-    val raw = payload.trim().orEmpty()
-    if (raw.isEmpty()) return ParsedStartPayload(null, null, null, emptyMap())
-    return try {
-        val obj = Json.parseToJsonElement(raw).jsonObject
-        val requestId = obj["requestId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        val chatId = obj["chatId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        val adapterId = obj["adapterId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        ParsedStartPayload(requestId, chatId, adapterId, parseConfigValues(obj))
-    } catch (_: Exception) { ParsedStartPayload(null, null, null, emptyMap()) }
+    val parsed = decodeBridgePayload(payload)
+    return ParsedStartPayload(
+        requestId = parsed?.requestId.nonBlank(),
+        chatId = parsed?.chatId.nonBlank(),
+        adapterId = parsed?.adapterId.nonBlank(),
+        configValues = normalizeConfigValues(parsed?.configValues)
+    )
 }
 
 internal fun parseRememberConfigPayload(payload: String): ParsedRememberConfigPayload? {
-    return try {
-        val obj = Json.parseToJsonElement(payload.trim()).jsonObject
-        val adapterId = obj["adapterId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() } ?: return null
-        ParsedRememberConfigPayload(
-            adapterId = adapterId,
-            configValues = parseConfigValues(obj),
-            modelByMode = parseConfigValues(obj, "modelByMode"),
-            effortByModel = parseConfigValues(obj, "effortByModel")
-        )
-    } catch (_: Exception) { null }
+    val parsed = decodeBridgePayload(payload) ?: return null
+    return ParsedRememberConfigPayload(
+        adapterId = parsed.adapterId.nonBlank() ?: return null,
+        configValues = normalizeConfigValues(parsed.configValues),
+        modelByMode = normalizeConfigValues(parsed.modelByMode),
+        effortByModel = normalizeConfigValues(parsed.effortByModel)
+    )
 }
 
 internal fun parseConversationLoadPayload(payload: String): Triple<String?, String?, String?> {
-    val raw = payload.trim().orEmpty()
-    if (raw.isEmpty()) return Triple(null, null, null)
-    return try {
-        val obj = Json.parseToJsonElement(raw).jsonObject
-        val chatId = obj["chatId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        val projectPath = obj["projectPath"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        val conversationId = obj["conversationId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        Triple(chatId, projectPath, conversationId)
-    } catch (_: Exception) { Triple(null, null, null) }
+    val parsed = decodeBridgePayload(payload)
+    return Triple(parsed?.chatId.nonBlank(), parsed?.projectPath.nonBlank(), parsed?.conversationId.nonBlank())
 }
 
 internal fun parseHistoryConversationCliPayload(payload: String): Pair<String?, String?> {
-    val raw = payload.trim().orEmpty()
-    if (raw.isEmpty()) return null to null
-    return try {
-        val obj = Json.parseToJsonElement(raw).jsonObject
-        val projectPath = obj["projectPath"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        val conversationId = obj["conversationId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        projectPath to conversationId
-    } catch (_: Exception) {
-        null to null
-    }
+    val parsed = decodeBridgePayload(payload)
+    return parsed?.projectPath.nonBlank() to parsed?.conversationId.nonBlank()
 }
 
 internal fun parseBlocksPayload(payload: String): ParsedBlocksPayload {
-    val raw = payload.trim().orEmpty()
-    if (raw.isEmpty()) return ParsedBlocksPayload(null, null, emptyList(), emptyList(), null, null, emptyMap())
-    return try {
-        val obj = Json.parseToJsonElement(raw).jsonObject
-        val requestId = obj["requestId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        val chatId = obj["chatId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        val forkBase = parseForkConversationBase(obj["forkBase"])
-        val adapterId = obj["adapterId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        val configValues = parseConfigValues(obj)
+    val parsed = decodeBridgePayload(payload)
+        ?: return ParsedBlocksPayload(null, null, emptyList(), emptyList(), null, null, emptyMap())
+    val textValue = parsed.text.orEmpty()
 
-        val textValue = obj["text"]?.jsonPrimitive?.content ?: ""
+    // The UI sends content blocks as a JSON array inside the text field.
+    val structured = textValue.takeIf { it.startsWith("[") && it.endsWith("]") }?.let { text ->
+        runCatching {
+            val rawBlocks = Json.parseToJsonElement(text).jsonArray.mapNotNull { it as? JsonObject }
+            parseContentBlocks(JsonArray(rawBlocks)) to rawBlocks
+        }.getOrNull()
+    }?.takeIf { (blocks, _) -> blocks.isNotEmpty() }
 
-        // The UI sends content blocks as a JSON array inside the text field.
-        if (textValue.startsWith("[") && textValue.endsWith("]")) {
-            runCatching {
-                val rawBlocks = Json.parseToJsonElement(textValue).jsonArray.mapNotNull { it as? JsonObject }
-                val blocks = parseContentBlocks(JsonArray(rawBlocks))
-                ParsedBlocksPayload(
-                    requestId = requestId,
-                    chatId = chatId,
-                    blocks = blocks,
-                    rawBlocks = rawBlocks,
-                    forkBase = forkBase,
-                    adapterId = adapterId,
-                    configValues = configValues
-                )
-            }.getOrNull()?.takeIf { it.blocks.isNotEmpty() }?.let { parsed ->
-                return parsed
+    // Fallback: treat as plain text
+    val (blocks, rawBlocks) = structured ?: (
+        listOf(ContentBlock.Text(textValue)) to listOf(
+            buildJsonObject {
+                put("type", "text")
+                put("text", textValue)
             }
-        }
-
-        // Fallback: treat as plain text
-        ParsedBlocksPayload(
-            requestId = requestId,
-            chatId = chatId,
-            blocks = listOf(ContentBlock.Text(textValue)),
-            rawBlocks = listOf(
-                buildJsonObject {
-                    put("type", "text")
-                    put("text", textValue)
-                }
-            ),
-            forkBase = forkBase,
-            adapterId = adapterId,
-            configValues = configValues
         )
-    } catch (_: Exception) { ParsedBlocksPayload(null, null, emptyList(), emptyList(), null, null, emptyMap()) }
+    )
+    val forkBase = parsed.forkBase?.let { base ->
+        val sourceConversationId = base.sourceConversationId?.trim().orEmpty()
+        val promptCount = base.promptCount ?: 0
+        if (sourceConversationId.isBlank() || promptCount <= 0) null
+        else ForkConversationBase(sourceConversationId = sourceConversationId, promptCount = promptCount)
+    }
+    return ParsedBlocksPayload(
+        requestId = parsed.requestId.nonBlank(),
+        chatId = parsed.chatId.nonBlank(),
+        blocks = blocks,
+        rawBlocks = rawBlocks,
+        forkBase = forkBase,
+        adapterId = parsed.adapterId.nonBlank(),
+        configValues = normalizeConfigValues(parsed.configValues)
+    )
 }
 
-private fun parseConfigValues(payload: JsonObject, key: String = "configValues"): Map<String, String> =
-    (payload[key] as? JsonObject).orEmpty().mapNotNull { (id, value) ->
+private fun normalizeConfigValues(values: JsonObject?): Map<String, String> =
+    values.orEmpty().mapNotNull { (id, value) ->
         val normalizedId = id.trim()
         val normalizedValue = (value as? JsonPrimitive)?.contentOrNull?.trim().orEmpty()
         if (normalizedId.isEmpty() || normalizedValue.isEmpty()) null else normalizedId to normalizedValue
     }.toMap()
 
-private fun parseForkConversationBase(element: JsonElement?): ForkConversationBase? {
-    val obj = element as? JsonObject ?: return null
-    val sourceConversationId = obj["sourceConversationId"]?.jsonPrimitive?.content?.trim().orEmpty()
-    val promptCount = obj["promptCount"]?.jsonPrimitive?.intOrNull ?: 0
-    if (sourceConversationId.isBlank() || promptCount <= 0) return null
-    return ForkConversationBase(sourceConversationId = sourceConversationId, promptCount = promptCount)
-}
-
 internal fun parseCancelPayload(payload: String): ParsedCancelPayload {
-    val raw = payload.trim().orEmpty()
-    if (raw.isEmpty()) return ParsedCancelPayload(null, null)
-    return try {
-        val obj = Json.parseToJsonElement(raw).jsonObject
-        ParsedCancelPayload(
-            requestId = obj["requestId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() },
-            chatId = obj["chatId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-        )
-    } catch (_: Exception) {
-        ParsedCancelPayload(null, raw.takeIf { it.isNotBlank() })
-    }
+    val parsed = decodeBridgePayload(payload)
+        ?: return ParsedCancelPayload(null, payload.trim().takeIf { it.isNotBlank() })
+    return ParsedCancelPayload(parsed.requestId.nonBlank(), parsed.chatId.nonBlank())
 }
 
 internal fun parseContentBlocks(blocksElement: JsonElement): List<ContentBlock> {

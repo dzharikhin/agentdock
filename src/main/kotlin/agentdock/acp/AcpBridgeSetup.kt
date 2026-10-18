@@ -564,15 +564,7 @@ internal fun AcpBridge.installAdapterQueries() {
     }
 
     host.register("fetchUsage") { payload ->
-        val raw = payload.trim()
-        val adapterId = if (raw.startsWith("{")) {
-            runCatching {
-                val obj = Json.parseToJsonElement(raw).jsonObject
-                obj["adapterId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
-            }.getOrNull() ?: parseIdOnlyPayload(raw) ?: raw
-        } else {
-            parseIdOnlyPayload(raw) ?: raw
-        }
+        val adapterId = parseAdapterIdPayload(payload) ?: payload.trim()
         scope.launch(Dispatchers.IO) {
             val result = when (adapterId) {
                 "claude-code" -> AcpUsageDataFetcher.fetchClaudeUsageData()
