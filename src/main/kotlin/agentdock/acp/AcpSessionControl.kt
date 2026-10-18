@@ -102,10 +102,7 @@ internal fun AcpClientService.prompt(chatId: String, blocks: List<ContentBlock>)
 internal suspend fun AcpClientService.cancel(chatId: String) {
     val context = sessions[chatId] ?: return
     cancelWithContext(context)
-    context.pendingRequests.values.forEach {
-        it.complete(RequestPermissionResponse(RequestPermissionOutcome.Cancelled))
-    }
-    context.pendingRequests.clear()
+    context.cancelPendingPermissions()
 }
 
 internal suspend fun AcpClientService.cancelWithContext(context: AcpClientService.AgentContext) {
@@ -119,10 +116,7 @@ internal suspend fun AcpClientService.stopAgent(chatId: String) {
     context.lifecycleMutex.withLock {
         try {
             context.ignoreUpdatesUntilPrompt = true
-            context.pendingRequests.values.forEach {
-                it.complete(RequestPermissionResponse(RequestPermissionOutcome.Cancelled))
-            }
-            context.pendingRequests.clear()
+            context.cancelPendingPermissions()
             try {
                 context.session?.cancel()
             } catch (error: CancellationException) {

@@ -62,13 +62,13 @@ internal fun AcpBridge.pushContentBlock(chatId: String, role: String, content: C
     )
 }
 
-internal fun AcpBridge.pushToolCallChunk(chatId: String, rawJson: String) {
-    val displayRawJson = compactToolRawJsonForDisplay(rawJson)
+/** Sends a tool call ([type] `tool_call`) or its update (`tool_call_update`) to the UI. */
+internal fun AcpBridge.pushToolCallChunk(chatId: String, type: String, toolCallId: String, rawJson: String, fullOutput: Boolean) {
+    val displayRawJson = compactToolRawJsonForDisplay(rawJson, fullOutput)
     val parsed = try { Json.parseToJsonElement(displayRawJson).jsonObject } catch (e: Exception) {
         LOG.debug("Failed to parse tool call JSON", e)
         null
     }
-    val toolCallId = parsed?.get("toolCallId")?.jsonPrimitive?.contentOrNull ?: ""
     val kind = parsed?.get("kind")?.jsonPrimitive?.contentOrNull ?: ""
     val title = parsed?.get("title")?.jsonPrimitive?.contentOrNull ?: ""
     val status = parsed?.get("status")?.jsonPrimitive?.contentOrNull ?: ""
@@ -76,30 +76,7 @@ internal fun AcpBridge.pushToolCallChunk(chatId: String, rawJson: String) {
     val json = buildJsonObject {
         put("chatId", chatId)
         put("role", "assistant")
-        put("type", "tool_call")
-        put("toolCallId", toolCallId)
-        put("toolKind", kind)
-        put("toolTitle", title)
-        put("toolStatus", status)
-        put("toolRawJson", displayRawJson)
-    }.toString()
-    dispatchContentChunkJson(json)
-}
-
-internal fun AcpBridge.pushToolCallUpdateChunk(chatId: String, toolCallId: String, rawJson: String, fullOutput: Boolean) {
-    val displayRawJson = compactToolRawJsonForDisplay(rawJson, fullOutput)
-    val parsed = try { Json.parseToJsonElement(displayRawJson).jsonObject } catch (e: Exception) {
-        LOG.debug("Failed to parse tool call update JSON", e)
-        null
-    }
-    val kind = parsed?.get("kind")?.jsonPrimitive?.contentOrNull ?: ""
-    val title = parsed?.get("title")?.jsonPrimitive?.contentOrNull ?: ""
-    val status = parsed?.get("status")?.jsonPrimitive?.contentOrNull ?: ""
-
-    val json = buildJsonObject {
-        put("chatId", chatId)
-        put("role", "assistant")
-        put("type", "tool_call_update")
+        put("type", type)
         put("toolCallId", toolCallId)
         put("toolKind", kind)
         put("toolTitle", title)

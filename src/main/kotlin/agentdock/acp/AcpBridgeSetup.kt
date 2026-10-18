@@ -105,64 +105,13 @@ internal fun AcpBridge.installServiceCallbacks() {
             }
             is SessionUpdate.ToolCall -> {
                 if (!isReplay) ensureChangesStateForLiveDiffs(chatId, update.content)
-                var json = try { Json.encodeToString(update) } catch (_: Exception) { update.toString() }
-                json = convertBrokenOtherPatchToolCallJson(json)
-                val todoToolCallKey = todoToolCallKey(chatId, sessionId, update.toolCallId.value)
-                if (hasFullOutputToolKind(json)) {
-                    fullOutputToolCallKeys.add(todoToolCallKey)
-                    json = dropOversizedToolCallPayload(json)
-                }
-                val todoPlanEntries = extractTodoPlanEntriesFromToolRawJson(json)
-                val isTodoWrite = todoPlanEntries != null || isTodoWriteToolCallJson(json)
-                if (isTodoWrite) {
-                    todoToolCallKeys.add(todoToolCallKey)
-                }
-                val shouldEmitTodoPlan = todoPlanEntries != null && emittedTodoPlanKeys.add(todoToolCallKey)
-                if (shouldEmitTodoPlan) {
-                    recordStoredEvent(chatId, sessionId, adapterName, buildStoredPlanChunk(todoPlanEntries), isReplay)
-                } else if (!isTodoWrite) {
-                    recordStoredEvent(chatId, sessionId, adapterName, buildStoredToolCallChunk(json), isReplay)
-                }
-                if (!isReplay) {
-                    if (!isTodoWrite || shouldEmitTodoPlan) {
-                        markLivePromptVisibleAssistantOutput(chatId)
-                    }
-                    if (shouldEmitTodoPlan) {
-                        pushPlanChunk(chatId, todoPlanEntries)
-                    } else if (!isTodoWrite) {
-                        pushToolCallChunk(chatId, json)
-                    }
-                }
+                val json = try { Json.encodeToString(update) } catch (_: Exception) { update.toString() }
+                handleToolCall(chatId, sessionId, adapterName, update.toolCallId.value, json, isUpdate = false, isReplay)
             }
             is SessionUpdate.ToolCallUpdate -> {
                 if (!isReplay) ensureChangesStateForLiveDiffs(chatId, update.content)
-                var json = try { Json.encodeToString(update) } catch (_: Exception) { update.toString() }
-                json = convertBrokenOtherPatchToolCallJson(json)
-                val todoToolCallKey = todoToolCallKey(chatId, sessionId, update.toolCallId.value)
-                if (hasFullOutputToolKind(json)) fullOutputToolCallKeys.add(todoToolCallKey)
-                val fullOutput = fullOutputToolCallKeys.contains(todoToolCallKey)
-                if (fullOutput) json = dropOversizedToolCallPayload(json)
-                val todoPlanEntries = extractTodoPlanEntriesFromToolRawJson(json)
-                val isTodoWrite = todoPlanEntries != null || todoToolCallKeys.contains(todoToolCallKey) || isTodoWriteToolCallJson(json)
-                if (isTodoWrite) {
-                    todoToolCallKeys.add(todoToolCallKey)
-                }
-                val shouldEmitTodoPlan = todoPlanEntries != null && emittedTodoPlanKeys.add(todoToolCallKey)
-                if (shouldEmitTodoPlan) {
-                    recordStoredEvent(chatId, sessionId, adapterName, buildStoredPlanChunk(todoPlanEntries), isReplay)
-                } else if (!isTodoWrite) {
-                    recordStoredEvent(chatId, sessionId, adapterName, buildStoredToolCallUpdateChunk(update.toolCallId.value, json, fullOutput), isReplay)
-                }
-                if (!isReplay) {
-                    if (!isTodoWrite || shouldEmitTodoPlan) {
-                        markLivePromptVisibleAssistantOutput(chatId)
-                    }
-                    if (shouldEmitTodoPlan) {
-                        pushPlanChunk(chatId, todoPlanEntries)
-                    } else if (!isTodoWrite) {
-                        pushToolCallUpdateChunk(chatId, update.toolCallId.value, json, fullOutput)
-                    }
-                }
+                val json = try { Json.encodeToString(update) } catch (_: Exception) { update.toString() }
+                handleToolCall(chatId, sessionId, adapterName, update.toolCallId.value, json, isUpdate = true, isReplay)
             }
             else -> {
                 val usage = extractUsageUpdate(update, _meta)
@@ -184,6 +133,49 @@ internal fun AcpBridge.installServiceCallbacks() {
 
 private fun todoToolCallKey(chatId: String, sessionId: String, toolCallId: String): String =
     listOf(chatId, sessionId, toolCallId).joinToString("|")
+
+/** Records and shows a tool call or its update; a todo tool call is shown as a plan instead. */
+private fun AcpBridge.handleToolCall(
+    chatId: String,
+    sessionId: String,
+    adapterName: String,
+    toolCallId: String,
+    rawJson: String,
+    isUpdate: Boolean,
+    isReplay: Boolean
+) {
+    var json = convertBrokenOtherPatchToolCallJson(rawJson)
+    val todoToolCallKey = todoToolCallKey(chatId, sessionId, toolCallId)
+    val hasFullOutputKind = hasFullOutputToolKind(json)
+    if (hasFullOutputKind) fullOutputToolCallKeys.add(todoToolCallKey)
+    // An update keeps the full output of a tool call whose kind an earlier event reported.
+    val fullOutput = isUpdate && fullOutputToolCallKeys.contains(todoToolCallKey)
+    if (hasFullOutputKind || fullOutput) json = dropOversizedToolCallPayload(json)
+    val todoPlanEntries = extractTodoPlanEntriesFromToolRawJson(json)
+    val isTodoWrite = todoPlanEntries != null ||
+        (isUpdate && todoToolCallKeys.contains(todoToolCallKey)) ||
+        isTodoWriteToolCallJson(json)
+    if (isTodoWrite) {
+        todoToolCallKeys.add(todoToolCallKey)
+    }
+    val shouldEmitTodoPlan = todoPlanEntries != null && emittedTodoPlanKeys.add(todoToolCallKey)
+    if (shouldEmitTodoPlan) {
+        recordStoredEvent(chatId, sessionId, adapterName, buildStoredPlanChunk(todoPlanEntries), isReplay)
+    } else if (!isTodoWrite) {
+        val chunk = if (isUpdate) buildStoredToolCallUpdateChunk(toolCallId, json, fullOutput) else buildStoredToolCallChunk(json)
+        recordStoredEvent(chatId, sessionId, adapterName, chunk, isReplay)
+    }
+    if (!isReplay) {
+        if (!isTodoWrite || shouldEmitTodoPlan) {
+            markLivePromptVisibleAssistantOutput(chatId)
+        }
+        if (shouldEmitTodoPlan) {
+            pushPlanChunk(chatId, todoPlanEntries)
+        } else if (!isTodoWrite) {
+            pushToolCallChunk(chatId, if (isUpdate) "tool_call_update" else "tool_call", toolCallId, json, fullOutput)
+        }
+    }
+}
 
 private data class PatchDiff(val path: String, val oldText: String?, val newText: String)
 
@@ -307,6 +299,67 @@ private fun AcpBridge.convertBrokenOtherPatchToolCallJson(rawJson: String): Stri
     }.toString()
 }
 
+/** The adapter an install job installs; [versionOverride] replaces the configured version. */
+private class AdapterInstallTarget(val adapterInfo: AcpAdapterConfig.AdapterInfo, val versionOverride: String? = null)
+
+/**
+ * Runs the install job of [adapterId] unless one is already running. [prepare] stops the adapter and
+ * returns what to install, or null to skip; the adapter files are replaced only after it returns.
+ */
+private fun AcpBridge.launchAdapterInstall(
+    adapterId: String,
+    prepare: (AcpAdapterInstallCancellation) -> AdapterInstallTarget?
+) {
+    if (adapterInstallJobs[adapterId]?.isActive == true) return
+    val cancellation = AcpAdapterInstallCancellation()
+    adapterInstallCancellations[adapterId] = cancellation
+    val job = scope.launch(Dispatchers.IO) {
+        var replacingRuntime = false
+        try {
+            val target = prepare(cancellation) ?: return@launch
+            replacingRuntime = true
+            val success = AcpAdapterPaths.installAdapterRuntime(
+                targetDir = File(AcpAdapterPaths.getDependenciesDir(), target.adapterInfo.id),
+                adapterInfo = target.adapterInfo,
+                statusCallback = { status ->
+                    downloadStatuses[adapterId] = status
+                    pushAdapters()
+                },
+                versionOverride = target.versionOverride,
+                cancellation = cancellation
+            )
+
+            if (success) {
+                downloadStatuses.remove(adapterId)
+                val installedVersion = target.versionOverride ?: AcpAdapterPaths.installedVersion(adapterId)
+                setDownloadProbeState(adapterId, downloaded = true, installedVersion = installedVersion)
+                service.initializeAdapterInBackground(adapterId)
+                refreshAdapterLoginStatus(adapterId)
+                pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
+            } else {
+                downloadStatuses.compute(adapterId) { _, previous ->
+                    previous?.takeIf { it.startsWith("Error:") }
+                }
+                pushAdapters()
+            }
+        } catch (_: CancellationException) {
+            downloadStatuses.remove(adapterId)
+            if (replacingRuntime) {
+                runCatching { AcpAdapterPaths.deleteAdapter(adapterId) }
+            }
+            resetDownloadProbeState(adapterId)
+        } catch (e: Exception) {
+            downloadStatuses[adapterId] = "Error: ${e.message}"
+        } finally {
+            adapterInstallJobs.remove(adapterId)
+            adapterInstallCancellations.remove(adapterId)
+            // Checks the files again, as a cancellation leaves the installed state unknown.
+            pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
+        }
+    }
+    adapterInstallJobs[adapterId] = job
+}
+
 internal fun AcpBridge.installAdapterQueries() {
     host.register("themeChanged") { theme ->
         ClientTheme.update(theme)
@@ -337,66 +390,16 @@ internal fun AcpBridge.installAdapterQueries() {
     host.register("downloadAgent") { payload ->
         val adapterId = parseIdOnlyPayload(payload)
         if (adapterId != null) {
-            if (adapterInstallJobs[adapterId]?.isActive == true) {
-                return@register
+            launchAdapterInstall(adapterId) {
+                downloadStatuses[adapterId] = "Starting download..."
+                resetDownloadProbeState(adapterId)
+                pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
+
+                service.stopSharedProcess(adapterId)
+                AcpConfigOptionsCache.remove(adapterId)
+                resetUpdateCheckState(adapterId)
+                AdapterInstallTarget(AcpAdapterPaths.getAdapterInfo(adapterId))
             }
-            val cancellation = AcpAdapterInstallCancellation()
-            adapterInstallCancellations[adapterId] = cancellation
-            val job = scope.launch(Dispatchers.IO) {
-                var replacingRuntime = false
-                try {
-                    downloadStatuses[adapterId] = "Starting download..."
-                    resetDownloadProbeState(adapterId)
-                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
-
-                    service.stopSharedProcess(adapterId)
-                    AcpConfigOptionsCache.remove(adapterId)
-                    resetUpdateCheckState(adapterId)
-                    val adapterInfo = AcpAdapterPaths.getAdapterInfo(adapterId)
-                    val targetDir = File(AcpAdapterPaths.getDependenciesDir(), adapterInfo.id)
-
-                    val statusCallback = { status: String ->
-                        downloadStatuses[adapterId] = status
-                        pushAdapters()
-                    }
-
-                    replacingRuntime = true
-                    val success = AcpAdapterPaths.installAdapterRuntime(
-                        targetDir = targetDir,
-                        adapterInfo = adapterInfo,
-                        statusCallback = statusCallback,
-                        cancellation = cancellation
-                    )
-
-                    if (success) {
-                        downloadStatuses.remove(adapterId)
-                        val installedVersion = AcpAdapterPaths.installedVersion(adapterId)
-                        setDownloadProbeState(adapterId, downloaded = true, installedVersion = installedVersion)
-                        service.initializeAdapterInBackground(adapterId)
-                        refreshAdapterLoginStatus(adapterId)
-                        pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
-                    } else {
-                        downloadStatuses.compute(adapterId) { _, previous ->
-                            previous?.takeIf { it.startsWith("Error:") }
-                        }
-                        pushAdapters()
-                    }
-                } catch (_: CancellationException) {
-                    downloadStatuses.remove(adapterId)
-                    if (replacingRuntime) {
-                        runCatching { AcpAdapterPaths.deleteAdapter(adapterId) }
-                    }
-                    resetDownloadProbeState(adapterId)
-                } catch (e: Exception) {
-                    downloadStatuses[adapterId] = "Error: ${e.message}"
-                } finally {
-                    adapterInstallJobs.remove(adapterId)
-                    adapterInstallCancellations.remove(adapterId)
-                    // Checks the files again, as a cancellation leaves the installed state unknown.
-                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
-                }
-            }
-            adapterInstallJobs[adapterId] = job
         }
     }
 
@@ -435,86 +438,38 @@ internal fun AcpBridge.installAdapterQueries() {
     host.register("updateAgent") { payload ->
         val adapterId = parseIdOnlyPayload(payload)
         if (adapterId != null) {
-            if (adapterInstallJobs[adapterId]?.isActive == true) {
-                return@register
-            }
-            val cancellation = AcpAdapterInstallCancellation()
-            adapterInstallCancellations[adapterId] = cancellation
-            val job = scope.launch(Dispatchers.IO) {
-                var replacingRuntime = false
-                try {
-                    val adapterInfo = AcpAdapterPaths.getAdapterInfo(adapterId)
-                    val isUpdateCheckSupported = AcpAdapterUpdates.isUpdateCheckSupported(adapterInfo)
-                    val installedVersion = AcpAdapterPaths.installedVersion(adapterId)
-                    val isStaticUpdateAvailable = installedVersion != null && installedVersion != adapterInfo.getConfiguredVersion()
+            launchAdapterInstall(adapterId) { cancellation ->
+                val adapterInfo = AcpAdapterPaths.getAdapterInfo(adapterId)
+                val isUpdateCheckSupported = AcpAdapterUpdates.isUpdateCheckSupported(adapterInfo)
+                val installedVersion = AcpAdapterPaths.installedVersion(adapterId)
+                val isStaticUpdateAvailable = installedVersion != null && installedVersion != adapterInfo.getConfiguredVersion()
 
-                    if (!isUpdateCheckSupported && !isStaticUpdateAvailable) {
-                        return@launch
-                    }
-
-                    val latestVersion = if (isUpdateCheckSupported) {
-                        latestVersionStates[adapterId]
-                            ?: AcpAdapterUpdates.latestAvailableVersion(adapterInfo)
-                            ?: throw IllegalStateException("Unable to resolve latest version")
-                    } else {
-                        adapterInfo.getConfiguredVersion()
-                    }
-                    cancellation.throwIfCancelled()
-                    latestVersionStates[adapterId] = latestVersion
-
-                    downloadStatuses[adapterId] = "Updating to $latestVersion..."
-                    resetDownloadProbeState(adapterId)
-                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
-
-                    service.stopSharedProcess(adapterId)
-                    AcpConfigOptionsCache.remove(adapterId)
-                    val targetDir = File(AcpAdapterPaths.getDependenciesDir(), adapterInfo.id)
-                    val deleted = AcpAdapterPaths.deleteAdapter(adapterId)
-                    if (!deleted) {
-                        throw IllegalStateException("Unable to remove old adapter files")
-                    }
-                    replacingRuntime = true
-
-                    val statusCallback = { status: String ->
-                        downloadStatuses[adapterId] = status
-                        pushAdapters()
-                    }
-
-                    val success = AcpAdapterPaths.installAdapterRuntime(
-                        targetDir = targetDir,
-                        adapterInfo = adapterInfo,
-                        statusCallback = statusCallback,
-                        versionOverride = latestVersion,
-                        cancellation = cancellation
-                    )
-
-                    if (success) {
-                        downloadStatuses.remove(adapterId)
-                        setDownloadProbeState(adapterId, downloaded = true, installedVersion = latestVersion)
-                        service.initializeAdapterInBackground(adapterId)
-                        refreshAdapterLoginStatus(adapterId)
-                        pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
-                    } else {
-                        downloadStatuses.compute(adapterId) { _, previous ->
-                            previous?.takeIf { it.startsWith("Error:") }
-                        }
-                    }
-                } catch (_: CancellationException) {
-                    downloadStatuses.remove(adapterId)
-                    if (replacingRuntime) {
-                        runCatching { AcpAdapterPaths.deleteAdapter(adapterId) }
-                    }
-                    resetDownloadProbeState(adapterId)
-                } catch (e: Exception) {
-                    downloadStatuses[adapterId] = "Error: ${e.message}"
-                } finally {
-                    adapterInstallJobs.remove(adapterId)
-                    adapterInstallCancellations.remove(adapterId)
-                    // Checks the files again, as a cancellation leaves the installed state unknown.
-                    pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
+                if (!isUpdateCheckSupported && !isStaticUpdateAvailable) {
+                    return@launchAdapterInstall null
                 }
+
+                val latestVersion = if (isUpdateCheckSupported) {
+                    latestVersionStates[adapterId]
+                        ?: AcpAdapterUpdates.latestAvailableVersion(adapterInfo)
+                        ?: throw IllegalStateException("Unable to resolve latest version")
+                } else {
+                    adapterInfo.getConfiguredVersion()
+                }
+                cancellation.throwIfCancelled()
+                latestVersionStates[adapterId] = latestVersion
+
+                downloadStatuses[adapterId] = "Updating to $latestVersion..."
+                resetDownloadProbeState(adapterId)
+                pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
+
+                service.stopSharedProcess(adapterId)
+                AcpConfigOptionsCache.remove(adapterId)
+                val deleted = AcpAdapterPaths.deleteAdapter(adapterId)
+                if (!deleted) {
+                    throw IllegalStateException("Unable to remove old adapter files")
+                }
+                AdapterInstallTarget(adapterInfo, versionOverride = latestVersion)
             }
-            adapterInstallJobs[adapterId] = job
         }
     }
 

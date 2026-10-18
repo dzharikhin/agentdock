@@ -330,25 +330,11 @@ class AcpClientService private constructor(val project: Project) {
         runCatching { adapterInitializationStateHandler?.invoke(adapterName, state, error) }
     }
 
-    internal fun SharedProcess.isHealthy(): Boolean {
-        val runningProcess = process ?: return false
-        if (!runningProcess.isAlive || client == null || !isInitialized) return false
+    internal fun SharedProcess.isHealthy(): Boolean = failureReason() == null
 
-        val protocolActive = protocolScope?.coroutineContext?.get(Job)?.isActive == true
-        if (!protocolActive) return false
-
-        if (!sessionUpdateWrapped) return true
-
-        val updateScopeActive = sessionUpdateScope?.coroutineContext?.get(Job)?.isActive == true
-        val updateWorkerActive = sessionUpdateWorker?.isActive == true
-        return updateScopeActive && updateWorkerActive
-    }
-
-    internal fun SharedProcess.failureReason(): String {
-        val runningProcess = process
-        if (runningProcess == null) {
-            return "Connection to the agent process is unavailable."
-        }
+    /** Why the process cannot serve requests, or null when it is healthy. */
+    internal fun SharedProcess.failureReason(): String? {
+        val runningProcess = process ?: return "Connection to the agent process is unavailable."
         if (!runningProcess.isAlive) {
             val exitCode = runCatching { runningProcess.exitValue() }.getOrNull()
             return if (exitCode != null) {
@@ -374,7 +360,7 @@ class AcpClientService private constructor(val project: Project) {
             }
         }
 
-        return "Connection to the agent process was lost."
+        return null
     }
 
     internal inner class AgentContext(val chatId: String) {
@@ -414,30 +400,25 @@ class AcpClientService private constructor(val project: Project) {
         @Volatile var session: ClientSession? = null
 
         fun stop() {
-            synchronized(observedToolCallIds) { observedToolCallIds.clear() }
-            session = null
-            sharedProcess = null
             statusRef.set(Status.NotStarted)
             sessionIdRef.get()?.let { systemInstructionsInjectedSessionIds.remove(it) }
             sessionIdRef.set(null)
             synchronized(liveOwnerBySessionId) { liveOwnerBySessionId.entries.removeIf { it.value == chatId } }
+            replayOwnerBySessionId.entries.removeIf { it.value == chatId }
             activeAdapterNameRef.set(null)
             activeModeIdRef.set(null)
             activeConfigValues.clear()
             runtimeMetadataRef.set(null)
-            appliedConfigGeneration = -1L
-            configOptionsUpdateInProgress = false
-            promptGeneration.incrementAndGet()
-            allowReplayDelivery = true
-            ignoreUpdatesUntilPrompt = false
-            replayOwnerBySessionId.entries.removeIf { it.value == chatId }
-            pendingRequests.values.forEach {
-                it.complete(RequestPermissionResponse(RequestPermissionOutcome.Cancelled))
-            }
-            pendingRequests.clear()
+            releaseConnection()
         }
 
         fun markBroken() {
+            releaseConnection()
+            statusRef.set(Status.Error)
+        }
+
+        /** Detaches the chat from its agent connection; the session identity is kept. */
+        private fun releaseConnection() {
             synchronized(observedToolCallIds) { observedToolCallIds.clear() }
             session = null
             sharedProcess = null
@@ -446,11 +427,14 @@ class AcpClientService private constructor(val project: Project) {
             configOptionsUpdateInProgress = false
             ignoreUpdatesUntilPrompt = false
             allowReplayDelivery = true
-            pendingRequests.values.forEach {
-                it.complete(RequestPermissionResponse(RequestPermissionOutcome.Cancelled))
+            cancelPendingPermissions()
+        }
+
+        fun cancelPendingPermissions() {
+            // Each request is removed before it completes, so one added meanwhile is never dropped unanswered.
+            pendingRequests.keys.forEach { requestId ->
+                pendingRequests.remove(requestId)?.complete(RequestPermissionResponse(RequestPermissionOutcome.Cancelled))
             }
-            pendingRequests.clear()
-            statusRef.set(Status.Error)
         }
     }
 
@@ -535,19 +519,14 @@ internal fun AcpClientService.promptDispatchFailure(chatId: String): String? {
     val context = sessions[chatId] ?: return "No active agent session."
     val session = context.session ?: return "No active agent session."
     val sharedProcess = context.sharedProcess ?: return "Connection to the agent process is unavailable."
-    if (!sharedProcess.isHealthy()) {
-        return sharedProcess.failureReason()
-    }
+    sharedProcess.failureReason()?.let { return it }
     return if (session.sessionId.value.isBlank()) "No active agent session." else null
 }
 
 internal fun AcpClientService.cancelDispatchFailure(chatId: String): String? {
     val context = sessions[chatId] ?: return "No active prompt is running."
     val sharedProcess = context.sharedProcess ?: return "Connection to the agent process is unavailable."
-    if (!sharedProcess.isHealthy()) {
-        return sharedProcess.failureReason()
-    }
-    return null
+    return sharedProcess.failureReason()
 }
 
 internal suspend fun AcpClientService.markChatSessionBroken(chatId: String) {

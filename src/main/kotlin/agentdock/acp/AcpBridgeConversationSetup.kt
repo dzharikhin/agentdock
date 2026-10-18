@@ -75,21 +75,32 @@ private fun AcpBridge.completeCancelledPromptWhenAgentSettles(chatId: String, ca
             } ?: false
         }
 
-        if (!promptSettled) {
-            val message = "\n\n[Warning: The cancel request was sent, but the AI agent did not finish the cancelled prompt within 10 seconds.]\n\n"
-            pushContentChunk(chatId, "assistant", "text", text = message)
-            appendLivePromptTextEvent(chatId, message)
+        if (promptSettled) {
+            flushLivePromptCapture(chatId)?.let {
+                pushPromptDoneChunk(chatId, it, outcome = "cancelled")
+            }
+            pushStatus(chatId, "ready")
+        } else {
             service.markChatSessionBroken(chatId)
             if (cancelledJob != null) {
                 promptJobs.remove(chatId, cancelledJob)
             }
+            failLivePrompt(
+                chatId,
+                "\n\n[Warning: The cancel request was sent, but the AI agent did not finish the cancelled prompt within 10 seconds.]\n\n"
+            )
         }
-
-        flushLivePromptCapture(chatId)?.let {
-            pushPromptDoneChunk(chatId, it, outcome = if (promptSettled) "cancelled" else "error")
-        }
-        pushStatus(chatId, if (promptSettled) "ready" else "error")
     }
+}
+
+/** Shows [message] in the chat and ends the live prompt with an error. */
+private fun AcpBridge.failLivePrompt(chatId: String, message: String, captureId: String? = null) {
+    pushContentChunk(chatId, "assistant", "text", text = message)
+    appendLivePromptTextEvent(chatId, message, captureId)
+    flushLivePromptCapture(chatId, captureId)?.let {
+        pushPromptDoneChunk(chatId, it, outcome = "error")
+    }
+    pushStatus(chatId, "error")
 }
 
 
@@ -202,14 +213,7 @@ internal fun AcpBridge.installConversationQueries() {
                                 }
                                 pushStatus(chatId, "ready")
                             }
-                            is AcpEvent.Error -> {
-                                pushContentChunk(chatId, "assistant", "text", text = "[Error: ${event.message}]")
-                                appendLivePromptTextEvent(chatId, "[Error: ${event.message}]", captureId)
-                                flushLivePromptCapture(chatId, captureId)?.let {
-                                    pushPromptDoneChunk(chatId, it, outcome = "error")
-                                }
-                                pushStatus(chatId, "error")
-                            }
+                            is AcpEvent.Error -> failLivePrompt(chatId, "[Error: ${event.message}]", captureId)
                         }
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
@@ -220,16 +224,10 @@ internal fun AcpBridge.installConversationQueries() {
                     }
                     throw e
                 } catch (e: Exception) {
-                    val message = "[Error: ${formatAcpError(e)}]"
                     if (previousPromptJob != null) {
                         service.markChatSessionBroken(chatId)
                     }
-                    pushContentChunk(chatId, "assistant", "text", text = message)
-                    appendLivePromptTextEvent(chatId, message, captureId)
-                    flushLivePromptCapture(chatId, captureId)?.let {
-                        pushPromptDoneChunk(chatId, it, outcome = "error")
-                    }
-                    pushStatus(chatId, "error")
+                    failLivePrompt(chatId, "[Error: ${formatAcpError(e)}]", captureId)
                 } finally {
                     promptJobs.remove(chatId, job)
                 }
@@ -242,14 +240,8 @@ internal fun AcpBridge.installConversationQueries() {
                     if (!job.isActive) break
                     if (service.status(chatId) != AcpClientService.Status.Prompting) break
                     val failure = service.promptDispatchFailure(chatId) ?: continue
-                    val message = "[Error: $failure]"
                     service.markChatSessionBroken(chatId)
-                    pushContentChunk(chatId, "assistant", "text", text = message)
-                    appendLivePromptTextEvent(chatId, message, captureId)
-                    flushLivePromptCapture(chatId, captureId)?.let {
-                        pushPromptDoneChunk(chatId, it, outcome = "error")
-                    }
-                    pushStatus(chatId, "error")
+                    failLivePrompt(chatId, "[Error: $failure]", captureId)
                     job.cancel(kotlinx.coroutines.CancellationException(failure))
                     recoverRuntimeAfterFailure(failure)
                     break
