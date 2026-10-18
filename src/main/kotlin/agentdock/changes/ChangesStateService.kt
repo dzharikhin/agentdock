@@ -29,10 +29,6 @@ object ChangesStateService {
 
         return false
     }
-    fun hasState(projectPath: String, sessionId: String, adapterName: String): Boolean {
-        return loadState(projectPath, sessionId, adapterName) != null
-    }
-
     fun loadState(projectPath: String, sessionId: String, adapterName: String): ChangesState? {
         val current = HistorySessionChangesStore.loadSessionChanges(projectPath, sessionId, adapterName) ?: return null
         return ChangesState(sessionId, adapterName, current.keptToolCallIds, current.processedFileStates)

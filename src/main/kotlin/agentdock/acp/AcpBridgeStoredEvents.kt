@@ -167,7 +167,7 @@ private fun AcpBridge.mergeStoredToolEvent(events: List<JsonObject>, event: Json
         "edit" -> mergeEditDiffContent(existingRaw, incomingRaw, mergedRaw)
         else -> mergeStoredToolOutput(existingRaw, incomingRaw, mergedRaw)
     }
-    val mergedRawJson = storedToolRawJson(mergedRawFinal.toString(), mergedKind in FULL_OUTPUT_TOOL_KINDS)
+    val mergedRawJson = storedToolRawJson(mergedRawFinal, mergedKind in FULL_OUTPUT_TOOL_KINDS)
 
     val mergedTitle = event["toolTitle"]?.jsonPrimitive?.contentOrNull
         ?: incomingRaw["title"]?.jsonPrimitive?.contentOrNull
@@ -541,42 +541,35 @@ internal fun AcpBridge.buildAssistantMetadata(
     )
 }
 
-internal fun AcpBridge.buildStoredToolCallChunk(rawJson: String): JsonObject {
-    val parsed = runCatching { Json.parseToJsonElement(rawJson).jsonObject }.getOrNull()
+internal fun AcpBridge.buildStoredToolCallChunk(raw: JsonObject): JsonObject {
     return buildJsonObject {
         put("role", "assistant")
         put("type", "tool_call")
-        put("toolCallId", parsed?.get("toolCallId")?.jsonPrimitive?.contentOrNull ?: "")
-        put("toolKind", parsed?.get("kind")?.jsonPrimitive?.contentOrNull ?: "")
-        put("toolTitle", parsed?.get("title")?.jsonPrimitive?.contentOrNull ?: "")
-        put("toolStatus", parsed?.get("status")?.jsonPrimitive?.contentOrNull ?: "")
-        put("toolRawJson", storedToolRawJson(rawJson))
+        put("toolCallId", raw["toolCallId"]?.jsonPrimitive?.contentOrNull ?: "")
+        put("toolKind", raw["kind"]?.jsonPrimitive?.contentOrNull ?: "")
+        put("toolTitle", raw["title"]?.jsonPrimitive?.contentOrNull ?: "")
+        put("toolStatus", raw["status"]?.jsonPrimitive?.contentOrNull ?: "")
+        put("toolRawJson", storedToolRawJson(raw))
     }
 }
 
-internal fun AcpBridge.buildStoredToolCallUpdateChunk(toolCallId: String, rawJson: String, fullOutput: Boolean): JsonObject {
+internal fun AcpBridge.buildStoredToolCallUpdateChunk(toolCallId: String, raw: JsonObject, fullOutput: Boolean): JsonObject {
     return buildJsonObject {
         put("role", "assistant")
         put("type", "tool_call_update")
         put("toolCallId", toolCallId)
-        put("toolRawJson", storedToolRawJson(rawJson, fullOutput))
+        put("toolRawJson", storedToolRawJson(raw, fullOutput))
     }
 }
 
-internal fun AcpBridge.storedToolRawJson(rawJson: String, fullOutput: Boolean = false): String {
-    val parsed = runCatching { Json.parseToJsonElement(rawJson).jsonObject }.getOrNull()
-    val compacted = parsed?.let { compactToolRawJson(it, fullOutput) } ?: return rawJson
+internal fun AcpBridge.storedToolRawJson(raw: JsonObject, fullOutput: Boolean = false): String {
+    val compacted = compactToolRawJson(raw, fullOutput)
     val compactedRawJson = compacted.toString()
     return if (shouldPreserveToolRawJson(compacted)) {
         HistoryDiffCompactor.compactStoredToolRawJson(compactedRawJson, Json)
     } else {
         compactedRawJson
     }
-}
-
-internal fun compactToolRawJsonForDisplay(rawJson: String, fullOutput: Boolean = false): String {
-    val parsed = runCatching { Json.parseToJsonElement(rawJson).jsonObject }.getOrNull()
-    return parsed?.let { compactToolRawJson(it, fullOutput) }?.toString() ?: rawJson
 }
 
 private fun shouldPreserveToolRawJson(parsed: JsonObject?): Boolean {
@@ -601,19 +594,17 @@ private val FULL_OUTPUT_TOOL_KINDS = setOf("edit", "think", "task")
 private const val MAX_FULL_OUTPUT_TOOL_CALL_CHARS = 1_000_000
 private val TOOL_CALL_IDENTITY_KEYS = setOf("toolCallId", "kind", "title", "status", "locations")
 
-internal fun dropOversizedToolCallPayload(rawJson: String): String {
-    if (rawJson.length <= MAX_FULL_OUTPUT_TOOL_CALL_CHARS) return rawJson
-    val parsed = runCatching { Json.parseToJsonElement(rawJson).jsonObject }.getOrNull() ?: return rawJson
-    return JsonObject(parsed.filterKeys { it in TOOL_CALL_IDENTITY_KEYS } + ("content" to JsonArray(emptyList()))).toString()
+internal fun dropOversizedToolCallPayload(raw: JsonObject): JsonObject {
+    if (raw.toString().length <= MAX_FULL_OUTPUT_TOOL_CALL_CHARS) return raw
+    return JsonObject(raw.filterKeys { it in TOOL_CALL_IDENTITY_KEYS } + ("content" to JsonArray(emptyList())))
 }
 
-internal fun hasFullOutputToolKind(rawJson: String): Boolean =
-    runCatching { Json.parseToJsonElement(rawJson).jsonObject["kind"] as? JsonPrimitive }.getOrNull()
-        ?.contentOrNull in FULL_OUTPUT_TOOL_KINDS
+internal fun hasFullOutputToolKind(raw: JsonObject): Boolean =
+    (raw["kind"] as? JsonPrimitive)?.contentOrNull in FULL_OUTPUT_TOOL_KINDS
 
 // Long tool output is truncated before it reaches the UI or history, wherever the adapter puts it.
 // Tool input, diffs and inline images stay intact: diffs are needed for undo, and images are shown.
-private fun compactToolRawJson(parsed: JsonObject, fullOutput: Boolean): JsonObject {
+internal fun compactToolRawJson(parsed: JsonObject, fullOutput: Boolean): JsonObject {
     if (fullOutput || (parsed["kind"] as? JsonPrimitive)?.contentOrNull in FULL_OUTPUT_TOOL_KINDS) return parsed
     return JsonObject(parsed.mapValues { (key, value) -> if (key == "rawInput") value else limitToolOutputStrings(value) })
 }

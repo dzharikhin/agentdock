@@ -63,32 +63,23 @@ internal fun AcpBridge.pushContentBlock(chatId: String, role: String, content: C
 }
 
 /** Sends a tool call ([type] `tool_call`) or its update (`tool_call_update`) to the UI. */
-internal fun AcpBridge.pushToolCallChunk(chatId: String, type: String, toolCallId: String, rawJson: String, fullOutput: Boolean) {
-    val displayRawJson = compactToolRawJsonForDisplay(rawJson, fullOutput)
-    val parsed = try { Json.parseToJsonElement(displayRawJson).jsonObject } catch (e: Exception) {
-        LOG.debug("Failed to parse tool call JSON", e)
-        null
-    }
-    val kind = parsed?.get("kind")?.jsonPrimitive?.contentOrNull ?: ""
-    val title = parsed?.get("title")?.jsonPrimitive?.contentOrNull ?: ""
-    val status = parsed?.get("status")?.jsonPrimitive?.contentOrNull ?: ""
-
+internal fun AcpBridge.pushToolCallChunk(chatId: String, type: String, toolCallId: String, raw: JsonObject, fullOutput: Boolean) {
+    val display = compactToolRawJson(raw, fullOutput)
     val json = buildJsonObject {
         put("chatId", chatId)
         put("role", "assistant")
         put("type", type)
         put("toolCallId", toolCallId)
-        put("toolKind", kind)
-        put("toolTitle", title)
-        put("toolStatus", status)
-        put("toolRawJson", displayRawJson)
+        put("toolKind", display["kind"]?.jsonPrimitive?.contentOrNull ?: "")
+        put("toolTitle", display["title"]?.jsonPrimitive?.contentOrNull ?: "")
+        put("toolStatus", display["status"]?.jsonPrimitive?.contentOrNull ?: "")
+        put("toolRawJson", display.toString())
     }.toString()
     dispatchContentChunkJson(json)
 }
 
-internal fun extractTodoPlanEntriesFromToolRawJson(rawJson: String): JsonArray? {
-    val parsed = runCatching { Json.parseToJsonElement(rawJson).jsonObject }.getOrNull() ?: return null
-    val rawInput = parsed["rawInput"] as? JsonObject ?: return null
+internal fun extractTodoPlanEntriesFromToolRawJson(raw: JsonObject): JsonArray? {
+    val rawInput = raw["rawInput"] as? JsonObject ?: return null
     val todos = rawInput["todos"] as? JsonArray ?: return null
 
     val entries = buildJsonArray {
@@ -109,13 +100,12 @@ internal fun extractTodoPlanEntriesFromToolRawJson(rawJson: String): JsonArray? 
     return entries.takeIf { it.isNotEmpty() }
 }
 
-internal fun isTodoWriteToolCallJson(rawJson: String): Boolean {
-    val parsed = runCatching { Json.parseToJsonElement(rawJson).jsonObject }.getOrNull() ?: return false
-    val kind = parsed["kind"]?.jsonPrimitive?.contentOrNull
-    val title = parsed["title"]?.jsonPrimitive?.contentOrNull
+internal fun isTodoWriteToolCallJson(raw: JsonObject): Boolean {
+    val kind = raw["kind"]?.jsonPrimitive?.contentOrNull
+    val title = raw["title"]?.jsonPrimitive?.contentOrNull
     if (kind == "todowrite") return true
     if (title == "todowrite") return true
-    val rawInput = parsed["rawInput"] as? JsonObject ?: return false
+    val rawInput = raw["rawInput"] as? JsonObject ?: return false
     return rawInput["todos"] is JsonArray
 }
 
@@ -356,12 +346,7 @@ internal fun AcpBridge.ensureChangesStateForLiveDiffs(chatId: String, content: L
     if (diffs.isEmpty()) return
 
     val projectPath = service.project.basePath.orEmpty()
-    if (!ChangesStateService.hasState(projectPath, sessionId, adNameValue)) {
-        ChangesStateService.ensureState(projectPath, sessionId, adNameValue)
-    }
-
-    val state = ChangesStateService.loadState(projectPath, sessionId, adNameValue) ?: ChangesStateService.ensureState(projectPath, sessionId, adNameValue)
-    pushChangesState(chatId, state, true)
+    pushChangesState(chatId, ChangesStateService.ensureState(projectPath, sessionId, adNameValue), true)
 }
 
 internal fun AcpBridge.pushPromptDoneChunk(

@@ -11,7 +11,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import java.io.File
 internal fun AcpBridge.installServiceCallbacks() {
@@ -105,12 +104,12 @@ internal fun AcpBridge.installServiceCallbacks() {
             }
             is SessionUpdate.ToolCall -> {
                 if (!isReplay) ensureChangesStateForLiveDiffs(chatId, update.content)
-                val json = try { Json.encodeToString(update) } catch (_: Exception) { update.toString() }
+                val json = try { Json.encodeToJsonElement(update).jsonObject } catch (_: Exception) { JsonObject(emptyMap()) }
                 handleToolCall(chatId, sessionId, adapterName, update.toolCallId.value, json, isUpdate = false, isReplay)
             }
             is SessionUpdate.ToolCallUpdate -> {
                 if (!isReplay) ensureChangesStateForLiveDiffs(chatId, update.content)
-                val json = try { Json.encodeToString(update) } catch (_: Exception) { update.toString() }
+                val json = try { Json.encodeToJsonElement(update).jsonObject } catch (_: Exception) { JsonObject(emptyMap()) }
                 handleToolCall(chatId, sessionId, adapterName, update.toolCallId.value, json, isUpdate = true, isReplay)
             }
             else -> {
@@ -140,11 +139,11 @@ private fun AcpBridge.handleToolCall(
     sessionId: String,
     adapterName: String,
     toolCallId: String,
-    rawJson: String,
+    raw: JsonObject,
     isUpdate: Boolean,
     isReplay: Boolean
 ) {
-    var json = convertBrokenOtherPatchToolCallJson(rawJson)
+    var json = convertBrokenOtherPatchToolCallJson(raw)
     val todoToolCallKey = todoToolCallKey(chatId, sessionId, toolCallId)
     val hasFullOutputKind = hasFullOutputToolKind(json)
     if (hasFullOutputKind) fullOutputToolCallKeys.add(todoToolCallKey)
@@ -180,8 +179,7 @@ private fun AcpBridge.handleToolCall(
 private data class PatchDiff(val path: String, val oldText: String?, val newText: String)
 
 // OpenCode reports apply_patch edits as kind=other, so normalize that broken payload shape.
-private fun AcpBridge.convertBrokenOtherPatchToolCallJson(rawJson: String): String {
-    val parsed = try { Json.parseToJsonElement(rawJson).jsonObject } catch (_: Exception) { return rawJson }
+private fun AcpBridge.convertBrokenOtherPatchToolCallJson(parsed: JsonObject): JsonObject {
     val kind = parsed["kind"]?.jsonPrimitive?.contentOrNull
     val rawInput = parsed["rawInput"]
     val patchText = when (kind) {
@@ -192,8 +190,8 @@ private fun AcpBridge.convertBrokenOtherPatchToolCallJson(rawJson: String): Stri
             else -> null
         }
         else -> null
-    } ?: return rawJson
-    if (!patchText.contains("*** Begin Patch")) return rawJson
+    } ?: return parsed
+    if (!patchText.contains("*** Begin Patch")) return parsed
 
     data class PatchHunk(val oldText: String, val newText: String)
     data class PatchFile(val path: String, val mode: String, val hunks: MutableList<PatchHunk>)
@@ -277,7 +275,7 @@ private fun AcpBridge.convertBrokenOtherPatchToolCallJson(rawJson: String): Stri
         }
     }
 
-    if (diffs.isEmpty()) return rawJson
+    if (diffs.isEmpty()) return parsed
 
     return buildJsonObject {
         parsed.forEach { (key, value) -> put(key, value) }
@@ -296,7 +294,7 @@ private fun AcpBridge.convertBrokenOtherPatchToolCallJson(rawJson: String): Stri
                 })
             }
         })
-    }.toString()
+    }
 }
 
 /** The adapter an install job installs; [versionOverride] replaces the configured version. */
