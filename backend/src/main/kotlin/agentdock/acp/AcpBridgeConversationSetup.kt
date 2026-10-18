@@ -326,4 +326,6 @@ internal suspend fun AcpBridge.stopConversation(chatId: String, awaitPrompt: Boo
     livePromptCaptures.remove(chatId)
     lateHistoryEventQueues.remove(chatId)?.close()
     historyReplayCaptures.remove(chatId)
+    forgetToolCallKeys(chatId)
+    lastStatusByChatId.remove(chatId)
 }

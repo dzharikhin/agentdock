@@ -132,6 +132,14 @@ internal fun AcpBridge.installServiceCallbacks() {
 private fun todoToolCallKey(chatId: String, sessionId: String, toolCallId: String): String =
     listOf(chatId, sessionId, toolCallId).joinToString("|")
 
+/** Forgets the tool call keys of a chat; a reopened chat replays its tool calls from scratch. */
+internal fun AcpBridge.forgetToolCallKeys(chatId: String) {
+    val prefix = "$chatId|"
+    listOf(todoToolCallKeys, fullOutputToolCallKeys, emittedTodoPlanKeys).forEach { keys ->
+        keys.removeIf { it.startsWith(prefix) }
+    }
+}
+
 /** Records and shows a tool call or its update; a todo tool call is shown as a plan instead. */
 private fun AcpBridge.handleToolCall(
     chatId: String,
