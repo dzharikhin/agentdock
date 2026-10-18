@@ -10,24 +10,10 @@ import { applyChunks } from '../hooks/chatSession/messageProcessing';
 import { stripTransferredContextForDisplay } from '../hooks/chatSession/chunkBlockHelpers';
 import {
   applyToolCallEvent,
-  extractResultTexts,
   extractToolCallDiffEntries,
   safeParseJson,
   stableToolCallEventId,
 } from './toolCallUtils';
-
-const REPLAY_IGNORED_USER_COMMAND_TAGS = [
-  'command-name',
-  'command-message',
-  'command-args',
-  'local-command-stdout',
-  'local-command-stderr',
-  'task-notification',
-];
-
-const REPLAY_IGNORED_USER_COMMAND_PATTERNS = REPLAY_IGNORED_USER_COMMAND_TAGS.map(
-  (tag) => new RegExp(`<${tag}>[\\s\\S]*?<\\/${tag}>`, 'gi')
-);
 
 const ASSISTANT_EVENT_TYPES = new Set([
   'text',
@@ -40,14 +26,6 @@ const ASSISTANT_EVENT_TYPES = new Set([
   'tool_call_update',
   'plan',
 ]);
-
-function stripReplayCommandMarkup(text: string): string {
-  let sanitized = text;
-  REPLAY_IGNORED_USER_COMMAND_PATTERNS.forEach((pattern) => {
-    sanitized = sanitized.replace(pattern, '');
-  });
-  return sanitized;
-}
 
 function baseChunk(role: 'user' | 'assistant'): ContentChunk {
   return { chatId: '', role, type: 'text', isReplay: true };
@@ -84,99 +62,9 @@ function replayToolCallId(
   return fallbackId;
 }
 
-function mergeReplayExecuteOutput(previous: string | undefined, incoming: string): string {
-  if (!previous) return incoming;
-  const normalizedPrevious = previous.replace(/\r\n?/g, '\n');
-  const normalizedIncoming = incoming.replace(/\r\n?/g, '\n');
-  if (normalizedIncoming === normalizedPrevious || normalizedIncoming.startsWith(normalizedPrevious)) return incoming;
-  if (normalizedPrevious.endsWith(normalizedIncoming)) return previous;
-  return `${previous}\n\n${incoming}`;
-}
-
-function mergeReplayToolContent(
-  previousRaw: Record<string, any> | undefined,
-  incomingRaw: Record<string, any>
-): Record<string, any> {
-  const previousContent = Array.isArray(previousRaw?.content) ? previousRaw.content : [];
-  const incomingContent = Array.isArray(incomingRaw.content) ? incomingRaw.content : [];
-  const isTextBlock = (item: any) => Boolean(
-    item && typeof item === 'object' && (
-      (item.content && typeof item.content === 'object' && typeof item.content.text === 'string')
-      || typeof item.text === 'string'
-    )
-  );
-  const sameBlock = (left: any, right: any) => JSON.stringify(left) === JSON.stringify(right);
-  const previousOutput = extractResultTexts(previousRaw || {});
-  const incomingOutput = extractResultTexts(incomingRaw);
-  if (previousContent.length === 0 && incomingContent.length === 0
-    && (!previousOutput || !incomingOutput)) {
-    return { ...previousRaw, ...incomingRaw };
-  }
-  const mergedOutput = previousOutput && incomingOutput
-    ? mergeReplayExecuteOutput(previousOutput, incomingOutput)
-    : (incomingOutput || previousOutput);
-  const incomingTextBlocks = incomingContent.filter(isTextBlock);
-  const incomingStructuredBlocks = incomingContent.filter((item: any) => !isTextBlock(item));
-  const previousHasTextBlock = previousContent.some(isTextBlock);
-  const isIncomingSnapshot = Boolean(
-    previousOutput && incomingOutput && mergedOutput === incomingOutput
-  );
-  const keepsPreviousText = Boolean(
-    previousOutput && incomingOutput && mergedOutput === previousOutput
-  );
-  const mergedContent: any[] = [];
-
-  if (isIncomingSnapshot) {
-    let insertedText = false;
-    previousContent.forEach((item: any) => {
-      if (!isTextBlock(item)) {
-        mergedContent.push(item);
-      } else if (!insertedText) {
-        mergedContent.push(...(
-          incomingTextBlocks.length > 0
-            ? incomingTextBlocks
-            : [{ type: 'content', content: { type: 'text', text: mergedOutput } }]
-        ));
-        insertedText = true;
-      }
-    });
-    if (!insertedText) {
-      mergedContent.push(...(
-        incomingTextBlocks.length > 0
-          ? incomingTextBlocks
-          : [{ type: 'content', content: { type: 'text', text: mergedOutput } }]
-      ));
-    }
-    incomingStructuredBlocks.forEach((item: any) => {
-      if (!previousContent.some((existing: any) => sameBlock(existing, item))) mergedContent.push(item);
-    });
-  } else {
-    mergedContent.push(...previousContent);
-    incomingContent.forEach((item: any) => {
-      if (isTextBlock(item)) {
-        if (!keepsPreviousText) mergedContent.push(item);
-      } else if (!previousContent.some((existing: any) => sameBlock(existing, item))) {
-        mergedContent.push(item);
-      }
-    });
-    if (previousOutput && incomingOutput && incomingTextBlocks.length === 0) {
-      mergedContent.push({
-        type: 'content',
-        content: {
-          type: 'text',
-          text: previousHasTextBlock && !keepsPreviousText ? incomingOutput : mergedOutput,
-        },
-      });
-    }
-  }
-
-  return { ...previousRaw, ...incomingRaw, content: mergedContent };
-}
-
 function replayAssistantChunks(prompt: ReplayPromptEntry, promptKey: string): ContentChunk[] {
   const identityState: ReplayToolIdentityState = {};
   const toolKinds = new Map<string, string>();
-  const observedToolRaws = new Map<string, Record<string, any>>();
 
   return (prompt.events || []).flatMap((event, eventIndex) => {
     if (event.role && event.role !== 'assistant') return [];
@@ -192,20 +80,6 @@ function replayAssistantChunks(prompt: ReplayPromptEntry, promptKey: string): Co
     const toolKind = event.toolKind || rawKind || (toolCallId ? toolKinds.get(toolCallId) : undefined);
     if (toolCallId && toolKind) toolKinds.set(toolCallId, toolKind);
 
-    let toolRawJson = event.toolRawJson;
-    // Legacy replay can store execute output as deltas. Track output even before
-    // kind is known, because some adapters provide kind only in a later update.
-    if (isToolEvent && toolCallId) {
-      const previousRaw = observedToolRaws.get(toolCallId);
-      const mergedRaw = previousRaw && toolKind?.toLowerCase() !== 'edit'
-        ? mergeReplayToolContent(previousRaw, raw)
-        : raw;
-      observedToolRaws.set(toolCallId, mergedRaw);
-      if (toolKind?.toLowerCase() === 'execute') {
-        toolRawJson = JSON.stringify(mergedRaw);
-      }
-    }
-
     return [{
       ...baseChunk('assistant'),
       type: type as ContentChunk['type'],
@@ -218,7 +92,7 @@ function replayAssistantChunks(prompt: ReplayPromptEntry, promptKey: string): Co
       toolKind,
       toolTitle: event.toolTitle,
       toolStatus: event.toolStatus,
-      toolRawJson,
+      toolRawJson: event.toolRawJson,
       planEntries: event.planEntries,
     }];
   });
@@ -263,9 +137,7 @@ function userChunkFromBlock(block: ReplayContentBlock): ContentChunk | null {
         endLine: block.endLine,
       };
     default: {
-      const text = stripReplayCommandMarkup(
-        stripTransferredContextForDisplay(block.text || '', 'user', true)
-      );
+      const text = stripTransferredContextForDisplay(block.text || '', 'user', true);
       if (!text.trim()) return null;
       return { ...baseChunk('user'), type: 'text', text };
     }

@@ -211,73 +211,6 @@ describe('replay rendering rules', () => {
       .toEqual(first.entries.map((entry) => entry.toolCallId));
   });
 
-  it('accumulates incremental execute output before passing it through live rendering', () => {
-    const executeEvent = (type: 'tool_call' | 'tool_call_update', text: string, status: string) => ({
-      role: 'assistant' as const,
-      type,
-      toolCallId: 'execute-1',
-      toolKind: type === 'tool_call' ? 'execute' : undefined,
-      toolTitle: type === 'tool_call' ? 'npm run build' : undefined,
-      toolStatus: status,
-      toolRawJson: JSON.stringify({
-        toolCallId: 'execute-1',
-        kind: type === 'tool_call' ? 'execute' : undefined,
-        status,
-        content: [{ type: 'content', content: { type: 'text', text } }],
-      }),
-    });
-    const data: ConversationReplayData = {
-      sessions: [{
-        sessionId: 'legacy-session',
-        adapterName: 'claude-code',
-        prompts: [{
-          events: [
-            executeEvent('tool_call', 'compiling...', 'running'),
-            executeEvent('tool_call_update', 'tests...', 'running'),
-            executeEvent('tool_call_update', 'done', 'completed'),
-          ],
-        }],
-      }],
-    };
-    const exploring = buildReplayMessages(data)[0].contentBlocks?.find(
-      (block): block is ExploringBlock => block.type === 'exploring'
-    );
-
-    expect(exploring?.entries[0].result).toBe('compiling...\n\ntests...\n\ndone');
-  });
-
-  it('does not duplicate execute output when an update is already a full snapshot', () => {
-    const data: ConversationReplayData = {
-      sessions: [{
-        sessionId: 'snapshot-session',
-        adapterName: 'claude-code',
-        prompts: [{
-          events: [
-            {
-              role: 'assistant', type: 'tool_call', toolCallId: 'execute-1', toolKind: 'execute',
-              toolTitle: 'npm run build', toolRawJson: JSON.stringify({
-                toolCallId: 'execute-1', kind: 'execute', status: 'running',
-                content: [{ type: 'content', content: { type: 'text', text: 'compiling...' } }],
-              }),
-            },
-            {
-              role: 'assistant', type: 'tool_call_update', toolCallId: 'execute-1',
-              toolRawJson: JSON.stringify({
-                toolCallId: 'execute-1', status: 'completed',
-                content: [{ type: 'content', content: { type: 'text', text: 'compiling...\ndone' } }],
-              }),
-            },
-          ],
-        }],
-      }],
-    };
-    const exploring = buildReplayMessages(data)[0].contentBlocks?.find(
-      (block): block is ExploringBlock => block.type === 'exploring'
-    );
-
-    expect(exploring?.entries[0].result).toBe('compiling...\ndone');
-  });
-
   it('does not duplicate incremental output for non-execute tools', () => {
     const data: ConversationReplayData = {
       sessions: [{
@@ -350,8 +283,7 @@ describe('replay rendering rules', () => {
     expect(user.content).toBe('Context from the previous chat.\n\nNow continue here.');
   });
 
-  it('strips slash-command markup and transferred context from user text', () => {
-    expect(messagesOf('userCommandMarkup')[0].content).toBe('Actual request');
+  it('strips transferred context from user text', () => {
     expect(messagesOf('transferredContext')[0].content).toBe('The real question');
   });
 
