@@ -34,26 +34,9 @@ configurations.named("testRuntimeOnly") {
 
 kotlin {
     jvmToolchain(25)
+    // Everything that touches JCEF, AWT, the microphone or the status bar belongs to the
+    // frontend module; the terminal integration is its own optional module.
     compilerOptions.freeCompilerArgs.add("-jvm-default=no-compatibility")
-    sourceSets["main"].kotlin.apply {
-        srcDir(rootProject.layout.projectDirectory.dir("src/main/kotlin"))
-        // Everything that touches JCEF, AWT, the microphone or the status bar belongs to the
-        // frontend module; the terminal integration is its own optional module.
-        exclude("agentdock/AddCodeReferenceToChatAction.kt")
-        exclude("agentdock/AddFileReferenceToChatAction.kt")
-        exclude("agentdock/AgentDockToolWindowFactory.kt")
-        exclude("agentdock/AssetLoader.kt")
-        exclude("agentdock/ExternalCodeReferenceDispatcher.kt")
-        exclude("agentdock/IdeTheme.kt")
-        exclude("agentdock/JcefDragAndDropSupport.kt")
-        exclude("agentdock/acp/AcpAudioPlayer.kt")
-        exclude("agentdock/acp/IdeTerminalBridge.kt")
-        exclude("agentdock/acp/IdeTerminalBridgeImpl.kt")
-        exclude("agentdock/bridge/frontend/**")
-        exclude("agentdock/audio/**")
-        exclude("agentdock/ui/**")
-    }
-    sourceSets["test"].kotlin.srcDir(rootProject.layout.projectDirectory.dir("src/test/kotlin"))
 }
 
 sourceSets["main"].resources.apply {

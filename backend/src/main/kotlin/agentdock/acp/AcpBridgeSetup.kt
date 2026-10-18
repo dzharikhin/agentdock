@@ -10,7 +10,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.*
 import java.io.File
 internal fun AcpBridge.installServiceCallbacks() {
@@ -33,7 +32,7 @@ internal fun AcpBridge.installServiceCallbacks() {
         pushAdapters()
         pushSessionConfigOptions(chatId, metadata, applyCurrentValues)
     }
-    service.setOnSessionUpdate { chatId: String, update: SessionUpdate, isReplay: Boolean, _meta: JsonElement? ->
+    service.setOnSessionUpdate { chatId: String, update: SessionUpdate, isReplay: Boolean, meta: JsonElement? ->
         if (isReplay && suppressReplayForChatIds.contains(chatId)) {
             replayFreshnessProbes[chatId]?.let { probe ->
                 when (update) {
@@ -74,7 +73,7 @@ internal fun AcpBridge.installServiceCallbacks() {
                         chatId,
                         sessionId,
                         adapterName,
-                        sessionUpdateMessageIdFromMeta(_meta),
+                        sessionUpdateMessageIdFromMeta(meta),
                         update.content
                     )
                 }
@@ -113,16 +112,16 @@ internal fun AcpBridge.installServiceCallbacks() {
                 handleToolCall(chatId, sessionId, adapterName, update.toolCallId.value, json, isUpdate = true, isReplay)
             }
             else -> {
-                val usage = extractUsageUpdate(update, _meta)
+                val usage = extractUsageUpdate(update, meta)
                 if (usage != null) {
                     recordUsageUpdate(chatId, sessionId, adapterName, usage.first, usage.second, isReplay)
-                } else if (isPlanUpdate(update, _meta)) {
-                    buildStoredPlanChunk(update, _meta)?.let { recordStoredEvent(chatId, sessionId, adapterName, it, isReplay) }
+                } else if (isPlanUpdate(update, meta)) {
+                    buildStoredPlanChunk(update, meta)?.let { recordStoredEvent(chatId, sessionId, adapterName, it, isReplay) }
                     if (!isReplay) {
-                        if (extractPlanEntries(update, _meta)?.isNotEmpty() == true) {
+                        if (extractPlanEntries(update, meta)?.isNotEmpty() == true) {
                             markLivePromptVisibleAssistantOutput(chatId)
                         }
-                        pushPlanChunk(chatId, update, _meta)
+                        pushPlanChunk(chatId, update, meta)
                     }
                 }
             }
@@ -179,7 +178,7 @@ private fun AcpBridge.handleToolCall(
 private data class PatchDiff(val path: String, val oldText: String?, val newText: String)
 
 // OpenCode reports apply_patch edits as kind=other, so normalize that broken payload shape.
-private fun AcpBridge.convertBrokenOtherPatchToolCallJson(parsed: JsonObject): JsonObject {
+private fun convertBrokenOtherPatchToolCallJson(parsed: JsonObject): JsonObject {
     val kind = parsed["kind"]?.jsonPrimitive?.contentOrNull
     val rawInput = parsed["rawInput"]
     val patchText = when (kind) {

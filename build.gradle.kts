@@ -49,11 +49,8 @@ dependencies {
     }
 }
 
-// The root project only assembles the plugin; every source file belongs to a content module.
 kotlin {
     jvmToolchain(25)
-    sourceSets["main"].kotlin.setSrcDirs(emptyList<String>())
-    sourceSets["test"].kotlin.setSrcDirs(emptyList<String>())
 }
 
 sourceSets {
