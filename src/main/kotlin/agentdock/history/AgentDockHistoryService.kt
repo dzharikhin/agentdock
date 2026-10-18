@@ -238,26 +238,6 @@ object AgentDockHistoryService {
         )
     }
 
-    fun loadSessionChanges(projectPath: String, sessionId: String, adapterName: String): SessionChangesData? {
-        return HistorySessionChangesStore.loadSessionChanges(projectPath, sessionId, adapterName)
-    }
-
-    fun saveSessionChanges(
-        projectPath: String,
-        sessionId: String,
-        adapterName: String,
-        keptToolCallIds: List<String>,
-        processedFileStates: List<ProcessedFileState>
-    ): Boolean {
-        return HistorySessionChangesStore.saveSessionChanges(
-            projectPath,
-            sessionId,
-            adapterName,
-            keptToolCallIds,
-            processedFileStates
-        )
-    }
-
     suspend fun getHistoryList(projectPath: String?): List<SessionMeta> = withContext(Dispatchers.IO) {
         HistorySyncService.getHistoryList(projectPath)
     }

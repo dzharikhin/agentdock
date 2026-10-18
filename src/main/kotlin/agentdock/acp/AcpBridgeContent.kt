@@ -340,24 +340,8 @@ internal fun AcpBridge.pushFileChangeStats(result: FileChangeStatsResultPayload)
 }
 
 internal fun AcpBridge.pushChangesState(chatId: String, state: ChangesState, hasPluginEdits: Boolean) {
-    val payload = buildJsonObject {
-        put("sessionId", state.sessionId)
-        put("adapterName", state.adapterName)
-        put("keptToolCallIds", buildJsonArray {
-            state.keptToolCallIds.forEach { toolCallId -> add(toolCallId) }
-        })
-        put("hasPluginEdits", hasPluginEdits)
-        put("processedFileStates", buildJsonArray {
-            state.processedFileStates.forEach { processed ->
-                add(buildJsonObject {
-                    put("filePath", processed.filePath)
-                    put("toolCallIds", buildJsonArray {
-                        processed.toolCallIds.forEach { toolCallId -> add(toolCallId) }
-                    })
-                })
-            }
-        })
-    }.toString().jsStringLiteral()
+    val payload = JsonObject(adapterJson.encodeToJsonElement(state).jsonObject + ("hasPluginEdits" to JsonPrimitive(hasPluginEdits)))
+        .toString().jsStringLiteral()
     val chatIdLiteral = chatId.jsStringLiteral()
     host.eval(jsCallback("__onChangesState", chatIdLiteral, "JSON.parse($payload)"))
 }

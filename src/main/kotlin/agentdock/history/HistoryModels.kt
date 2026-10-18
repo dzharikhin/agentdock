@@ -26,12 +26,6 @@ data class SessionMeta(
     val group: String? = null
 )
 
-data class SessionChangesData(
-    val keptToolCallIds: List<String> = emptyList(),
-    val processedFileStates: List<ProcessedFileState> = emptyList(),
-    val updatedAt: Long = Instant.now().toEpochMilli()
-)
-
 @Serializable
 data class ProcessedFileState(
     val filePath: String,

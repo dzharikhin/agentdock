@@ -3,20 +3,14 @@ package agentdock.history
 import java.time.Instant
 
 internal object HistorySessionChangesStore {
-    fun loadSessionChanges(projectPath: String, sessionId: String, adapterName: String): SessionChangesData? {
+    fun loadSessionChanges(projectPath: String, sessionId: String, adapterName: String): HistorySessionChangesEntry? {
         if (projectPath.isBlank() || sessionId.isBlank() || adapterName.isBlank()) return null
         val indexFile = HistoryStorage.ensureProjectIndexFile(projectPath)
         val conversations = HistoryStorage.readProjectIndex(indexFile)
-        val session = conversations.asSequence()
+        return conversations.asSequence()
             .flatMap { it.sessions.asSequence() }
             .firstOrNull { it.sessionId == sessionId && it.adapterName == adapterName }
-            ?: return null
-        val changes = session.changes ?: return null
-        return SessionChangesData(
-            keptToolCallIds = changes.keptToolCallIds,
-            processedFileStates = changes.processedFileStates,
-            updatedAt = changes.updatedAt
-        )
+            ?.changes
     }
 
     fun saveSessionChanges(

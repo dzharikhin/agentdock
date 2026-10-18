@@ -1,17 +1,15 @@
 package agentdock.changes
 
 import kotlinx.serialization.Serializable
+import agentdock.history.HistorySessionChangesStore
 import agentdock.history.ProcessedFileState
-import agentdock.history.AgentDockHistoryService
-import java.time.Instant
 
 @Serializable
 data class ChangesState(
     val sessionId: String,
     val adapterName: String,
     val keptToolCallIds: List<String> = emptyList(),
-    val processedFileStates: List<ProcessedFileState> = emptyList(),
-    val updatedAt: Long = Instant.now().toEpochMilli()
+    val processedFileStates: List<ProcessedFileState> = emptyList()
 )
 
 object ChangesStateService {
@@ -36,21 +34,12 @@ object ChangesStateService {
     }
 
     fun loadState(projectPath: String, sessionId: String, adapterName: String): ChangesState? {
-        val current = AgentDockHistoryService.loadSessionChanges(projectPath, sessionId, adapterName)
-        if (current != null) {
-            return ChangesState(
-                sessionId = sessionId,
-                adapterName = adapterName,
-                keptToolCallIds = current.keptToolCallIds,
-                processedFileStates = current.processedFileStates,
-                updatedAt = current.updatedAt
-            )
-        }
-        return null
+        val current = HistorySessionChangesStore.loadSessionChanges(projectPath, sessionId, adapterName) ?: return null
+        return ChangesState(sessionId, adapterName, current.keptToolCallIds, current.processedFileStates)
     }
 
     fun saveState(projectPath: String, state: ChangesState) {
-        AgentDockHistoryService.saveSessionChanges(
+        HistorySessionChangesStore.saveSessionChanges(
             projectPath = projectPath,
             sessionId = state.sessionId,
             adapterName = state.adapterName,
