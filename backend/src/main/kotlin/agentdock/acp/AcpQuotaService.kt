@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.*
+import kotlin.time.Duration.Companion.minutes
 
 @Service(Service.Level.APP)
 class AcpQuotaService : Disposable {
@@ -35,7 +36,7 @@ class AcpQuotaService : Disposable {
         pollingJob?.cancel()
         pollingJob = scope.launch {
             while (isActive) {
-                delay(POLL_INTERVAL_MS)
+                delay(POLL_INTERVAL)
                 updateQuotas()
             }
         }
@@ -293,7 +294,7 @@ class AcpQuotaService : Disposable {
     }
 
     companion object {
-        private const val POLL_INTERVAL_MS = 5L * 60 * 1000
+        private val POLL_INTERVAL = 5.minutes
         private const val CLOCK_SKEW_MS = 5L * 60 * 1000
         private const val MAX_DISPLAYABLE_RESET_MS = 100L * 24 * 60 * 60 * 1000
 

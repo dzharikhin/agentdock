@@ -18,6 +18,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * The tool window's link to the backend.
@@ -91,7 +92,7 @@ internal class BridgeConnection(
                 // The backend went away or the link broke; retry below.
             }
             reconnect = true
-            delay(REMOTE_RECONNECT_DELAY_MS)
+            delay(REMOTE_RECONNECT_DELAY)
         }
     }
 
@@ -118,4 +119,4 @@ internal class BridgeConnection(
     }
 }
 
-internal const val REMOTE_RECONNECT_DELAY_MS = 1_000L
+internal val REMOTE_RECONNECT_DELAY = 1.seconds

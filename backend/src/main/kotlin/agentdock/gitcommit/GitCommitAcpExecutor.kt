@@ -32,13 +32,14 @@ import agentdock.acp.serializeContentBlock
 import agentdock.history.AgentDockHistoryService
 import com.agentclientprotocol.annotations.UnstableApi
 import com.agentclientprotocol.model.AcpCreatedSessionResponse
+import kotlin.time.Duration.Companion.minutes
 
 internal class GitCommitAcpExecutor(
     private val project: Project,
     private val acpService: AcpClientService = AcpClientService.getInstance(project)
 ) {
     companion object {
-        private const val GENERATION_TIMEOUT_MS = 120_000L
+        private val GENERATION_TIMEOUT = 2.minutes
     }
 
     @OptIn(UnstableApi::class)
@@ -117,7 +118,7 @@ internal class GitCommitAcpExecutor(
 
             val responseText = StringBuilder()
             try {
-                withTimeout(GENERATION_TIMEOUT_MS) {
+                withTimeout(GENERATION_TIMEOUT) {
                     session.prompt(listOf(ContentBlock.Text(prompt))).collect { event ->
                         if (event is Event.SessionUpdateEvent) {
                             appendVisibleAssistantText(responseText, event.update)

@@ -9,16 +9,17 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.*
+import kotlin.time.Duration.Companion.seconds
 
 private data class PermissionDecisionPayload(
     val requestId: String,
     val decision: String
 )
 
-private const val PROMPT_HEALTH_POLL_INTERVAL_MS = 5_000L
-private const val CANCEL_REQUEST_TIMEOUT_MS = 10_000L
-private const val CANCELLED_PROMPT_RESPONSE_TIMEOUT_MS = 10_000L
-private const val PREVIOUS_PROMPT_SETTLE_TIMEOUT_MS = 30_000L
+private val PROMPT_HEALTH_POLL_INTERVAL = 5.seconds
+private val CANCEL_REQUEST_TIMEOUT = 10.seconds
+private val CANCELLED_PROMPT_RESPONSE_TIMEOUT = 10.seconds
+private val PREVIOUS_PROMPT_SETTLE_TIMEOUT = 30.seconds
 
 internal fun AcpBridge.pushConversationError(chatId: String, error: Throwable) {
     pushContentChunk(chatId, "assistant", "text", text = "[Error: ${formatAcpError(error)}]")
@@ -66,14 +67,8 @@ internal fun AcpBridge.startInitialAdapterRefresh() {
 
 private fun AcpBridge.completeCancelledPromptWhenAgentSettles(chatId: String, cancelledJob: Job?) {
     scope.launch(Dispatchers.Default) {
-        val promptSettled = if (cancelledJob == null) {
-            true
-        } else {
-            withTimeoutOrNull(CANCELLED_PROMPT_RESPONSE_TIMEOUT_MS) {
-                cancelledJob.join()
-                true
-            } ?: false
-        }
+        val promptSettled = cancelledJob == null ||
+            withTimeoutOrNull(CANCELLED_PROMPT_RESPONSE_TIMEOUT) { cancelledJob.join() } != null
 
         if (promptSettled) {
             flushLivePromptCapture(chatId)?.let {
@@ -82,9 +77,7 @@ private fun AcpBridge.completeCancelledPromptWhenAgentSettles(chatId: String, ca
             pushStatus(chatId, "ready")
         } else {
             service.markChatSessionBroken(chatId)
-            if (cancelledJob != null) {
-                promptJobs.remove(chatId, cancelledJob)
-            }
+            promptJobs.remove(chatId, cancelledJob)
             failLivePrompt(
                 chatId,
                 "\n\n[Warning: The cancel request was sent, but the AI agent did not finish the cancelled prompt within 10 seconds.]\n\n"
@@ -114,7 +107,7 @@ internal fun AcpBridge.installConversationQueries() {
             scope.launch(Dispatchers.Default) {
                 pushStatus(chatId, "initializing")
                 try {
-                    withTimeout(AcpBridge.START_AGENT_TIMEOUT_MS) {
+                    withTimeout(AcpBridge.START_AGENT_TIMEOUT) {
                         service.startAgent(
                             chatId,
                             adapterName,
@@ -168,7 +161,7 @@ internal fun AcpBridge.installConversationQueries() {
             job = scope.launch(Dispatchers.Default, start = CoroutineStart.LAZY) {
                 try {
                     if (previousPromptJob != null) {
-                        val previousPromptSettled = withTimeoutOrNull(PREVIOUS_PROMPT_SETTLE_TIMEOUT_MS) {
+                        val previousPromptSettled = withTimeoutOrNull(PREVIOUS_PROMPT_SETTLE_TIMEOUT) {
                             previousPromptJob.join()
                             true
                         } ?: false
@@ -182,7 +175,7 @@ internal fun AcpBridge.installConversationQueries() {
                     // captured at submission must be applied before the agent receives the prompt.
                     // Bounded like every other start, so a stuck agent fails the prompt
                     // instead of leaving the user waiting on a prompt that never runs.
-                    val started = withTimeoutOrNull(AcpBridge.START_AGENT_TIMEOUT_MS) {
+                    val started = withTimeoutOrNull(AcpBridge.START_AGENT_TIMEOUT) {
                         service.startAgent(
                             chatId = chatId,
                             adapterName = parsed.adapterId,
@@ -192,7 +185,7 @@ internal fun AcpBridge.installConversationQueries() {
                     }
                     if (started == null) {
                         throw IllegalStateException(
-                            "The agent did not become ready within ${AcpBridge.START_AGENT_TIMEOUT_MS / 1000}s."
+                            "The agent did not become ready within ${AcpBridge.START_AGENT_TIMEOUT.inWholeSeconds}s."
                         )
                     }
                     refreshLivePromptAssistantMetadata(chatId, captureId)
@@ -236,7 +229,7 @@ internal fun AcpBridge.installConversationQueries() {
             job.start()
             val watcher = scope.launch(Dispatchers.Default) {
                 while (job.isActive) {
-                    delay(PROMPT_HEALTH_POLL_INTERVAL_MS)
+                    delay(PROMPT_HEALTH_POLL_INTERVAL)
                     if (!job.isActive) break
                     if (service.status(chatId) != AcpClientService.Status.Prompting) break
                     val failure = service.promptDispatchFailure(chatId) ?: continue
@@ -273,7 +266,7 @@ internal fun AcpBridge.installConversationQueries() {
             scope.launch(Dispatchers.Default) {
                 try {
                     val cancelledJob = promptJobs[chatId]?.takeIf { it.isActive }
-                    withTimeout(CANCEL_REQUEST_TIMEOUT_MS) {
+                    withTimeout(CANCEL_REQUEST_TIMEOUT) {
                         service.cancel(chatId)
                     }
                     pushContentChunk(chatId, "assistant", "text", text = "\n\n[Cancelled]\n\n")
@@ -318,8 +311,8 @@ internal suspend fun AcpBridge.stopConversation(chatId: String, awaitPrompt: Boo
     if (awaitPrompt) {
         historyLoadMutexes[chatId]?.mutex?.withLock { }
         val promptJob = promptJobs[chatId]
-        withTimeout(CANCEL_REQUEST_TIMEOUT_MS) { service.cancel(chatId) }
-        withTimeout(CANCELLED_PROMPT_RESPONSE_TIMEOUT_MS) { promptJob?.join() }
+        withTimeout(CANCEL_REQUEST_TIMEOUT) { service.cancel(chatId) }
+        withTimeout(CANCELLED_PROMPT_RESPONSE_TIMEOUT) { promptJob?.join() }
     }
     service.stopAgent(chatId)
     awaitingBackgroundOutput.remove(chatId)

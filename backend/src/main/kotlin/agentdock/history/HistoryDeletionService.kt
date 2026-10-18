@@ -4,6 +4,8 @@ import kotlinx.coroutines.delay
 import agentdock.acp.AcpAdapterConfig
 import java.io.File
 import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 internal object HistoryDeletionService {
     suspend fun deleteConversations(
@@ -57,8 +59,8 @@ internal object HistoryDeletionService {
         projectPath: String?,
         sessionId: String,
         adapterName: String,
-        waitTimeoutMillis: Long,
-        pollIntervalMillis: Long
+        waitTimeout: Duration,
+        pollInterval: Duration
     ): Boolean {
         val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
         val cleanSessionId = sessionId.trim()
@@ -67,10 +69,10 @@ internal object HistoryDeletionService {
             return false
         }
 
-        val deadline = System.currentTimeMillis() + waitTimeoutMillis.coerceAtLeast(0L)
+        val deadline = System.currentTimeMillis() + waitTimeout.inWholeMilliseconds.coerceAtLeast(0L)
         var sourceMeta = HistorySessionSourceResolver.findSessionSourceMeta(cleanProjectPath, cleanSessionId, cleanAdapterName)
         while (sourceMeta == null && System.currentTimeMillis() < deadline) {
-            delay(pollIntervalMillis.coerceAtLeast(50L))
+            delay(pollInterval.coerceAtLeast(50.milliseconds))
             sourceMeta = HistorySessionSourceResolver.findSessionSourceMeta(cleanProjectPath, cleanSessionId, cleanAdapterName)
         }
 

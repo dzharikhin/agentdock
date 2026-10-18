@@ -60,7 +60,7 @@ class FrontendNativeStateService(
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {}
-            delay(REMOTE_RECONNECT_DELAY_MS)
+            delay(REMOTE_RECONNECT_DELAY)
         }
     }
 }

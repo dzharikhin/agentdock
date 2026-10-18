@@ -24,13 +24,14 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlin.time.Duration.Companion.seconds
 
 // Includes process launch, ACP initialize, and config-options discovery.
-private const val ADAPTER_INITIALIZATION_TIMEOUT_MS = 300_000L
-private const val ACP_INITIALIZE_ATTEMPT_TIMEOUT_MS = 90_000L
+private val ADAPTER_INITIALIZATION_TIMEOUT = 300.seconds
+private val ACP_INITIALIZE_ATTEMPT_TIMEOUT = 90.seconds
 private const val ACP_INITIALIZE_MAX_ATTEMPTS = 2
-private const val ACP_INITIALIZE_RETRY_DELAY_MS = 5_000L
-private const val CONFIG_OPTIONS_FETCH_TIMEOUT_MS = 120_000L
+private val ACP_INITIALIZE_RETRY_DELAY = 5.seconds
+private val CONFIG_OPTIONS_FETCH_TIMEOUT = 120.seconds
 
 /**
  * Initializes one shared process. Mutex waiters never own or stop another
@@ -48,13 +49,13 @@ internal suspend fun AcpClientService.startAndInitializeSharedProcess(
         if (sharedProcess.isHealthy()) return@withLock
 
         try {
-            val completed = withTimeoutOrNull(ADAPTER_INITIALIZATION_TIMEOUT_MS) {
+            val completed = withTimeoutOrNull(ADAPTER_INITIALIZATION_TIMEOUT) {
                 initializeSharedProcessWithinBudget(sharedProcess, adapterInfo)
                 true
             }
             if (completed != true) {
                 throw TimeoutException(
-                    "Adapter initialization timed out after ${ADAPTER_INITIALIZATION_TIMEOUT_MS / 1000}s"
+                    "Adapter initialization timed out after ${ADAPTER_INITIALIZATION_TIMEOUT.inWholeSeconds}s"
                 )
             }
         } catch (error: Exception) {
@@ -95,7 +96,7 @@ private suspend fun AcpClientService.initializeSharedProcessWithinBudget(
             if (error is CancellationException) throw error
             lastError = error
             if (attempt == ACP_INITIALIZE_MAX_ATTEMPTS) break
-            delay(ACP_INITIALIZE_RETRY_DELAY_MS)
+            delay(ACP_INITIALIZE_RETRY_DELAY)
         }
     }
     if (lastError != null) throw lastError
@@ -212,7 +213,7 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
         }
 
         reportProgress("Waiting for ACP initialize... (attempt $attempt/$ACP_INITIALIZE_MAX_ATTEMPTS)")
-        val result = withTimeoutOrNull(ACP_INITIALIZE_ATTEMPT_TIMEOUT_MS) {
+        val result = withTimeoutOrNull(ACP_INITIALIZE_ATTEMPT_TIMEOUT) {
             client.initialize(
                 ClientInfo(
                     PROTOCOL_VERSION_V1,
@@ -227,7 +228,7 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
                 )
             )
         } ?: throw TimeoutException(
-            "ACP initialize timed out after ${ACP_INITIALIZE_ATTEMPT_TIMEOUT_MS / 1000}s"
+            "ACP initialize timed out after ${ACP_INITIALIZE_ATTEMPT_TIMEOUT.inWholeSeconds}s"
         )
         sharedProcess.authMethods = result.authMethods
         sharedProcess.logoutAvailable = result.capabilities.auth.logout != null
@@ -276,10 +277,10 @@ private suspend fun AcpClientService.fetchAndStoreRuntimeMetadata(
     val protocol = sharedProcess.protocol
         ?: throw IllegalStateException("ACP protocol was not initialized for adapter '${adapterInfo.id}'")
     try {
-        val metadata = withTimeoutOrNull(CONFIG_OPTIONS_FETCH_TIMEOUT_MS) {
+        val metadata = withTimeoutOrNull(CONFIG_OPTIONS_FETCH_TIMEOUT) {
             fetchAdapterRuntimeMetadata(protocol, adapterInfo, onConfigMutated = sharedProcess::markConfigMutated)
         } ?: throw TimeoutException(
-            "Config options fetch timed out after ${CONFIG_OPTIONS_FETCH_TIMEOUT_MS / 1000}s"
+            "Config options fetch timed out after ${CONFIG_OPTIONS_FETCH_TIMEOUT.inWholeSeconds}s"
         )
         adapterRuntimeMetadataMap[adapterInfo.id] = metadata
     } catch (error: Exception) {

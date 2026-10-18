@@ -8,12 +8,14 @@ import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
 
 internal object AcpAuthenticationService {
-    private const val AUTH_TIMEOUT_MS = 300_000L
-    private const val AUTH_STATUS_POLL_INTERVAL_MS = 1_000L
-    private const val LOGOUT_TIMEOUT_MS = 15_000L
+    private val AUTH_TIMEOUT = 5.minutes
+    private val AUTH_STATUS_POLL_INTERVAL = 1.seconds
+    private val LOGOUT_TIMEOUT = 15.seconds
 
     @OptIn(com.agentclientprotocol.annotations.UnstableApi::class)
     suspend fun login(
@@ -48,7 +50,7 @@ internal object AcpAuthenticationService {
             is AuthMethod.AgentAuth -> {
                 val client = sharedProcess.client
                     ?: throw IllegalStateException("ACP client is not initialized for '$adapterId'")
-                withTimeout(AUTH_TIMEOUT_MS) {
+                withTimeout(AUTH_TIMEOUT) {
                     client.authenticate(method.id)
                 }
             }
@@ -70,12 +72,12 @@ internal object AcpAuthenticationService {
         check(adapterInfo.loginStatusMethod != null) {
             "Authentication status is not configured for '${adapterInfo.id}'"
         }
-        val authenticated = withTimeoutOrNull(AUTH_TIMEOUT_MS) {
+        val authenticated = withTimeoutOrNull(AUTH_TIMEOUT) {
             while (true) {
                 if (withContext(Dispatchers.IO) { AcpLoginStatus.resolve(adapterInfo) } == true) {
                     return@withTimeoutOrNull true
                 }
-                delay(AUTH_STATUS_POLL_INTERVAL_MS)
+                delay(AUTH_STATUS_POLL_INTERVAL)
             }
         }
         check(authenticated == true) { "Authentication timed out" }
@@ -90,7 +92,7 @@ internal object AcpAuthenticationService {
         runCommand(
             command = command,
             workingDirectory = File(adapterRoot),
-            timeoutMs = AUTH_TIMEOUT_MS,
+            timeout = AUTH_TIMEOUT,
             actionName = "Login"
         )
     }
@@ -125,7 +127,7 @@ internal object AcpAuthenticationService {
         }
         val client = sharedProcess.client
             ?: throw IllegalStateException("ACP client is not initialized for '$adapterId'")
-        withTimeout(AUTH_TIMEOUT_MS) {
+        withTimeout(AUTH_TIMEOUT) {
             client.logout()
         }
     }
@@ -142,7 +144,7 @@ internal object AcpAuthenticationService {
         runCommand(
             command = command,
             workingDirectory = File(adapterRoot),
-            timeoutMs = LOGOUT_TIMEOUT_MS,
+            timeout = LOGOUT_TIMEOUT,
             actionName = "Logout"
         )
     }
@@ -163,7 +165,7 @@ internal object AcpAuthenticationService {
     private suspend fun runCommand(
         command: List<String>,
         workingDirectory: File,
-        timeoutMs: Long,
+        timeout: Duration,
         actionName: String
     ) {
         val result = runInterruptible(Dispatchers.IO) {
@@ -173,7 +175,7 @@ internal object AcpAuthenticationService {
                 extraPathEntries = AcpNodeRuntimeResolver.resolveAvailable()?.pathEntries.orEmpty(),
                 workingDirectory = workingDirectory,
                 redirectErrorStream = true,
-                timeout = timeoutMs.milliseconds
+                timeout = timeout
             )
         }
         check(!result.timedOut) { "$actionName timed out" }

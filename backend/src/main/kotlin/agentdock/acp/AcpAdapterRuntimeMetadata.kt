@@ -10,8 +10,11 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
-private const val PROBE_SESSION_OPERATION_TIMEOUT_MS = 3_000L
+private val PROBE_SESSION_OPERATION_TIMEOUT = 3.seconds
 
 @OptIn(com.agentclientprotocol.annotations.UnstableApi::class)
 internal suspend fun AcpClientService.fetchAdapterRuntimeMetadata(
@@ -59,7 +62,7 @@ private suspend fun AcpClientService.cleanupProbeSessions(
     val probeProjectPath = AcpAdapterPaths.getProbeSessionDir().absolutePath
     val sessionIds = linkedSetOf<String>()
     try {
-        withTimeoutOrNull(PROBE_SESSION_OPERATION_TIMEOUT_MS) {
+        withTimeoutOrNull(PROBE_SESSION_OPERATION_TIMEOUT) {
             listHistorySessions(
                 adapterInfo = adapterInfo,
                 projectPath = probeProjectPath,
@@ -85,7 +88,7 @@ private suspend fun AcpClientService.cleanupProbeSessions(
 
     sessionIds.forEach { sessionId ->
         try {
-            withTimeoutOrNull(PROBE_SESSION_OPERATION_TIMEOUT_MS) {
+            withTimeoutOrNull(PROBE_SESSION_OPERATION_TIMEOUT) {
                 when {
                     adapterInfo.sessionDeleteMethod == "grokCliSessionDelete" ->
                         GrokSessionHistory.grokCliSessionDelete(adapterInfo.id, probeProjectPath, sessionId)
@@ -97,8 +100,8 @@ private suspend fun AcpClientService.cleanupProbeSessions(
                         projectPath = probeProjectPath,
                         sessionId = sessionId,
                         adapterName = adapterInfo.id,
-                        waitTimeoutMillis = if (sessionId == currentSessionId) 1_000L else 0L,
-                        pollIntervalMillis = 100L
+                        waitTimeout = if (sessionId == currentSessionId) 1.seconds else Duration.ZERO,
+                        pollInterval = 100.milliseconds
                     )
                 }
             }

@@ -23,8 +23,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.seconds
 
-private const val SESSION_LIST_TIMEOUT_MS = 30_000L
+private val SESSION_LIST_TIMEOUT = 30.seconds
 
 internal object HistorySyncService {
     private val log = Logger.getInstance(HistorySyncService::class.java)
@@ -253,13 +254,13 @@ internal object HistorySyncService {
         val scans = adapters.map { adapterInfo ->
             async(Dispatchers.IO) {
                 try {
-                    val sessions = withTimeout(SESSION_LIST_TIMEOUT_MS) {
+                    val sessions = withTimeout(SESSION_LIST_TIMEOUT) {
                         service.listHistorySessions(adapterInfo, projectPath)
                     }
                     AdapterSessionScan(adapterInfo.id, sessions)
                 } catch (error: TimeoutCancellationException) {
                     log.warn(
-                        "Session list timed out for adapter '${adapterInfo.id}' after ${SESSION_LIST_TIMEOUT_MS}ms",
+                        "Session list timed out for adapter '${adapterInfo.id}' after ${SESSION_LIST_TIMEOUT.inWholeMilliseconds}ms",
                         error
                     )
                     null

@@ -9,6 +9,7 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration.Companion.seconds
 
 internal class HistoryLoadMutexEntry {
     val mutex = Mutex()
@@ -63,7 +64,7 @@ class AcpBridge(
     companion object {
         // The service owns the 300s adapter-initialization budget. Leave time
         // for session creation and preference application after it completes.
-        const val START_AGENT_TIMEOUT_MS = 360_000L
+        val START_AGENT_TIMEOUT = 360.seconds
     }
 
     fun install() {

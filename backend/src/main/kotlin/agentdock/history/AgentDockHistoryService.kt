@@ -3,6 +3,9 @@ package agentdock.history
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 object AgentDockHistoryService {
     fun registerEphemeralSession(projectPath: String?, adapterName: String, sessionId: String) {
@@ -262,15 +265,15 @@ object AgentDockHistoryService {
         projectPath: String?,
         sessionId: String,
         adapterName: String,
-        waitTimeoutMillis: Long = 5_000L,
-        pollIntervalMillis: Long = 250L
+        waitTimeout: Duration = 5.seconds,
+        pollInterval: Duration = 250.milliseconds
     ): Boolean = withContext(Dispatchers.IO) {
         HistoryDeletionService.deleteSessionImmediately(
             projectPath,
             sessionId,
             adapterName,
-            waitTimeoutMillis,
-            pollIntervalMillis
+            waitTimeout,
+            pollInterval
         )
     }
 

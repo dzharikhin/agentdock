@@ -16,13 +16,13 @@ import kotlin.time.Duration.Companion.seconds
 import com.agentclientprotocol.model.AuthMethod
 
 private const val RUNTIME_CHECK_MAX_ATTEMPTS = 3
-private const val RUNTIME_CHECK_RETRY_DELAY_MS = 1_000L
+private val RUNTIME_CHECK_RETRY_DELAY = 1.seconds
 private val LOG = Logger.getInstance("agentdock.acp.AcpBridgeAdapterStatus")
 
 private suspend fun runRuntimeCheckWithRetries(check: suspend (attempt: Int) -> Boolean): Boolean {
     for (attempt in 1..RUNTIME_CHECK_MAX_ATTEMPTS) {
         if (check(attempt)) return true
-        if (attempt < RUNTIME_CHECK_MAX_ATTEMPTS) delay(RUNTIME_CHECK_RETRY_DELAY_MS)
+        if (attempt < RUNTIME_CHECK_MAX_ATTEMPTS) delay(RUNTIME_CHECK_RETRY_DELAY)
     }
     return false
 }

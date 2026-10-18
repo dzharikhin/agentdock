@@ -12,8 +12,9 @@ import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import agentdock.systeminstructions.SystemInstructionsStore
+import kotlin.time.Duration.Companion.seconds
 
-private const val SESSION_CLOSE_TIMEOUT_MS = 3_000L
+private val SESSION_CLOSE_TIMEOUT = 3.seconds
 
 internal fun AcpClientService.respondToPermissionRequest(requestId: String, decision: String) {
     for (context in sessions.values) {
@@ -127,7 +128,7 @@ internal suspend fun AcpClientService.stopAgent(chatId: String) {
             val sharedProcess = context.sharedProcess
             val sessionId = context.sessionIdRef.get()
             if (sharedProcess?.sessionCloseAvailable == true && sessionId != null) {
-                withTimeoutOrNull(SESSION_CLOSE_TIMEOUT_MS) {
+                withTimeoutOrNull(SESSION_CLOSE_TIMEOUT) {
                     sharedProcess.protocol?.closeAcpSession(sessionId)
                 }
             }
