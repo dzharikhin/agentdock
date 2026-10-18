@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -72,11 +73,11 @@ class McpBridge(
 
     private fun push(servers: List<McpServerConfig>) {
         val escaped = Json.encodeToString(ListSerializer(McpServerConfig.serializer()), servers).jsStringLiteral()
-        host.eval("if(window.__onMcpServers) window.__onMcpServers(JSON.parse($escaped));")
+        host.eval(jsCallback("__onMcpServers", "JSON.parse($escaped)"))
     }
 
     private fun pushStatus(update: McpStatusUpdate) {
         val escaped = json.encodeToString(update).jsStringLiteral()
-        host.eval("if(window.__onMcpStatus) window.__onMcpStatus(JSON.parse($escaped));")
+        host.eval(jsCallback("__onMcpStatus", "JSON.parse($escaped)"))
     }
 }

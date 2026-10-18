@@ -1,6 +1,7 @@
 package agentdock.acp
 
 import agentdock.bridge.BridgeHost
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -111,13 +112,13 @@ class CustomAcpBridge(
 
     private fun pushStatus(update: CustomAcpStatusUpdate) {
         val payload = customAcpJson.encodeToString(update).jsStringLiteral()
-        host.eval("if(window.__onCustomAcpStatus) window.__onCustomAcpStatus(JSON.parse($payload));")
+        host.eval(jsCallback("__onCustomAcpStatus", "JSON.parse($payload)"))
     }
 
     private fun push(configs: List<CustomAcpConfig>) {
         val payload = customAcpJson
             .encodeToString(ListSerializer(CustomAcpConfig.serializer()), configs)
             .jsStringLiteral()
-        host.eval("if(window.__onCustomAcpConfigs) window.__onCustomAcpConfigs(JSON.parse($payload));")
+        host.eval(jsCallback("__onCustomAcpConfigs", "JSON.parse($payload)"))
     }
 }

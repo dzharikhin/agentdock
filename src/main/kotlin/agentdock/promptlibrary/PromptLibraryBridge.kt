@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -36,6 +37,6 @@ class PromptLibraryBridge(
 
     private fun push(prompts: List<PromptLibraryItem>) {
         val payload = Json.encodeToString(ListSerializer(PromptLibraryItem.serializer()), prompts).jsStringLiteral()
-        host.eval("if(window.__onPromptLibrary) window.__onPromptLibrary(JSON.parse($payload));")
+        host.eval(jsCallback("__onPromptLibrary", "JSON.parse($payload)"))
     }
 }

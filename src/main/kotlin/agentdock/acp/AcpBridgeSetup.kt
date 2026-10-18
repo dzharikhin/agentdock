@@ -2,6 +2,7 @@ package agentdock.acp
 
 import agentdock.BuildConfig
 import agentdock.bridge.ClientTheme
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 import com.agentclientprotocol.model.ContentBlock
 import com.agentclientprotocol.model.SessionUpdate
@@ -64,8 +65,8 @@ internal fun AcpBridge.installServiceCallbacks() {
         }
         if (!isReplay && hasAssistantOutput && awaitingBackgroundOutput.remove(chatId, sessionId)) {
             val escapedChatId = chatId.jsStringLiteral()
-            host.eval("if(window.__onAssistantActivity) window.__onAssistantActivity($escapedChatId);")
-            host.eval("if(window.__agentDockPlaySound) window.__agentDockPlaySound('backgroundResumed');")
+            host.eval(jsCallback("__onAssistantActivity", escapedChatId))
+            host.eval(jsCallback("__agentDockPlaySound", "'backgroundResumed'"))
         }
         when (update) {
             is SessionUpdate.UserMessageChunk -> {
@@ -422,7 +423,7 @@ internal fun AcpBridge.installAdapterQueries() {
                     downloadStatuses.remove(adapterId)
                     authErrors.remove(adapterId)
                     setDownloadProbeState(adapterId, downloaded = false)
-                    host.eval("if(window.__onAdapterDeleted) window.__onAdapterDeleted(${adapterId.jsStringLiteral()});")
+                    host.eval(jsCallback("__onAdapterDeleted", adapterId.jsStringLiteral()))
                 } else {
                     downloadStatuses[adapterId] = "Error: Unable to remove adapter files"
                 }
@@ -546,7 +547,7 @@ internal fun AcpBridge.installAdapterQueries() {
                 AcpUsageDataFetcher.discardCachedUsage(adapterId)
                 if (adapterId == "cursor-cli") {
                     AcpQuotaService.getInstance().clearQuotaForAdapter(adapterId)
-                    host.eval("if(window.__onUsageData) window.__onUsageData(${adapterId.jsStringLiteral()}, '');")
+                    host.eval(jsCallback("__onUsageData", adapterId.jsStringLiteral(), "''"))
                 }
                 if (restartRequired) {
                     service.stopSharedProcess(adapterId)
@@ -588,7 +589,7 @@ internal fun AcpBridge.installAdapterQueries() {
             }
             val escapedAdapterId = adapterId.jsStringLiteral()
             val escapedResult = result.jsStringLiteral()
-            host.eval("if(window.__onUsageData) window.__onUsageData($escapedAdapterId, $escapedResult);")
+            host.eval(jsCallback("__onUsageData", escapedAdapterId, escapedResult))
         }
     }
 
@@ -665,5 +666,5 @@ internal fun AcpBridge.pushLogEntry(entry: AcpLogEntry) {
         put("json", entry.json)
         put("timestamp", entry.timestampMillis)
     }.toString().jsStringLiteral()
-    host.eval("if(window.__onAcpLog) window.__onAcpLog(JSON.parse($payload));")
+    host.eval(jsCallback("__onAcpLog", "JSON.parse($payload)"))
 }

@@ -9,6 +9,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import agentdock.acp.AcpQuotaService
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 
 class SettingsBridge(
@@ -48,7 +49,7 @@ class SettingsBridge(
     /** Sends the settings to React and refreshes the client-side native snapshot. */
     private fun pushGlobalSettings(settings: GlobalSettings) {
         val encoded = json.encodeToString(GlobalSettingsPayload(settings = settings))
-        host.eval("if(window.__onGlobalSettings) window.__onGlobalSettings(JSON.parse(${encoded.jsStringLiteral()}));")
+        host.eval(jsCallback("__onGlobalSettings", "JSON.parse(${encoded.jsStringLiteral()})"))
         host.updateSettings(settings)
     }
 }

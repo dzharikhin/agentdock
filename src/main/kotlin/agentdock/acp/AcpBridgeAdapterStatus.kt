@@ -7,6 +7,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import agentdock.bridge.ClientTheme
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 import com.intellij.openapi.diagnostic.Logger
 import java.io.File
@@ -355,7 +356,7 @@ internal fun AcpBridge.pushAdapters(
 
         val payload = adapterJson.encodeToString(adapters)
         val escaped = payload.jsStringLiteral()
-        host.eval("if(window.__onAdapters) window.__onAdapters(JSON.parse($escaped));")
+        host.eval(jsCallback("__onAdapters", "JSON.parse($escaped)"))
 
         unique.values.forEach { info ->
             if (!includeRuntimeChecks) return@forEach

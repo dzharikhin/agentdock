@@ -9,6 +9,7 @@ import agentdock.settings.AudioTranscriptionProviders
 import agentdock.settings.AudioTranscriptionResultPayload
 import agentdock.settings.AudioTranscriptionSettings
 import agentdock.settings.StopRecordingRequest
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -379,18 +380,18 @@ internal class AudioInputBridge(
     private fun push(state: AudioTranscriptionFeatureState) {
         if (disposed) return
         val payload = json.encodeToString(state).jsStringLiteral()
-        eval("if(window.__onAudioTranscriptionFeature) window.__onAudioTranscriptionFeature(JSON.parse($payload));")
+        eval(jsCallback("__onAudioTranscriptionFeature", "JSON.parse($payload)"))
     }
 
     private fun pushResult(result: AudioTranscriptionResultPayload) {
         if (disposed) return
         val payload = json.encodeToString(result).jsStringLiteral()
-        eval("if(window.__onAudioTranscriptionResult) window.__onAudioTranscriptionResult(JSON.parse($payload));")
+        eval(jsCallback("__onAudioTranscriptionResult", "JSON.parse($payload)"))
     }
 
     private fun pushRecordingState(state: AudioRecordingStatePayload) {
         if (disposed) return
         val payload = json.encodeToString(state).jsStringLiteral()
-        eval("if(window.__onAudioRecordingState) window.__onAudioRecordingState(JSON.parse($payload));")
+        eval(jsCallback("__onAudioRecordingState", "JSON.parse($payload)"))
     }
 }

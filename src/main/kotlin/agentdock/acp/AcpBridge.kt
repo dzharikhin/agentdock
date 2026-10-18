@@ -1,6 +1,7 @@
 package agentdock.acp
 
 import agentdock.bridge.BridgeHost
+import agentdock.utils.jsCallback
 import com.intellij.openapi.application.ApplicationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -78,11 +79,6 @@ class AcpBridge(
 
     internal fun dispatchContentChunkJson(json: String) {
         if (!host.isAttached) return
-        host.eval("""
-                if(window.__onContentChunk){
-                    var __chunk = $json;
-                    window.__onContentChunk(__chunk);
-                }
-                """.trimIndent())
+        host.eval(jsCallback("__onContentChunk", json))
     }
 }

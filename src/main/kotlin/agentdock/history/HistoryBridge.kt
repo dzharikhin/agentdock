@@ -12,6 +12,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 
 private val permissiveJson = Json {
@@ -215,7 +216,7 @@ class HistoryBridge(
                         request.query
                     )
                     val result = permissiveJson.encodeToString(SearchHistoryResultPayload(request.query, snippets))
-                    host.eval("if(window.__onHistorySearchResult) window.__onHistorySearchResult(JSON.parse(${result.jsStringLiteral()}));")
+                    host.eval(jsCallback("__onHistorySearchResult", "JSON.parse(${result.jsStringLiteral()})"))
                 } catch (e: Exception) {
                     sendJsError("Error during history search: ${e.message}")
                 }
@@ -240,12 +241,12 @@ class HistoryBridge(
 
     private fun pushHistoryList(jsonArray: String) {
         val escaped = jsonArray.jsStringLiteral()
-        host.eval("if(window.__onHistoryList) window.__onHistoryList(JSON.parse($escaped));")
+        host.eval(jsCallback("__onHistoryList", "JSON.parse($escaped)"))
     }
 
     private fun pushDeleteResult(result: DeleteHistoryResultPayload) {
         val escaped = permissiveJson.encodeToString(result).jsStringLiteral()
-        host.eval("if(window.__onHistoryDeleteResult) window.__onHistoryDeleteResult(JSON.parse($escaped));")
+        host.eval(jsCallback("__onHistoryDeleteResult", "JSON.parse($escaped)"))
     }
 
     private fun sendJsError(msg: String) {

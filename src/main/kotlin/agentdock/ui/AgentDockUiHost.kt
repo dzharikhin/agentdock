@@ -10,6 +10,7 @@ import agentdock.bridge.frontend.BridgeScripts
 import agentdock.bridge.frontend.FrontendBridge
 import agentdock.bridge.frontend.FrontendSettings
 import agentdock.settings.GlobalSettings
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 import com.intellij.ide.IdeEventQueue
 import com.intellij.ide.ui.LafManagerListener
@@ -325,9 +326,9 @@ class AgentDockUiHost(
         val connection = ApplicationManager.getApplication().messageBus.connect(browser)
         connection.subscribe(LafManagerListener.TOPIC, LafManagerListener {
             bridge.eval(IdeTheme.generateCssUpdateScript())
-            bridge.eval("if(window.__onThemeChanged) window.__onThemeChanged();")
+            bridge.eval(jsCallback("__onThemeChanged"))
             val theme = (if (IdeTheme.isDarkTheme()) "dark" else "light").jsStringLiteral()
-            bridge.eval("window.__agentDockInvoke && window.__agentDockInvoke('themeChanged', $theme);")
+            bridge.eval(jsCallback("__agentDockInvoke", "'themeChanged'", theme))
         })
     }
 

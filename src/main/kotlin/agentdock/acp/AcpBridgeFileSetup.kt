@@ -19,6 +19,7 @@ import agentdock.changes.ChangesStateService
 import agentdock.changes.UndoFileHandler
 import agentdock.changes.UndoOperation
 import agentdock.utils.LocalFilePathPolicy
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 import com.intellij.openapi.project.Project
 import java.io.File
@@ -271,7 +272,7 @@ internal fun AcpBridge.installMiscQueries() {
                     .take(50)
             }
             val json = try { kotlinx.serialization.json.Json.encodeToString<List<FileSearchItem>>(list) } catch (e: Exception) { "[]" }
-            host.eval("if(window.__onFilesResult) window.__onFilesResult(" + json + ");")
+            host.eval(jsCallback("__onFilesResult", json))
         }
     }
     host.register("openFile") { payload ->
@@ -326,7 +327,7 @@ internal fun AcpBridge.installMiscQueries() {
                     }
 
                     val jsonArrayStr = results.joinToString(",")
-                    host.eval("if(window.__onAttachmentsAdded) window.__onAttachmentsAdded(${normalizedChatId.jsStringLiteral()}, [$jsonArrayStr]);")
+                    host.eval(jsCallback("__onAttachmentsAdded", normalizedChatId.jsStringLiteral(), "[$jsonArrayStr]"))
                 }
             }
         }
@@ -339,8 +340,7 @@ internal fun AcpBridge.installMiscQueries() {
 
         if (path.isNotBlank()) scope.launch(Dispatchers.IO) {
             val dataUrl = readLocalImageDataUrl(service.project, path).orEmpty()
-            host.eval("if(window.__onLocalImageResult) window.__onLocalImageResult(" +
-                "${buildJsonObject { put("path", path); put("dataUrl", dataUrl) }});")
+            host.eval(jsCallback("__onLocalImageResult", buildJsonObject { put("path", path); put("dataUrl", dataUrl) }.toString()))
         }
     }
 
@@ -358,8 +358,7 @@ internal fun AcpBridge.installFileIconQuery() {
         if (path.isNotBlank()) scope.launch(Dispatchers.IO) {
             // One file per request, so the read action stays short enough not to stall writes.
             val icon = readAction { provider.iconForPath(path) }.orEmpty()
-            host.eval("if(window.__onFileIconResult) window.__onFileIconResult(" +
-                        "${buildJsonObject { put("path", path); put("icon", icon) }});")
+            host.eval(jsCallback("__onFileIconResult", buildJsonObject { put("path", path); put("icon", icon) }.toString()))
         }
     }
 }

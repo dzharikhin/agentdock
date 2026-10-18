@@ -6,6 +6,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 
 private val json = Json { ignoreUnknownKeys = true }
@@ -36,6 +37,6 @@ class SystemInstructionsBridge(
 
     private fun push(instructions: List<SystemInstruction>) {
         val payload = Json.encodeToString(ListSerializer(SystemInstruction.serializer()), instructions).jsStringLiteral()
-        host.eval("if(window.__onSystemInstructions) window.__onSystemInstructions(JSON.parse($payload));")
+        host.eval(jsCallback("__onSystemInstructions", "JSON.parse($payload)"))
     }
 }

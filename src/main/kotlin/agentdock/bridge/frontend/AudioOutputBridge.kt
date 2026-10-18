@@ -4,6 +4,7 @@ import agentdock.audio.SpeechSynthesizers
 import agentdock.settings.AudioOutputProviderSettings
 import agentdock.settings.SpeechRequest
 import agentdock.settings.SpeechResultPayload
+import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
@@ -159,7 +160,7 @@ internal class AudioOutputBridge(
     private fun push(result: SpeechResultPayload) {
         if (disposed) return
         val payload = json.encodeToString(result).jsStringLiteral()
-        eval("if(window.__onSpeechResult) window.__onSpeechResult(JSON.parse($payload));")
+        eval(jsCallback("__onSpeechResult", "JSON.parse($payload)"))
     }
 
     private class SpeechCache(val voice: String, val audio: Map<String, ByteArray>)
