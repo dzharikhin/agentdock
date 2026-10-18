@@ -109,13 +109,3 @@ private suspend fun AcpClientService.cleanupProbeSessions(
         }
     }
 }
-
-internal fun AcpClientService.storeFreshAdapterRuntimeMetadata(
-    adapterInfo: AcpAdapterConfig.AdapterInfo,
-    metadata: AcpClientService.AdapterRuntimeMetadata
-): AcpClientService.AdapterRuntimeMetadata {
-    val updatedMetadata = AcpConfigOptionsCache.updateFromSnapshot(adapterInfo, metadata)
-        .toRuntimeMetadata(adapterInfo)
-    adapterRuntimeMetadataMap[adapterInfo.id] = updatedMetadata
-    return updatedMetadata
-}

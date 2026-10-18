@@ -117,7 +117,7 @@ internal suspend fun AcpClientService.startAgent(
     }
 }
 
-private suspend fun AcpClientService.applySessionConfigOptions(
+internal suspend fun AcpClientService.applySessionConfigOptions(
     context: AcpClientService.AgentContext,
     adapterName: String,
     preferredValues: Map<String, String>

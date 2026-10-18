@@ -21,21 +21,17 @@ import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonElement
 import java.util.UUID
 import java.util.concurrent.ConcurrentLinkedQueue
-import agentdock.acp.AcpAdapterConfig
 import agentdock.acp.AcpAdapterPaths
 import agentdock.acp.AcpClientService
+import agentdock.acp.applySessionConfigOptions
 import agentdock.acp.awaitPendingSessionUpdates
 import agentdock.acp.ensureSharedProcessStarted
 import agentdock.acp.findReasoningEffortOption
 import agentdock.acp.resolveModelToApply
-import agentdock.acp.runtimeMetadataFromSetConfigOptionResponseJson
 import agentdock.acp.serializeContentBlock
-import agentdock.acp.setSessionConfigOptionRaw
-import agentdock.acp.storeFreshAdapterRuntimeMetadata
 import agentdock.history.AgentDockHistoryService
 import com.agentclientprotocol.annotations.UnstableApi
 import com.agentclientprotocol.model.AcpCreatedSessionResponse
-import com.agentclientprotocol.protocol.Protocol
 
 internal class GitCommitAcpExecutor(
     private val project: Project,
@@ -101,15 +97,23 @@ internal class GitCommitAcpExecutor(
             ephemeralSessionId = session.sessionId.value
             AgentDockHistoryService.registerEphemeralSession(project.basePath, adapterInfo.id, ephemeralSessionId)
 
-            applyConfiguration(
-                session = session,
-                protocol = sharedProcess.protocol,
-                sharedProcess = sharedProcess,
-                adapterInfo = adapterInfo,
-                initialMetadata = runtimeMetadata ?: AcpClientService.AdapterRuntimeMetadata(emptyList()),
-                selectedModelId = selectedModelId,
-                selectedReasoningEffortId = config.reasoningEffortId,
-            )
+            val metadata = runtimeMetadata ?: AcpClientService.AdapterRuntimeMetadata(emptyList())
+            val preferredValues = buildMap {
+                metadata.modelConfigId?.let { id -> selectedModelId?.let { put(id, it) } }
+                metadata.configOptions.findReasoningEffortOption()?.let { option ->
+                    config.reasoningEffortId.trim().takeIf(String::isNotEmpty)?.let { put(option.id, it) }
+                }
+            }
+            // The context is not registered as a chat, so applying options publishes nothing to the UI.
+            val context = acpService.createAgentContext(commitChatId).also {
+                it.session = session
+                it.sharedProcess = sharedProcess
+                it.sessionIdRef.set(session.sessionId.value)
+                it.runtimeMetadataRef.set(metadata)
+            }
+            if (!acpService.applySessionConfigOptions(context, adapterInfo.id, preferredValues)) {
+                error("Failed to apply session config options")
+            }
 
             val responseText = StringBuilder()
             try {
@@ -155,56 +159,6 @@ internal class GitCommitAcpExecutor(
                 }
             }
         }
-    }
-
-    @OptIn(UnstableApi::class)
-    private suspend fun applyConfiguration(
-        session: ClientSession,
-        protocol: Protocol?,
-        sharedProcess: AcpClientService.SharedProcess,
-        adapterInfo: AcpAdapterConfig.AdapterInfo,
-        initialMetadata: AcpClientService.AdapterRuntimeMetadata,
-        selectedModelId: String?,
-        selectedReasoningEffortId: String,
-    ) {
-        var metadata = initialMetadata
-        if (!selectedModelId.isNullOrBlank()) {
-            val configId = metadata.modelConfigId
-            if (configId == null) {
-                if (selectedModelId != metadata.currentModelId) {
-                    error("ACP adapter '${adapterInfo.id}' does not provide a model config option")
-                }
-            } else {
-                val activeProtocol = protocol
-                    ?: error("ACP protocol is not initialized for ${adapterInfo.id}")
-                val response = activeProtocol.setSessionConfigOptionRaw(
-                    session.sessionId.value,
-                    configId,
-                    selectedModelId,
-                )
-                sharedProcess.markConfigMutated()
-                metadata = runtimeMetadataFromSetConfigOptionResponseJson(response, adapterInfo)
-                acpService.storeFreshAdapterRuntimeMetadata(adapterInfo, metadata)
-            }
-        }
-
-        val effortId = selectedReasoningEffortId.trim().takeIf(String::isNotEmpty) ?: return
-        val effortOption = metadata.configOptions.findReasoningEffortOption() ?: return
-        if (!effortOption.accepts(effortId)) return
-
-        val activeProtocol = protocol
-            ?: error("ACP protocol is not initialized for ${adapterInfo.id}")
-        val response = activeProtocol.setSessionConfigOptionRaw(
-            session.sessionId.value,
-            effortOption.id,
-            effortId,
-            effortOption.type,
-        )
-        sharedProcess.markConfigMutated()
-        acpService.storeFreshAdapterRuntimeMetadata(
-            adapterInfo,
-            runtimeMetadataFromSetConfigOptionResponseJson(response, adapterInfo),
-        )
     }
 
     private fun appendVisibleAssistantText(buffer: StringBuilder, update: SessionUpdate) {
