@@ -55,9 +55,7 @@ import {
   onBridgeEvent,
 } from './bridgeEvents';
 
-let saveTranscriptCounter = 0;
-let fileChangeStatsCounter = 0;
-let bridgeOperationCounter = 0;
+let bridgeRequestCounter = 0;
 let latestGlobalSettings: GlobalSettingsPayload | undefined;
 const availableCommandsByAdapter = new Map<string, AvailableCommand[]>();
 const pendingRpcMethodsById = new Map<string | number, string>();
@@ -66,19 +64,53 @@ const BRIDGE_REQUEST_TIMEOUT_MS = 120_000;
 const BRIDGE_OPERATION_TIMEOUT_MS = 10_000;
 const CANCEL_PROMPT_OPERATION_TIMEOUT_MS = 15_000;
 
-function nextSaveTranscriptRequestId(): string {
-  saveTranscriptCounter += 1;
-  return `transcript-${saveTranscriptCounter}-${Date.now()}`;
+function nextBridgeRequestId(prefix: string): string {
+  bridgeRequestCounter += 1;
+  return `${prefix}-${bridgeRequestCounter}-${Date.now()}`;
 }
 
-function nextFileChangeStatsRequestId(): string {
-  fileChangeStatsCounter += 1;
-  return `file-change-stats-${fileChangeStatsCounter}-${Date.now()}`;
-}
+/** Invokes a bridge function and resolves with the backend response carrying the same request ID. */
+function awaitBridgeResponse<P extends { requestId: string }>(
+  subscribe: (callback: (e: CustomEvent<{ payload: P }>) => void) => () => void,
+  requestId: string,
+  invoke: () => void,
+  options: {
+    timeoutMs: number;
+    timeoutMessage: string;
+    /** Returns the rejection message for a failed response. */
+    failure?: (payload: P) => string | undefined;
+    onTimeout?: () => void;
+  },
+): Promise<P> {
+  return new Promise((resolve, reject) => {
+    let cleanup = () => {};
+    const timeout = window.setTimeout(() => {
+      options.onTimeout?.();
+      cleanup();
+      reject(new Error(options.timeoutMessage));
+    }, options.timeoutMs);
 
-function nextBridgeOperationRequestId(operation: string): string {
-  bridgeOperationCounter += 1;
-  return `${operation}-${bridgeOperationCounter}-${Date.now()}`;
+    cleanup = subscribe((e) => {
+      const payload = e.detail.payload;
+      if (payload.requestId !== requestId) return;
+      window.clearTimeout(timeout);
+      cleanup();
+      const error = options.failure?.(payload);
+      if (error === undefined) {
+        resolve(payload);
+        return;
+      }
+      reject(new Error(error));
+    });
+
+    try {
+      invoke();
+    } catch (error) {
+      window.clearTimeout(timeout);
+      cleanup();
+      reject(error instanceof Error ? error : new Error(String(error)));
+    }
+  });
 }
 
 function awaitBridgeOperation(
@@ -86,34 +118,12 @@ function awaitBridgeOperation(
   invoke: (requestId: string) => void,
   timeoutMs = BRIDGE_OPERATION_TIMEOUT_MS,
 ): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const requestId = nextBridgeOperationRequestId(operation);
-    let cleanup = () => {};
-    const timeout = window.setTimeout(() => {
-      cleanup();
-      reject(new Error(`Bridge request '${operation}' was not acknowledged. Connection to the agent may be broken.`));
-    }, timeoutMs);
-
-    cleanup = ACPBridge.onBridgeOperationResult((e) => {
-      const payload = e.detail.payload;
-      if (payload.requestId !== requestId) return;
-      window.clearTimeout(timeout);
-      cleanup();
-      if (payload.ok) {
-        resolve();
-        return;
-      }
-      reject(new Error(payload.error || `Bridge request '${operation}' failed.`));
-    });
-
-    try {
-      invoke(requestId);
-    } catch (error) {
-      window.clearTimeout(timeout);
-      cleanup();
-      reject(error instanceof Error ? error : new Error(String(error)));
-    }
-  });
+  const requestId = nextBridgeRequestId(operation);
+  return awaitBridgeResponse(ACPBridge.onBridgeOperationResult, requestId, () => invoke(requestId), {
+    timeoutMs,
+    timeoutMessage: `Bridge request '${operation}' was not acknowledged. Connection to the agent may be broken.`,
+    failure: (payload) => (payload.ok ? undefined : payload.error || `Bridge request '${operation}' failed.`),
+  }).then(() => undefined);
 }
 
 const FILE_ICON_REQUEST_TIMEOUT_MS = 5_000;
@@ -510,38 +520,20 @@ export const ACPBridge = {
   },
 
   saveConversationTranscript: (conversationId: string, text: string): Promise<ConversationTranscriptSavedPayload> => {
-    return new Promise((resolve, reject) => {
-      if (typeof window.__saveConversationTranscript !== 'function') {
-        reject(new Error('Transcript persistence bridge is not available.'));
-        return;
-      }
-
-      const requestId = nextSaveTranscriptRequestId();
-      let cleanup = () => {};
-      const timeout = window.setTimeout(() => {
-        cleanup();
-        reject(new Error('Transcript persistence timed out.'));
-      }, BRIDGE_REQUEST_TIMEOUT_MS);
-      cleanup = ACPBridge.onConversationTranscriptSaved((e) => {
-        const payload = e.detail.payload;
-        if (payload.requestId !== requestId) return;
-        window.clearTimeout(timeout);
-        cleanup();
-        if (payload.success && payload.filePath) {
-          resolve(payload);
-          return;
-        }
-        reject(new Error(payload.error || 'Failed to persist transcript.'));
-      });
-
-      try {
-        window.__saveConversationTranscript(JSON.stringify({ requestId, conversationId, text }));
-      } catch (error) {
-        window.clearTimeout(timeout);
-        cleanup();
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
-    });
+    if (typeof window.__saveConversationTranscript !== 'function') {
+      return Promise.reject(new Error('Transcript persistence bridge is not available.'));
+    }
+    const requestId = nextBridgeRequestId('transcript');
+    return awaitBridgeResponse(
+      ACPBridge.onConversationTranscriptSaved,
+      requestId,
+      () => window.__saveConversationTranscript?.(JSON.stringify({ requestId, conversationId, text })),
+      {
+        timeoutMs: BRIDGE_REQUEST_TIMEOUT_MS,
+        timeoutMessage: 'Transcript persistence timed out.',
+        failure: (payload) => (payload.success && payload.filePath ? undefined : payload.error || 'Failed to persist transcript.'),
+      },
+    );
   },
 
   openAgentCli: (adapterId: string) => {
@@ -562,34 +554,16 @@ export const ACPBridge = {
     operations: FileChangeOperation[];
     allowDeleted: boolean;
   }[]): Promise<FileChangeStatsResultPayload> => {
-    return new Promise((resolve, reject) => {
-      if (typeof window.__computeFileChangeStats !== 'function') {
-        reject(new Error('File change stats bridge is not available.'));
-        return;
-      }
-
-      const requestId = nextFileChangeStatsRequestId();
-      let cleanup = () => {};
-      const timeout = window.setTimeout(() => {
-        cleanup();
-        reject(new Error('File change stats request timed out.'));
-      }, BRIDGE_REQUEST_TIMEOUT_MS);
-      cleanup = ACPBridge.onFileChangeStats((e) => {
-        const payload = e.detail.payload;
-        if (payload.requestId !== requestId) return;
-        window.clearTimeout(timeout);
-        cleanup();
-        resolve(payload);
-      });
-
-      try {
-        window.__computeFileChangeStats(JSON.stringify({ requestId, files }));
-      } catch (error) {
-        window.clearTimeout(timeout);
-        cleanup();
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
-    });
+    if (typeof window.__computeFileChangeStats !== 'function') {
+      return Promise.reject(new Error('File change stats bridge is not available.'));
+    }
+    const requestId = nextBridgeRequestId('file-change-stats');
+    return awaitBridgeResponse(
+      ACPBridge.onFileChangeStats,
+      requestId,
+      () => window.__computeFileChangeStats?.(JSON.stringify({ requestId, files })),
+      { timeoutMs: BRIDGE_REQUEST_TIMEOUT_MS, timeoutMessage: 'File change stats request timed out.' },
+    );
   },
 
   onToolCall: (callback: (e: CustomEvent<ToolCallBridgeEvent>) => void) => onBridgeEvent(EVENT_NAMES.TOOL_CALL, callback),
@@ -742,42 +716,23 @@ export const ACPBridge = {
   },
 
   stopAudioRecording: (requestId: string, ownerId: string): Promise<AudioTranscriptionResultPayload> => {
-    return new Promise((resolve, reject) => {
-      if (typeof window.__stopAudioRecording !== 'function') {
-        reject(new Error('Audio recording bridge is not available.'));
-        return;
-      }
-
-      const timeout = setTimeout(() => {
-        ACPBridge.cancelAudioTranscription(requestId);
-        ACPBridge.cancelAudioRecording(ownerId);
-        cleanup();
-        reject(new Error('Audio transcription timed out.'));
-      }, 30_000);
-      const cleanup = ACPBridge.onAudioTranscriptionResult((e) => {
-        const payload = e.detail.payload;
-        if (payload.requestId !== requestId) return;
-        clearTimeout(timeout);
-        cleanup();
-        if (payload.cancelled) {
-          resolve(payload);
-          return;
-        }
-        if (payload.success) {
-          resolve(payload);
-        } else {
-          reject(new Error(payload.error || 'Audio transcription failed'));
-        }
-      });
-
-      try {
-        window.__stopAudioRecording(JSON.stringify({ requestId, ownerId }));
-      } catch (error) {
-        clearTimeout(timeout);
-        cleanup();
-        reject(error instanceof Error ? error : new Error(String(error)));
-      }
-    });
+    if (typeof window.__stopAudioRecording !== 'function') {
+      return Promise.reject(new Error('Audio recording bridge is not available.'));
+    }
+    return awaitBridgeResponse(
+      ACPBridge.onAudioTranscriptionResult,
+      requestId,
+      () => window.__stopAudioRecording?.(JSON.stringify({ requestId, ownerId })),
+      {
+        timeoutMs: 30_000,
+        timeoutMessage: 'Audio transcription timed out.',
+        failure: (payload) => (payload.cancelled || payload.success ? undefined : payload.error || 'Audio transcription failed'),
+        onTimeout: () => {
+          ACPBridge.cancelAudioTranscription(requestId);
+          ACPBridge.cancelAudioRecording(ownerId);
+        },
+      },
+    );
   },
 
   cancelAudioTranscription: (requestId: string) => {
