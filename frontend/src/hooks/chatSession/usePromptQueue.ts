@@ -4,7 +4,6 @@ import { QueuedPrompt, QueuePromptDraft } from './promptQueueTypes';
 const MAX_PROMPT_QUEUE_ITEMS = 10;
 
 interface UsePromptQueueOptions {
-  enabled: boolean;
   canDrain: boolean;
   canPreempt: boolean;
   onDrain: (prompt: QueuedPrompt) => void;
@@ -18,7 +17,7 @@ function nextQueuedPromptId(): string {
   return `queued-${promptQueueCounter}-${Date.now()}`;
 }
 
-export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreempt }: UsePromptQueueOptions) {
+export function usePromptQueue({ canDrain, canPreempt, onDrain, onPreempt }: UsePromptQueueOptions) {
   const [items, setItems] = useState<QueuedPrompt[]>([]);
   const itemsRef = useRef<QueuedPrompt[]>([]);
   const onDrainRef = useRef(onDrain);
@@ -44,12 +43,6 @@ export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreem
     onPreemptRef.current = onPreempt;
   }, [onPreempt]);
 
-  useEffect(() => {
-    if (!enabled) {
-      setPreempting(false);
-    }
-  }, [enabled, setPreempting]);
-
   const updateItems = useCallback((updater: (prev: QueuedPrompt[]) => QueuedPrompt[]) => {
     const next = updater(itemsRef.current);
     itemsRef.current = next;
@@ -61,14 +54,8 @@ export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreem
     updateItems(() => []);
   }, [updateItems]);
 
-  useEffect(() => {
-    if (!enabled) {
-      clearQueue();
-    }
-  }, [enabled, clearQueue]);
-
   const enqueuePrompt = useCallback((draft: QueuePromptDraft): boolean => {
-    if (!enabled || itemsRef.current.length >= MAX_PROMPT_QUEUE_ITEMS) {
+    if (itemsRef.current.length >= MAX_PROMPT_QUEUE_ITEMS) {
       return false;
     }
 
@@ -87,7 +74,7 @@ export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreem
       return next;
     });
     return true;
-  }, [enabled, updateItems]);
+  }, [updateItems]);
 
   const removeQueuedPrompt = useCallback((id: string) => {
     updateItems((prev) => prev.filter((item) => item.id !== id));
@@ -133,7 +120,7 @@ export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreem
     }
 
     updateItems((prev) => [{ ...item, scheduledAt: undefined }, ...prev.filter((queued) => queued.id !== id)]);
-    if (!enabled || !canPreempt || preemptingRef.current) return;
+    if (!canPreempt || preemptingRef.current) return;
 
     setPreempting(true);
     onPreemptRef.current().then((accepted) => {
@@ -142,11 +129,11 @@ export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreem
     }).catch(() => {
       setPreempting(false);
     });
-  }, [canDrain, canPreempt, enabled, setPreempting, updateItems]);
+  }, [canDrain, canPreempt, setPreempting, updateItems]);
 
   const firstPrompt = items[0];
   useEffect(() => {
-    if (!enabled || !canDrain || isPreempting || !firstPrompt) return;
+    if (!canDrain || isPreempting || !firstPrompt) return;
     let timer: number | undefined;
     const drainWhenDue = () => {
       window.clearTimeout(timer);
@@ -171,7 +158,7 @@ export function usePromptQueue({ enabled, canDrain, canPreempt, onDrain, onPreem
       window.removeEventListener('focus', drainWhenDue);
       document.removeEventListener('visibilitychange', drainWhenDue);
     };
-  }, [canDrain, enabled, isPreempting, firstPrompt, updateItems]);
+  }, [canDrain, isPreempting, firstPrompt, updateItems]);
 
   return {
     queuedPrompts: items,

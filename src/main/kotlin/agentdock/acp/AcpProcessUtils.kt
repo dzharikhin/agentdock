@@ -10,10 +10,10 @@ internal object AcpProcessUtils {
 
     private const val EXIT_TIMEOUT_SECONDS = 2L
 
-    fun stopProcessesUsingAdapterRoot(adapterName: String, target: AcpExecutionTarget = AcpAdapterPaths.getExecutionTarget()) {
+    fun stopProcessesUsingAdapterRoot(adapterName: String) {
         val adapterRoot = runCatching {
             if (AcpAdapterPaths.getAdapterInfo(adapterName).isCustom) return
-            File(AcpAdapterPaths.getDownloadPath(adapterName, target))
+            File(AcpAdapterPaths.getDownloadPath(adapterName))
         }.getOrNull() ?: return
 
         stopProcessesUsingAdapterRootPaths(listOf(adapterRoot))

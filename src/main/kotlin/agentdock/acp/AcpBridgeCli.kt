@@ -25,7 +25,7 @@ internal class AcpBridgeCli(
         val shellFlavor = detectIdeTerminalShellFlavor()
         val (adapterInfo, command) = buildCliCommand(adapterId, emptyList(), shellFlavor) ?: return
         if (command.isBlank()) return
-        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId, AcpAdapterPaths.getExecutionTarget())
+        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId)
         openInIdeTerminal(resolveTerminalWorkingDir(adapterRoot), "${adapterInfo.name} CLI", command)
     }
 
@@ -38,13 +38,10 @@ internal class AcpBridgeCli(
         check(terminalCapability.available) { "IDE terminal is unavailable" }
 
         val adapterInfo = AcpAdapterConfig.getAdapterInfo(adapterId)
-        val target = AcpAdapterPaths.getExecutionTarget()
-        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId, target)
-        val commandParts = AcpAdapterPaths.buildLaunchCommand(
+        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId)
+        val commandParts = buildAdapterLaunchCommand(
             adapterRootPath = adapterRoot,
-            adapterInfo = adapterInfo.copy(args = emptyList()),
-            projectPath = project.basePath,
-            target = target
+            adapterInfo = adapterInfo.copy(args = emptyList())
         ) + args
         val shellFlavor = detectIdeTerminalShellFlavor()
         val command = toShellCommand(
@@ -149,18 +146,17 @@ internal fun buildAdapterCliCommandParts(
 ): Pair<AcpAdapterConfig.AdapterInfo, List<String>>? {
     val adapterInfo = runCatching { AcpAdapterConfig.getAdapterInfo(adapterId) }.getOrNull() ?: return null
     val cli = adapterInfo.cli ?: return null
-    val target = AcpAdapterPaths.getExecutionTarget()
-    val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId, target)
-    if (!AcpAdapterPaths.isDownloaded(adapterId, target)) return null
+    val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId)
+    if (!AcpAdapterPaths.isDownloaded(adapterId)) return null
 
-    val executable = platformBinaryForTarget(cli.executable, target)
+    val executable = platformBinary(cli.executable)
     val entryPath = cli.entryPath?.takeIf { it.isNotBlank() }
     if (executable.isNullOrBlank()) return null
 
     val commandParts = mutableListOf<String>()
-    commandParts += resolveCliPath(adapterRoot, executable, target)
+    commandParts += resolveCliPath(adapterRoot, executable)
     if (entryPath != null) {
-        commandParts += resolveCliPath(adapterRoot, entryPath, target)
+        commandParts += resolveCliPath(adapterRoot, entryPath)
     }
     commandParts += cli.args
     commandParts += extraArgs
@@ -175,7 +171,7 @@ internal fun applyCliPlaceholders(values: List<String>, placeholders: Map<String
     }
 }
 
-internal fun resolveCliPath(adapterRoot: String, raw: String, target: AcpExecutionTarget): String {
+internal fun resolveCliPath(adapterRoot: String, raw: String): String {
     val path = raw.trim()
     if (path.isEmpty()) return path
     val file = File(path)

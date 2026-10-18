@@ -248,7 +248,6 @@ export function useAgentRuntimeOptions({
     selectedModelId,
     selectedModeId,
     selectedReasoningEffortId,
-    modelIdForStart: selectedAgentId ? selectedModelId : '',
     handleSessionConfigOptions,
     handleModelChange,
     handleReportedModeChange: (value: string) =>

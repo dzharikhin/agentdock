@@ -70,20 +70,14 @@ private suspend fun AcpClientService.initializeSharedProcessWithinBudget(
     adapterInfo: AcpAdapterConfig.AdapterInfo
 ) {
     val adapterId = adapterInfo.id
-    val target = AcpAdapterPaths.getExecutionTarget()
-    val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId, target)
+    val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId)
 
     updateAdapterInitializationState(
         adapterId,
         AcpClientService.AdapterInitializationStatus.Initializing,
         detail = "Resolving launch command..."
     )
-    val command = AcpAdapterPaths.buildLaunchCommand(
-        adapterRootPath = adapterRoot,
-        adapterInfo = adapterInfo,
-        projectPath = project.basePath,
-        target = target
-    )
+    val command = buildAdapterLaunchCommand(adapterRoot, adapterInfo)
 
     var lastError: Exception? = null
     for (attempt in 1..ACP_INITIALIZE_MAX_ATTEMPTS) {
@@ -241,10 +235,6 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
         sharedProcess.sessionDeleteAvailable = result.capabilities.sessionCapabilities.delete != null
         sharedProcess.sessionCloseAvailable = result.capabilities.sessionCapabilities.close != null
     } catch (error: Exception) {
-        if (error is CancellationException) {
-            sharedProcess.stop()
-            throw error
-        }
         sharedProcess.stop()
         throw error
     } finally {
@@ -261,9 +251,8 @@ internal suspend fun AcpClientService.testCustomAcpConnection(config: CustomAcpC
     var errorMessage: String? = null
     try {
         val adapterInfo = CustomAcpConfigStore.toAdapterInfo(config)
-        val target = AcpAdapterPaths.getExecutionTarget()
-        val root = resolveDownloadPath(adapterInfo, target)
-        val command = AcpAdapterPaths.buildLaunchCommand(root, adapterInfo, project.basePath, target)
+        val root = resolveDownloadPath(adapterInfo)
+        val command = buildAdapterLaunchCommand(root, adapterInfo)
         initializeFreshProcessAttempt(sharedProcess, adapterInfo, root, command, 1, diagnostics)
     } catch (error: Exception) {
         currentCoroutineContext().ensureActive()

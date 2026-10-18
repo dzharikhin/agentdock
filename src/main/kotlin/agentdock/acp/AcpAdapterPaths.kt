@@ -1,5 +1,6 @@
 package agentdock.acp
 
+import agentdock.utils.AgentDockPaths
 import java.io.File
 
 /**
@@ -20,16 +21,14 @@ object AcpAdapterPaths {
         }
     }
 
-    private fun currentTarget(): AcpExecutionTarget = AcpExecutionMode.currentTarget()
-
     fun getBaseRuntimeDir(): File {
-        val dir = AcpExecutionMode.localBaseRuntimeDir()
+        val dir = AgentDockPaths.baseRuntimeDir()
         dir.mkdirs()
         return dir
     }
 
     fun getDependenciesDir(): File {
-        val dir = AcpExecutionMode.localDependenciesDir()
+        val dir = AgentDockPaths.dependenciesDir()
         dir.mkdirs()
         return dir
     }
@@ -40,40 +39,29 @@ object AcpAdapterPaths {
         return dir
     }
 
-    internal fun getExecutionTarget(): AcpExecutionTarget = currentTarget()
-
-    internal fun getDownloadPath(
-        adapterName: String? = null,
-        target: AcpExecutionTarget = currentTarget()
-    ): String {
+    internal fun getDownloadPath(adapterName: String? = null): String {
         val adapterInfo = getAdapterInfo(adapterName)
-        return resolveDownloadPath(adapterInfo, target)
+        return resolveDownloadPath(adapterInfo)
     }
 
-    internal fun installedVersion(
-        adapterName: String? = null,
-        target: AcpExecutionTarget = currentTarget()
-    ): String? {
+    internal fun installedVersion(adapterName: String? = null): String? {
         val adapterInfo = getAdapterInfo(adapterName)
         if (adapterInfo.isCustom) return null
         val runtimeDir = File(getDependenciesDir(), adapterInfo.id)
         return installedVersionFromRuntimeDir(runtimeDir, adapterInfo)
     }
 
-    internal fun isDownloaded(
-        adapterName: String? = null,
-        target: AcpExecutionTarget = currentTarget()
-    ): Boolean {
+    internal fun isDownloaded(adapterName: String? = null): Boolean {
         val adapterInfo = getAdapterInfo(adapterName)
         if (adapterInfo.isCustom) return isCustomExecutableAvailable(adapterInfo.customCommand.orEmpty())
         val runtimeDir = File(getDependenciesDir(), adapterInfo.id)
-        return hasInstalledAdapterLaunch(runtimeDir, adapterInfo, target) &&
+        return hasInstalledAdapterLaunch(runtimeDir, adapterInfo) &&
             isInstalledVersionSupported(adapterInfo, installedVersionFromRuntimeDir(runtimeDir, adapterInfo))
     }
 
-    internal fun deleteAdapter(adapterName: String? = null, target: AcpExecutionTarget = currentTarget()): Boolean {
+    internal fun deleteAdapter(adapterName: String? = null): Boolean {
         val adapterInfo = getAdapterInfo(adapterName)
-        return deleteLocalAdapterRuntime(File(getDependenciesDir(), adapterInfo.id), adapterInfo.id, target)
+        return deleteAdapterRuntime(File(getDependenciesDir(), adapterInfo.id), adapterInfo.id)
     }
 
     fun applyPatches(
@@ -92,7 +80,6 @@ object AcpAdapterPaths {
         targetDir: File,
         adapterInfo: AcpAdapterConfig.AdapterInfo,
         statusCallback: ((String) -> Unit)? = null,
-        target: AcpExecutionTarget = currentTarget(),
         versionOverride: String? = null,
         cancellation: AcpAdapterInstallCancellation? = null
     ): Boolean {
@@ -116,9 +103,9 @@ object AcpAdapterPaths {
         cancellation?.throwIfCancelled()
         val installedVersionOverride = resolvedAdapterInfo.distribution.version
             .takeIf { resolvedAdapterInfo.distribution.type == AcpAdapterConfig.DistributionType.ARCHIVE }
-        val hasLaunchExecutable = hasInstalledAdapterLaunch(targetDir, resolvedAdapterInfo, target)
+        val hasLaunchExecutable = hasInstalledAdapterLaunch(targetDir, resolvedAdapterInfo)
         if (!hasLaunchExecutable) {
-            statusCallback?.invoke(missingLaunchTargetError(targetDir.absolutePath, resolvedAdapterInfo, target))
+            statusCallback?.invoke(missingLaunchTargetError(targetDir.absolutePath, resolvedAdapterInfo))
         }
         val installedVersion = installedVersionOverride
             ?: installedVersionFromRuntimeDir(targetDir, resolvedAdapterInfo)
@@ -130,13 +117,6 @@ object AcpAdapterPaths {
         return downloaded
     }
 
-    internal fun downloadArchiveDistribution(
-        targetDir: File,
-        adapterInfo: AcpAdapterConfig.AdapterInfo,
-        statusCallback: ((String) -> Unit)? = null,
-        cancellation: AcpAdapterInstallCancellation? = null
-    ): Boolean = downloadArchiveDistributionLocal(targetDir, adapterInfo, statusCallback, cancellation)
-
     fun resolveAdapterName(adapterName: String?): String {
         val explicit = adapterName?.trim().takeUnless { it.isNullOrEmpty() }
         if (explicit != null) return explicit
@@ -147,29 +127,15 @@ object AcpAdapterPaths {
         )
     }
 
-    internal fun resolveLaunchPath(
-        adapterRootPath: String,
-        adapterInfo: AcpAdapterConfig.AdapterInfo,
-        target: AcpExecutionTarget = currentTarget()
-    ): String? = resolveAdapterLaunchPath(adapterRootPath, adapterInfo, target)
-
-    internal fun buildLaunchCommand(
-        adapterRootPath: String,
-        adapterInfo: AcpAdapterConfig.AdapterInfo,
-        projectPath: String? = null,
-        target: AcpExecutionTarget = currentTarget()
-    ): List<String> = buildAdapterLaunchCommand(adapterRootPath, adapterInfo, projectPath, target)
-
     internal fun hasInstalledAdapterLaunch(
         runtimeDir: File,
-        adapterInfo: AcpAdapterConfig.AdapterInfo,
-        target: AcpExecutionTarget
+        adapterInfo: AcpAdapterConfig.AdapterInfo
     ): Boolean {
         if (adapterInfo.isCustom) return isCustomExecutableAvailable(adapterInfo.customCommand.orEmpty())
         return runtimeDir.isDirectory &&
             (adapterInfo.distribution.type != AcpAdapterConfig.DistributionType.NPM ||
                 File(runtimeDir, "node_modules").isDirectory) &&
-            resolveAdapterLaunchFile(runtimeDir, adapterInfo, target)?.isFile == true
+            resolveAdapterLaunchFile(runtimeDir, adapterInfo)?.isFile == true
     }
 
     private fun isCustomExecutableAvailable(command: String): Boolean {
@@ -198,10 +164,9 @@ object AcpAdapterPaths {
 
     private fun missingLaunchTargetError(
         runtimeDir: String,
-        adapterInfo: AcpAdapterConfig.AdapterInfo,
-        target: AcpExecutionTarget
+        adapterInfo: AcpAdapterConfig.AdapterInfo
     ): String {
-        val launchPath = resolveAdapterLaunchPath(runtimeDir, adapterInfo, target)
+        val launchPath = resolveAdapterLaunchPath(runtimeDir, adapterInfo)
             ?: return "Error: ${adapterInfo.name} installed, but no launch executable is configured for this platform"
         return "Error: ${adapterInfo.name} installed, but launch executable was not found: $launchPath"
     }

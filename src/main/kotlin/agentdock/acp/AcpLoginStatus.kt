@@ -19,12 +19,9 @@ internal object AcpLoginStatus {
     private const val QODER_METHOD = "qoderCliStatus"
     private const val STATUS_TIMEOUT_SECONDS = 10L
 
-    fun resolve(
-        adapterInfo: AcpAdapterConfig.AdapterInfo,
-        target: AcpExecutionTarget
-    ): Boolean? = when (adapterInfo.loginStatusMethod) {
+    fun resolve(adapterInfo: AcpAdapterConfig.AdapterInfo): Boolean? = when (adapterInfo.loginStatusMethod) {
         ANTIGRAVITY_METHOD -> resolveAntigravity()
-        CLAUDE_CODE_METHOD -> resolveClaudeCode(adapterInfo, target)
+        CLAUDE_CODE_METHOD -> resolveClaudeCode(adapterInfo)
         CODEX_METHOD -> resolveCodex(adapterInfo)
         CURSOR_METHOD -> resolveCursor(adapterInfo)
         COPILOT_RPC_METHOD -> AcpCopilotAuthenticationRpc.fetchLoginStatus(adapterInfo.id)
@@ -33,15 +30,11 @@ internal object AcpLoginStatus {
         else -> null
     }
 
-    private fun resolveClaudeCode(
-        adapterInfo: AcpAdapterConfig.AdapterInfo,
-        target: AcpExecutionTarget
-    ): Boolean? {
-        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterInfo.id, target)
-        val command = AcpAdapterPaths.buildLaunchCommand(
+    private fun resolveClaudeCode(adapterInfo: AcpAdapterConfig.AdapterInfo): Boolean? {
+        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterInfo.id)
+        val command = buildAdapterLaunchCommand(
             adapterRootPath = adapterRoot,
-            adapterInfo = adapterInfo.copy(args = emptyList()),
-            target = target
+            adapterInfo = adapterInfo.copy(args = emptyList())
         ) + listOf("--cli", "auth", "status")
         val result = AcpExecutionMode.runCommand(
             command = command,

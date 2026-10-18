@@ -81,14 +81,13 @@ private suspend fun AcpBridge.importConversationFromAgent(
     conversationId: String,
     sessionId: String,
     adapterName: String,
-    modelId: String? = null,
     modeId: String? = null
 ) {
     pushStatus(chatId, "initializing")
     startHistoryReplayCapture(chatId, projectPath, conversationId)
     beginImportedReplaySession(chatId, sessionId, adapterName)
     withTimeout(AcpBridge.START_AGENT_TIMEOUT_MS) {
-        service.loadSession(chatId, adapterName, sessionId, modelId, modeId)
+        service.loadSession(chatId, adapterName, sessionId, modeId)
     }
     val capturedConversation = flushHistoryReplayCapture(chatId)
     pushAdapters()
@@ -156,7 +155,7 @@ internal fun AcpBridge.installConversationHistoryQueries() {
                                 importConversationFromAgent(
                                     chatId, projectPath, conversationId,
                                     lastSession.sessionId, lastSession.adapterName,
-                                    lastSession.modelId, lastSession.modeId
+                                    lastSession.modeId
                                 )
                             }
                         } catch (e: Exception) {

@@ -219,7 +219,6 @@ export type AttentionLevel = 'warning' | 'processing' | 'unread' | '';
 
 export interface TabUiFlags {
   unread: boolean;
-  atBottom: boolean;
   canMarkRead: boolean;
   warning: boolean;
   processing: boolean;
@@ -648,6 +647,8 @@ declare global {
     __requestHostRepaint?: (reason?: string) => void;
     /** Answered with an `agent-dock-ui-visibility` event telling whether the UI is on screen. */
     __readUiVisibility?: () => void;
+    /** Answered with an `agent-dock-ui-zoom` event carrying the current UI zoom. */
+    __readUiZoom?: () => void;
     /** Mirrors the open chats' dot on the plugin icon: `warning`, `unread`, or empty for none. */
     __setAttentionBadge?: (level: AttentionLevel) => void;
 

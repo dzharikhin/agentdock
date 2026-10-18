@@ -60,7 +60,7 @@ object AgentDockHistoryService {
                 HistoryStorage.requireSafeConversationId(conversationId.orEmpty())
             }.getOrElse { return null }
             if (cleanProjectPath.isBlank() || cleanConversationId.isBlank()) return null
-            if (!hasConversationInCurrentEnvironment(cleanProjectPath, cleanConversationId)) return null
+            if (!hasConversation(cleanProjectPath, cleanConversationId)) return null
             val replayFile = HistoryStorage.conversationDataFile(cleanProjectPath, cleanConversationId)
             val data = HistoryReplayStore.readConversationData(replayFile) ?: return null
             val lastPrompt = data.sessions.lastOrNull()?.prompts?.lastOrNull()
@@ -258,14 +258,6 @@ object AgentDockHistoryService {
         )
     }
 
-    fun deleteSessionChanges(projectPath: String, sessionId: String, adapterName: String): Boolean {
-        return HistorySessionChangesStore.deleteSessionChanges(projectPath, sessionId, adapterName)
-    }
-
-    suspend fun syncHistoryIndex(projectPath: String?): Boolean = withContext(Dispatchers.IO) {
-        HistorySyncService.syncHistoryIndex(projectPath)
-    }
-
     suspend fun getHistoryList(projectPath: String?): List<SessionMeta> = withContext(Dispatchers.IO) {
         HistorySyncService.getHistoryList(projectPath)
     }
@@ -318,7 +310,7 @@ object AgentDockHistoryService {
             HistoryConversationIndexService.renameGroup(projectPath, group, newGroup)
         }
 
-    private fun hasConversationInCurrentEnvironment(projectPath: String, conversationId: String): Boolean {
+    private fun hasConversation(projectPath: String, conversationId: String): Boolean {
         val cleanConversationId = runCatching {
             HistoryStorage.requireSafeConversationId(conversationId)
         }.getOrElse { return false }

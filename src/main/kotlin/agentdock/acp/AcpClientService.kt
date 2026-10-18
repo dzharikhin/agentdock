@@ -54,12 +54,10 @@ class AcpClientService private constructor(val project: Project) {
         val availableModes get() = modeOption?.options.orEmpty().map {
             AcpAdapterConfig.ModeInfo(it.value, it.name, it.description)
         }
-        val modeConfigId get() = modeOption?.id
         val currentReasoningEffortId get() = reasoningOption?.currentValue?.takeIf(String::isNotEmpty)
         val availableReasoningEfforts get() = reasoningOption?.options.orEmpty().map {
             AcpAdapterConfig.ModeInfo(it.value, it.name, it.description)
         }
-        val reasoningEffortConfigId get() = reasoningOption?.id
 
         fun configOptionsForModel(modelId: String?): List<AcpConfigOption> =
             modelId?.let { configOptionsByModel[it] } ?: configOptions
@@ -297,15 +295,15 @@ class AcpClientService private constructor(val project: Project) {
     internal fun availableCommands(adapterName: String): List<AvailableCommandPayload> = availableCommandsByAdapter[adapterName] ?: emptyList()
     internal fun allAvailableCommands(): Map<String, List<AvailableCommandPayload>> = availableCommandsByAdapter.toMap()
     fun isAdapterReady(adapterName: String): Boolean {
-        val sharedProc = activeProcesses[processKey(adapterName)] ?: return false
+        val sharedProc = activeProcesses[adapterName] ?: return false
         return sharedProc.isHealthy()
     }
 
     fun adapterAuthMethods(adapterName: String): List<AuthMethod> =
-        activeProcesses[processKey(adapterName)]?.authMethods.orEmpty()
+        activeProcesses[adapterName]?.authMethods.orEmpty()
 
     fun isAdapterLogoutAvailable(adapterName: String): Boolean =
-        activeProcesses[processKey(adapterName)]?.logoutAvailable == true
+        activeProcesses[adapterName]?.logoutAvailable == true
 
     internal fun updateAvailableCommands(adapterName: String, commands: List<AvailableCommandPayload>) {
         availableCommandsByAdapter[adapterName] = commands
@@ -384,15 +382,12 @@ class AcpClientService private constructor(val project: Project) {
         val statusRef = AtomicReference(Status.NotStarted)
         val sessionIdRef = AtomicReference<String?>(null)
         val activeAdapterNameRef = AtomicReference<String?>(null)
-        val activeModelIdRef = AtomicReference<String?>(null)
         val activeModeIdRef = AtomicReference<String?>(null)
-        val activeReasoningEffortIdRef = AtomicReference<String?>(null)
         val activeConfigValues = ConcurrentHashMap<String, String>()
         val runtimeMetadataRef = AtomicReference<AdapterRuntimeMetadata?>(null)
         @Volatile var appliedConfigGeneration: Long = -1L
         @Volatile var configOptionsUpdateInProgress: Boolean = false
         val promptGeneration = AtomicLong(0)
-        @Volatile var lastHistoryLoadTime: Long = System.currentTimeMillis()
         @Volatile var allowReplayDelivery: Boolean = true
         @Volatile var ignoreUpdatesUntilPrompt: Boolean = false
 
@@ -427,15 +422,12 @@ class AcpClientService private constructor(val project: Project) {
             sessionIdRef.set(null)
             synchronized(liveOwnerBySessionId) { liveOwnerBySessionId.entries.removeIf { it.value == chatId } }
             activeAdapterNameRef.set(null)
-            activeModelIdRef.set(null)
             activeModeIdRef.set(null)
-            activeReasoningEffortIdRef.set(null)
             activeConfigValues.clear()
             runtimeMetadataRef.set(null)
             appliedConfigGeneration = -1L
             configOptionsUpdateInProgress = false
             promptGeneration.incrementAndGet()
-            lastHistoryLoadTime = 0
             allowReplayDelivery = true
             ignoreUpdatesUntilPrompt = false
             replayOwnerBySessionId.entries.removeIf { it.value == chatId }

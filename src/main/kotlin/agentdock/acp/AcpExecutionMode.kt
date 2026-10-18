@@ -1,16 +1,10 @@
 package agentdock.acp
 
-import agentdock.utils.AgentDockPaths
 import com.intellij.execution.configurations.GeneralCommandLine
-import java.io.File
 import java.util.concurrent.TimeUnit
 
 internal fun quoteUnixShellArg(value: String): String =
     "'" + value.replace("'", "'\"'\"'") + "'"
-
-internal enum class AcpExecutionTarget {
-    LOCAL
-}
 
 internal data class CommandResult(
     val exitCode: Int,
@@ -30,12 +24,6 @@ internal object AcpExecutionMode {
             else -> "linux"
         }
     }
-
-    fun currentTarget(): AcpExecutionTarget = AcpExecutionTarget.LOCAL
-
-    fun localBaseRuntimeDir(): File = AgentDockPaths.baseRuntimeDir()
-
-    fun localDependenciesDir(): File = AgentDockPaths.dependenciesDir()
 
     fun runCommand(
         command: List<String>,

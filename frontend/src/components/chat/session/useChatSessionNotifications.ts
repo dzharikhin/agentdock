@@ -11,7 +11,6 @@ interface UseChatSessionNotificationsOptions {
   acpSessionId: string;
   adapterName: string;
   onAssistantActivity?: () => void;
-  onAtBottomChange?: (isAtBottom: boolean) => void;
   onCanMarkReadChange?: (canMarkRead: boolean) => void;
   onPermissionRequestChange?: (hasPendingPermission: boolean) => void;
   onProcessingChange?: (isProcessing: boolean) => void;
@@ -27,7 +26,6 @@ export function useChatSessionNotifications({
   acpSessionId,
   adapterName,
   onAssistantActivity,
-  onAtBottomChange,
   onCanMarkReadChange,
   onPermissionRequestChange,
   onProcessingChange,
@@ -38,10 +36,6 @@ export function useChatSessionNotifications({
   const prevIsSendingRef = useRef(isSending);
   const pendingAssistantActivityRef = useRef(false);
   const lastNotifiedAssistantKeyRef = useRef('');
-
-  const handleAtBottomChange = useCallback((isAtBottom: boolean) => {
-    onAtBottomChange?.(isAtBottom);
-  }, [onAtBottomChange]);
 
   const handleCanMarkReadChange = useCallback((canMarkRead: boolean) => {
     onCanMarkReadChange?.(canMarkRead);
@@ -127,7 +121,6 @@ export function useChatSessionNotifications({
   }, []);
 
   return {
-    handleAtBottomChange,
     handleCanMarkReadChange,
   };
 }

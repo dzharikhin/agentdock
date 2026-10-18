@@ -53,13 +53,13 @@ internal fun resolveInstallAdapterInfo(
     return adapterInfo.withDistributionVersion(resolvedVersion)
 }
 
-internal fun downloadArchiveDistributionLocal(
+internal fun downloadArchiveDistribution(
     targetDir: File,
     adapterInfo: AcpAdapterConfig.AdapterInfo,
-    statusCallback: ((String) -> Unit)? = null,
-    cancellation: AcpAdapterInstallCancellation? = null
+    statusCallback: ((String) -> Unit)?,
+    cancellation: AcpAdapterInstallCancellation?
 ): Boolean {
-    val runtime = detectRuntimePlatform(AcpExecutionTarget.LOCAL)
+    val runtime = detectRuntimePlatform()
     targetDir.mkdirs()
 
     val rawUrl = adapterInfo.distribution.downloadUrl
@@ -153,13 +153,9 @@ internal fun prepareAdapterTargetDir(targetDir: File) {
     targetDir.mkdirs()
 }
 
-internal fun deleteLocalAdapterRuntime(
-    runtimeDir: File,
-    adapterId: String,
-    target: AcpExecutionTarget
-): Boolean {
+internal fun deleteAdapterRuntime(runtimeDir: File, adapterId: String): Boolean {
     return runCatching {
-        AcpProcessUtils.stopProcessesUsingAdapterRoot(adapterId, target)
+        AcpProcessUtils.stopProcessesUsingAdapterRoot(adapterId)
         deleteDirectoryWithRetries(runtimeDir)
     }.getOrDefault(false)
 }
@@ -171,7 +167,7 @@ internal fun installedVersionFromRuntimeDir(
     if (!runtimeDir.isDirectory) return null
     return when (adapterInfo.distribution.type) {
         AcpAdapterConfig.DistributionType.NPM -> {
-            val packageJson = File(resolveNpmPackageRootPath(runtimeDir.absolutePath, adapterInfo, AcpExecutionTarget.LOCAL), "package.json")
+            val packageJson = File(resolveNpmPackageRootPath(runtimeDir.absolutePath, adapterInfo), "package.json")
             runCatching {
                 adapterMetadataJson.parseToJsonElement(packageJson.readText()).jsonObject["version"]?.toString()?.trim('"')
             }.getOrNull()?.takeIf { it.isNotBlank() }
@@ -196,7 +192,7 @@ internal fun writeInstallMetadata(runtimeDir: File, version: String) {
     )
 }
 
-private fun detectRuntimePlatform(target: AcpExecutionTarget): RuntimePlatform {
+private fun detectRuntimePlatform(): RuntimePlatform {
     val os = System.getProperty("os.name").lowercase()
     val arch = System.getProperty("os.arch").lowercase()
     val isArm64 = arch.contains("aarch64") || arch.contains("arm64")

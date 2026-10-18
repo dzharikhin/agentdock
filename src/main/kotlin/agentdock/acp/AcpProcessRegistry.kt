@@ -1,5 +1,6 @@
 package agentdock.acp
 
+import agentdock.utils.AgentDockPaths
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -17,7 +18,7 @@ import java.util.UUID
 
 internal object AcpProcessRegistry {
     private val store = AcpProcessRegistryStore(
-        baseDir = File(AcpExecutionMode.localBaseRuntimeDir(), "processes"),
+        baseDir = File(AgentDockPaths.baseRuntimeDir(), "processes"),
         currentOwnerPid = ProcessHandle.current().pid(),
         currentOwnerId = "${ProcessHandle.current().pid()}-${UUID.randomUUID()}",
         isProcessAlive = { pid -> runCatching { ProcessHandle.of(pid).map { it.isAlive }.orElse(false) }.getOrDefault(false) },

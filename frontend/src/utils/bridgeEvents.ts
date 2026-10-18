@@ -74,7 +74,6 @@ export const EVENT_NAMES = {
   AVAILABLE_COMMANDS: 'acp-available-commands',
   USAGE_DATA: 'acp-usage-data',
   PERMISSION: 'acp-permission',
-  LOG: 'acp-log',
   HISTORY_LIST: 'history-list',
   HISTORY_DELETE_RESULT: 'history-delete-result',
   HISTORY_DELETE_REQUEST: 'history-delete-request',

@@ -59,7 +59,6 @@ interface ChatInputControlsProps {
   onApprovalModeChange: (mode: ApprovalMode) => void;
   onSend: () => void;
   onStop: () => void;
-  promptQueueEnabled?: boolean;
   scheduleEnabled?: boolean;
   onScheduleModeChange?: (enabled: boolean) => void;
   hasAttachments?: boolean;
@@ -99,7 +98,6 @@ export function ChatInputControls({
   onApprovalModeChange,
   onSend,
   onStop,
-  promptQueueEnabled = false,
   scheduleEnabled = false,
   onScheduleModeChange,
   hasAttachments = false,
@@ -346,7 +344,7 @@ export function ChatInputControls({
 
         {isSending ? (
           <>
-          {promptQueueEnabled && hasInput && (
+          {hasInput && (
             <Tooltip variant="minimal" content="Add to queue" className="h-full">
               <button key="queue-button" type="button" onClick={onSend} aria-label="Add to queue"
                 className={`flex items-center h-full px-1.5 rounded appearance-none border-0 bg-background-secondary outline-none

@@ -69,10 +69,9 @@ internal object AcpAuthenticationService {
         check(adapterInfo.loginStatusMethod != null) {
             "Authentication status is not configured for '${adapterInfo.id}'"
         }
-        val target = AcpAdapterPaths.getExecutionTarget()
         val authenticated = withTimeoutOrNull(AUTH_TIMEOUT_MS) {
             while (true) {
-                if (withContext(Dispatchers.IO) { AcpLoginStatus.resolve(adapterInfo, target) } == true) {
+                if (withContext(Dispatchers.IO) { AcpLoginStatus.resolve(adapterInfo) } == true) {
                     return@withTimeoutOrNull true
                 }
                 delay(AUTH_STATUS_POLL_INTERVAL_MS)
@@ -82,12 +81,10 @@ internal object AcpAuthenticationService {
     }
 
     private suspend fun cliLogin(adapterInfo: AcpAdapterConfig.AdapterInfo) {
-        val target = AcpAdapterPaths.getExecutionTarget()
-        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterInfo.id, target)
-        val command = AcpAdapterPaths.buildLaunchCommand(
+        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterInfo.id)
+        val command = buildAdapterLaunchCommand(
             adapterRootPath = adapterRoot,
-            adapterInfo = adapterInfo.copy(args = emptyList()),
-            target = target
+            adapterInfo = adapterInfo.copy(args = emptyList())
         ) + adapterInfo.loginArgs
         runCommand(
             adapterId = adapterInfo.id,
@@ -137,12 +134,10 @@ internal object AcpAuthenticationService {
         check(adapterInfo.logoutArgs.isNotEmpty()) {
             "Adapter '${adapterInfo.id}' does not define logoutArgs for CLI logout"
         }
-        val target = AcpAdapterPaths.getExecutionTarget()
-        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterInfo.id, target)
-        val command = AcpAdapterPaths.buildLaunchCommand(
+        val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterInfo.id)
+        val command = buildAdapterLaunchCommand(
             adapterRootPath = adapterRoot,
-            adapterInfo = adapterInfo.copy(args = emptyList()),
-            target = target
+            adapterInfo = adapterInfo.copy(args = emptyList())
         ) + adapterInfo.logoutArgs
         runCommand(
             adapterId = adapterInfo.id,
@@ -158,7 +153,7 @@ internal object AcpAuthenticationService {
         service: AcpClientService
     ): AcpClientService.SharedProcess {
         val adapterInfo = AcpAdapterConfig.getAdapterInfo(adapterId)
-        val sharedProcess = service.activeProcesses.computeIfAbsent(service.processKey(adapterId)) {
+        val sharedProcess = service.activeProcesses.computeIfAbsent(adapterId) {
             service.createSharedProcess(adapterId)
         }
         service.ensureSharedProcessStarted(sharedProcess, adapterInfo)

@@ -20,7 +20,6 @@ internal suspend fun AcpClientService.listHistorySessions(
     allowInitializingProcess: Boolean = false,
     preserveNativeCwd: Boolean = false
 ): List<SessionMeta> {
-    ensureExecutionTargetCurrent()
     check(AcpAdapterPaths.isDownloaded(adapterInfo.id)) {
         "Adapter '${adapterInfo.id}' is not installed"
     }
@@ -44,15 +43,15 @@ internal suspend fun AcpClientService.listHistorySessions(
 
 internal fun AcpClientService.canListHistorySessions(adapterInfo: AcpAdapterConfig.AdapterInfo): Boolean =
     when (adapterInfo.sessionListMethod) {
-        "acpSessionList" -> activeProcesses[processKey(adapterInfo.id)]?.sessionListAvailable == true
+        "acpSessionList" -> activeProcesses[adapterInfo.id]?.sessionListAvailable == true
         else -> true
     }
 
 internal fun AcpClientService.canDeleteHistorySession(adapterName: String): Boolean =
-    activeProcesses[processKey(adapterName)]?.sessionDeleteAvailable == true
+    activeProcesses[adapterName]?.sessionDeleteAvailable == true
 
 internal fun AcpClientService.canCloseHistorySession(adapterName: String): Boolean =
-    activeProcesses[processKey(adapterName)]?.sessionCloseAvailable == true
+    activeProcesses[adapterName]?.sessionCloseAvailable == true
 
 @OptIn(UnstableApi::class)
 private suspend fun AcpClientService.acpSessionList(
@@ -61,7 +60,7 @@ private suspend fun AcpClientService.acpSessionList(
     allowInitializingProcess: Boolean,
     preserveNativeCwd: Boolean
 ): List<SessionMeta> {
-    val sharedProc = activeProcesses[processKey(adapterInfo.id)]?.takeIf {
+    val sharedProc = activeProcesses[adapterInfo.id]?.takeIf {
         it.isHealthy() || (allowInitializingProcess && it.client != null)
     }
         ?: throw IllegalStateException("Adapter '${adapterInfo.id}' is not ready for session/list")
@@ -71,8 +70,10 @@ private suspend fun AcpClientService.acpSessionList(
         "Adapter '${adapterInfo.id}' did not advertise session/list support"
     }
     val expectedProjectPath = historyComparablePath(projectPath)
-    val sessionListCwd = resolveSessionCwd(projectPath).let { cwd ->
-        if (adapterInfo.sessionListPosixCwd && !preserveNativeCwd) cwd.replace('\\', '/') else cwd
+    val sessionListCwd = if (adapterInfo.sessionListPosixCwd && !preserveNativeCwd) {
+        projectPath.replace('\\', '/')
+    } else {
+        projectPath
     }
 
     return client.listSessions(cwd = sessionListCwd).toList().mapNotNull { session ->
@@ -96,7 +97,7 @@ private suspend fun AcpClientService.acpSessionList(
 
 @OptIn(UnstableApi::class)
 internal suspend fun AcpClientService.deleteHistorySession(adapterName: String, sessionId: String): Boolean {
-    val sharedProc = activeProcesses[processKey(adapterName)]?.takeIf { it.isHealthy() } ?: return false
+    val sharedProc = activeProcesses[adapterName]?.takeIf { it.isHealthy() } ?: return false
     if (!sharedProc.sessionDeleteAvailable) return false
     val protocol = sharedProc.protocol ?: return false
     return protocol.deleteAcpSession(sessionId)

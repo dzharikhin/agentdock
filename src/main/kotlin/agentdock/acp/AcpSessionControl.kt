@@ -145,9 +145,8 @@ internal suspend fun AcpClientService.stopAgent(chatId: String) {
 }
 
 internal fun AcpClientService.stopSharedProcess(adapterName: String) {
-    ensureExecutionTargetCurrent()
     adapterInitializationJobs.remove(adapterName)?.cancel()
-    val shared = activeProcesses.remove(processKey(adapterName))
+    val shared = activeProcesses.remove(adapterName)
     teardownAdapterProcess(shared)
     updateAdapterInitializationState(adapterName, AcpClientService.AdapterInitializationStatus.NotStarted)
     adapterRuntimeMetadataMap.remove(adapterName)
@@ -156,10 +155,9 @@ internal fun AcpClientService.stopSharedProcess(adapterName: String) {
 }
 
 internal fun AcpClientService.replaceSharedProcess(adapterName: String): AcpClientService.SharedProcess {
-    ensureExecutionTargetCurrent()
-    val previous = activeProcesses.remove(processKey(adapterName))
+    val previous = activeProcesses.remove(adapterName)
     teardownAdapterProcess(previous)
-    return createSharedProcess(adapterName).also { activeProcesses[processKey(adapterName)] = it }
+    return createSharedProcess(adapterName).also { activeProcesses[adapterName] = it }
 }
 
 internal fun AcpClientService.teardownAdapterProcess(
@@ -168,10 +166,7 @@ internal fun AcpClientService.teardownAdapterProcess(
     runCatching { shared?.stop() }
 }
 
-internal fun AcpClientService.resetExecutionEnvironment(
-    clearSessions: Boolean,
-    restartDownloadedAdapters: Boolean
-) {
+internal fun AcpClientService.resetRuntime(restartDownloadedAdapters: Boolean) {
     adapterInitializationJobs.values.forEach { it.cancel() }
     adapterInitializationJobs.clear()
     adapterInitializationState.clear()
@@ -185,9 +180,7 @@ internal fun AcpClientService.resetExecutionEnvironment(
     configProbeSessionKeys.clear()
 
     sessions.values.forEach { it.stop() }
-    if (clearSessions) {
-        sessions.clear()
-    }
+    sessions.clear()
 
     val processes = activeProcesses.values.toList()
     activeProcesses.clear()
@@ -204,10 +197,7 @@ internal fun AcpClientService.resetExecutionEnvironment(
 internal fun AcpClientService.recoverRuntime(): Boolean {
     if (!runtimeRecoveryInProgress.compareAndSet(false, true)) return false
     return try {
-        resetExecutionEnvironment(
-            clearSessions = true,
-            restartDownloadedAdapters = true
-        )
+        resetRuntime(restartDownloadedAdapters = true)
         true
     } finally {
         runtimeRecoveryInProgress.set(false)
@@ -216,14 +206,11 @@ internal fun AcpClientService.recoverRuntime(): Boolean {
 
 internal fun AcpClientService.shutdown() {
     scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
-    resetExecutionEnvironment(
-        clearSessions = true,
-        restartDownloadedAdapters = false
-    )
+    resetRuntime(restartDownloadedAdapters = false)
 }
 
 internal suspend fun AcpClientService.awaitPendingSessionUpdates(adapterName: String) {
-    val sharedProc = activeProcesses[processKey(adapterName)] ?: return
+    val sharedProc = activeProcesses[adapterName] ?: return
     val queue = sharedProc.sessionUpdateQueue ?: return
     val completed = CompletableDeferred<Unit>()
     queue.send(QueuedSessionUpdate.Barrier(completed))

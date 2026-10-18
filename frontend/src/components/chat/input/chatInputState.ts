@@ -20,7 +20,6 @@ export interface ChatInputProps {
   queueError?: string;
   onStop: () => void;
   isSending: boolean;
-  promptQueueEnabled?: boolean;
   agentOptions: DropdownOption[];
   selectedAgentId: string;
   onAgentChange: (id: string) => void;

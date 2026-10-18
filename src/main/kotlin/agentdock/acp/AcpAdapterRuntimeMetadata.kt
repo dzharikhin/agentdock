@@ -20,7 +20,7 @@ internal suspend fun AcpClientService.fetchAdapterRuntimeMetadata(
     onConfigMutated: (() -> Unit)? = null
 ): AcpClientService.AdapterRuntimeMetadata {
     val probeProjectPath = AcpAdapterPaths.getProbeSessionDir().absolutePath
-    val result = protocol.newSessionRaw(resolveSessionCwd(probeProjectPath))
+    val result = protocol.newSessionRaw(probeProjectPath)
     val sessionId = result["sessionId"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
     if (sessionId.isEmpty()) {
         throw IllegalStateException("ACP session/new response did not include sessionId")
@@ -94,7 +94,7 @@ private suspend fun AcpClientService.cleanupProbeSessions(
                         deleted || (sessionCloseAvailable && protocol.closeAcpSession(sessionId))
                     }
                     else -> AgentDockHistoryService.deleteSessionImmediately(
-                        projectPath = resolveSessionCwd(probeProjectPath),
+                        projectPath = probeProjectPath,
                         sessionId = sessionId,
                         adapterName = adapterInfo.id,
                         waitTimeoutMillis = if (sessionId == currentSessionId) 1_000L else 0L,

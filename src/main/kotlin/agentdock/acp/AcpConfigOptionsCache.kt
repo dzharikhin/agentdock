@@ -49,7 +49,7 @@ internal object AcpConfigOptionsCache {
     }
 
     fun adapterVersion(adapterInfo: AcpAdapterConfig.AdapterInfo): String {
-        return AcpAdapterPaths.installedVersion(adapterInfo.id, AcpAdapterPaths.getExecutionTarget())
+        return AcpAdapterPaths.installedVersion(adapterInfo.id)
             ?: adapterInfo.getConfiguredVersion()
     }
 

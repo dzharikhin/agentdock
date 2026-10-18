@@ -4,25 +4,16 @@ import java.io.File
 
 private const val DEFAULT_NPM_LAUNCH_PATH = "dist/index.js"
 
-internal fun isWindowsLocalTarget(target: AcpExecutionTarget): Boolean =
-    target == AcpExecutionTarget.LOCAL && AcpExecutionMode.isWindowsHost()
-
-internal fun platformBinaryForTarget(
-    binary: AcpAdapterConfig.PlatformBinary?,
-    target: AcpExecutionTarget
-): String? {
-    if (isWindowsLocalTarget(target)) return binary?.win
+internal fun platformBinary(binary: AcpAdapterConfig.PlatformBinary?): String? {
     return when (AcpExecutionMode.hostPlatform()) {
+        "windows" -> binary?.win
         "macos" -> binary?.macos ?: binary?.unix
         "linux" -> binary?.linux ?: binary?.unix
         else -> binary?.unix
     }
 }
 
-internal fun resolveDownloadPath(
-    adapterInfo: AcpAdapterConfig.AdapterInfo,
-    target: AcpExecutionTarget
-): String {
+internal fun resolveDownloadPath(adapterInfo: AcpAdapterConfig.AdapterInfo): String {
     val customCommand = adapterInfo.customCommand
     if (customCommand != null) {
         return File(customCommand).absoluteFile.parentFile?.absolutePath
@@ -33,16 +24,15 @@ internal fun resolveDownloadPath(
 
 internal fun resolveAdapterLaunchFile(
     adapterRoot: File,
-    adapterInfo: AcpAdapterConfig.AdapterInfo,
-    target: AcpExecutionTarget
+    adapterInfo: AcpAdapterConfig.AdapterInfo
 ): File? {
     return when (adapterInfo.distribution.type) {
         AcpAdapterConfig.DistributionType.ARCHIVE -> {
-            val binName = platformBinaryForTarget(adapterInfo.distribution.binaryName, target)
+            val binName = platformBinary(adapterInfo.distribution.binaryName)
             if (binName.isNullOrBlank()) null else File(adapterRoot, binName)
         }
         AcpAdapterConfig.DistributionType.NPM -> {
-            val launchPath = resolveNpmLaunchRelativePath(adapterInfo, target)
+            val launchPath = resolveNpmLaunchRelativePath(adapterInfo)
             File(adapterRoot, launchPath.replace("/", File.separator).replace("\\", File.separator))
         }
     }
@@ -50,41 +40,38 @@ internal fun resolveAdapterLaunchFile(
 
 internal fun resolveAdapterLaunchPath(
     adapterRootPath: String,
-    adapterInfo: AcpAdapterConfig.AdapterInfo,
-    target: AcpExecutionTarget
+    adapterInfo: AcpAdapterConfig.AdapterInfo
 ): String? {
     return when (adapterInfo.distribution.type) {
         AcpAdapterConfig.DistributionType.ARCHIVE -> {
-            val binName = platformBinaryForTarget(adapterInfo.distribution.binaryName, target)
-            binName?.takeIf { it.isNotBlank() }?.let { joinAdapterPath(adapterRootPath, it, target) }
+            val binName = platformBinary(adapterInfo.distribution.binaryName)
+            binName?.takeIf { it.isNotBlank() }?.let { joinAdapterPath(adapterRootPath, it) }
         }
         AcpAdapterConfig.DistributionType.NPM -> {
-            val launchPath = resolveNpmLaunchRelativePath(adapterInfo, target)
-            joinAdapterPath(adapterRootPath, launchPath, target)
+            val launchPath = resolveNpmLaunchRelativePath(adapterInfo)
+            joinAdapterPath(adapterRootPath, launchPath)
         }
     }
 }
 
 internal fun buildAdapterLaunchCommand(
     adapterRootPath: String,
-    adapterInfo: AcpAdapterConfig.AdapterInfo,
-    projectPath: String?,
-    target: AcpExecutionTarget
+    adapterInfo: AcpAdapterConfig.AdapterInfo
 ): List<String> {
     adapterInfo.customCommand?.let { command ->
-        val resolvedCommand = resolveCustomWindowsCommand(command, adapterInfo.environment, target)
+        val resolvedCommand = resolveCustomWindowsCommand(command, adapterInfo.environment)
         val name = File(resolvedCommand).name.lowercase()
         val base = when {
-            isWindowsLocalTarget(target) && (name.endsWith(".cmd") || name.endsWith(".bat")) ->
+            AcpExecutionMode.isWindowsHost() && (name.endsWith(".cmd") || name.endsWith(".bat")) ->
                 mutableListOf("cmd.exe", "/c", resolvedCommand)
-            isWindowsLocalTarget(target) && name.endsWith(".ps1") ->
+            AcpExecutionMode.isWindowsHost() && name.endsWith(".ps1") ->
                 mutableListOf("powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", resolvedCommand)
             else -> mutableListOf(resolvedCommand)
         }
         base.addAll(adapterInfo.args)
         return base
     }
-    val launchPath = resolveAdapterLaunchPath(adapterRootPath, adapterInfo, target)
+    val launchPath = resolveAdapterLaunchPath(adapterRootPath, adapterInfo)
         ?: throw IllegalStateException("Missing launch target for adapter '${adapterInfo.id}'")
     val launchFile = File(launchPath)
     val name = launchFile.name.lowercase()
@@ -107,10 +94,9 @@ internal fun buildAdapterLaunchCommand(
 
 private fun resolveCustomWindowsCommand(
     command: String,
-    environmentOverrides: Map<String, String>,
-    target: AcpExecutionTarget
+    environmentOverrides: Map<String, String>
 ): String {
-    if (!isWindowsLocalTarget(target)) return command
+    if (!AcpExecutionMode.isWindowsHost()) return command
 
     val commandFile = File(command)
     if (commandFile.extension.isNotEmpty()) return command
@@ -155,9 +141,6 @@ private fun environmentValue(environment: Map<String, String>, name: String): St
     environment.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
 
 internal fun resolvePatchRoot(adapterRoot: File, adapterInfo: AcpAdapterConfig.AdapterInfo): File {
-    if (adapterInfo.patchRoot == AcpAdapterConfig.PatchRoot.RUNTIME) {
-        return adapterRoot
-    }
     return when (adapterInfo.distribution.type) {
         AcpAdapterConfig.DistributionType.ARCHIVE -> adapterRoot
         AcpAdapterConfig.DistributionType.NPM -> resolveNpmPackageRoot(adapterRoot, adapterInfo)
@@ -172,19 +155,15 @@ private fun resolveNpmPackageRoot(adapterRoot: File, adapterInfo: AcpAdapterConf
 
 internal fun resolveNpmPackageRootPath(
     adapterRootPath: String,
-    adapterInfo: AcpAdapterConfig.AdapterInfo,
-    target: AcpExecutionTarget
+    adapterInfo: AcpAdapterConfig.AdapterInfo
 ): String {
     val packageName = adapterInfo.distribution.packageName
         ?: throw IllegalStateException("Adapter '${adapterInfo.id}' missing distribution.packageName in configuration")
-    return joinAdapterPath(adapterRootPath, "node_modules/$packageName", target)
+    return joinAdapterPath(adapterRootPath, "node_modules/$packageName")
 }
 
-private fun resolveNpmLaunchRelativePath(
-    adapterInfo: AcpAdapterConfig.AdapterInfo,
-    target: AcpExecutionTarget
-): String {
-    val launchBinary = platformBinaryForTarget(adapterInfo.launchBinary, target).orEmpty().trim()
+private fun resolveNpmLaunchRelativePath(adapterInfo: AcpAdapterConfig.AdapterInfo): String {
+    val launchBinary = platformBinary(adapterInfo.launchBinary).orEmpty().trim()
     if (launchBinary.isNotEmpty()) return launchBinary
 
     val launchPath = adapterInfo.launchPath.ifBlank { DEFAULT_NPM_LAUNCH_PATH }
@@ -193,7 +172,7 @@ private fun resolveNpmLaunchRelativePath(
     return "node_modules/$packageName/$launchPath"
 }
 
-private fun joinAdapterPath(base: String, relative: String, target: AcpExecutionTarget): String {
+private fun joinAdapterPath(base: String, relative: String): String {
     val separator = File.separator
     val normalizedRelative = relative.replace("/", File.separator).replace("\\", File.separator)
     return if (base.endsWith(separator)) base + normalizedRelative else base + separator + normalizedRelative

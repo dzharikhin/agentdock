@@ -59,12 +59,6 @@ object AcpAdapterConfig {
     }
 
     @Serializable
-    enum class PatchRoot {
-        @SerialName("package") PACKAGE,
-        @SerialName("runtime") RUNTIME
-    }
-
-    @Serializable
     enum class UpdateSourceType {
         @SerialName("github_release") GITHUB_RELEASE
     }
@@ -108,7 +102,6 @@ object AcpAdapterConfig {
         val clientCapabilitiesMeta: JsonObject = JsonObject(emptyMap()),
         val args: List<String> = emptyList(),
         val platformArgs: Map<String, List<String>> = emptyMap(),
-        val patchRoot: PatchRoot = PatchRoot.PACKAGE,
         val patches: List<String> = emptyList(),
         val loginMethod: String? = null,
         val logoutMethod: String? = null,

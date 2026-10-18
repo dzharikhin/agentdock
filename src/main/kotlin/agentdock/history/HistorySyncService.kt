@@ -49,13 +49,6 @@ internal object HistorySyncService {
         }
     }
 
-    suspend fun syncHistoryIndex(projectPath: String?): Boolean {
-        val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
-        if (cleanProjectPath.isBlank()) return false
-        syncProjectIndex(cleanProjectPath)
-        return true
-    }
-
     fun getHistoryList(projectPath: String?): List<SessionMeta> {
         val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
         return buildHistoryList(cleanProjectPath, HistoryStorage.readExistingProjectIndex(cleanProjectPath))
@@ -181,7 +174,7 @@ internal object HistorySyncService {
                 }
                 updatedConversation
             }
-        }.toMutableList()
+        }
 
         val newConversations = availableSessions
             .filter { keptKeys.add("${it.adapterName}:${it.sessionId}") }
@@ -206,7 +199,6 @@ internal object HistorySyncService {
             }
 
         val combinedConversations = syncedExisting + newConversations
-        syncedExisting.addAll(newConversations)
         if (newConversations.isNotEmpty()) {
             changed = true
         }
@@ -315,7 +307,7 @@ internal object HistorySyncService {
         sessionId: String,
         sourceFilePath: String?
     ) {
-        val jobKey = HistoryEnvironment.historySyncKey(projectPath) + "||$adapterName:$sessionId"
+        val jobKey = "$projectPath||$adapterName:$sessionId"
         if (ephemeralDeletionJobs.putIfAbsent(jobKey, true) != null) return
 
         backgroundScope.launch {

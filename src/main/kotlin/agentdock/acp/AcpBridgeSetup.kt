@@ -342,7 +342,6 @@ internal fun AcpBridge.installAdapterQueries() {
             val cancellation = AcpAdapterInstallCancellation()
             adapterInstallCancellations[adapterId] = cancellation
             val job = scope.launch(Dispatchers.IO) {
-                val target = AcpAdapterPaths.getExecutionTarget()
                 var replacingRuntime = false
                 try {
                     downloadStatuses[adapterId] = "Starting download..."
@@ -351,7 +350,7 @@ internal fun AcpBridge.installAdapterQueries() {
 
                     service.stopSharedProcess(adapterId)
                     AcpConfigOptionsCache.remove(adapterId)
-                    resetUpdateCheckState(adapterId, target)
+                    resetUpdateCheckState(adapterId)
                     val adapterInfo = AcpAdapterPaths.getAdapterInfo(adapterId)
                     val targetDir = File(AcpAdapterPaths.getDependenciesDir(), adapterInfo.id)
 
@@ -365,14 +364,13 @@ internal fun AcpBridge.installAdapterQueries() {
                         targetDir = targetDir,
                         adapterInfo = adapterInfo,
                         statusCallback = statusCallback,
-                        target = target,
                         cancellation = cancellation
                     )
 
                     if (success) {
                         downloadStatuses.remove(adapterId)
-                        val installedVersion = AcpAdapterPaths.installedVersion(adapterId, target)
-                        setDownloadProbeState(adapterId, target, downloaded = true, installedVersion = installedVersion)
+                        val installedVersion = AcpAdapterPaths.installedVersion(adapterId)
+                        setDownloadProbeState(adapterId, downloaded = true, installedVersion = installedVersion)
                         service.initializeAdapterInBackground(adapterId)
                         refreshAdapterLoginStatus(adapterId)
                         pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
@@ -385,7 +383,7 @@ internal fun AcpBridge.installAdapterQueries() {
                 } catch (_: CancellationException) {
                     downloadStatuses.remove(adapterId)
                     if (replacingRuntime) {
-                        runCatching { AcpAdapterPaths.deleteAdapter(adapterId, target) }
+                        runCatching { AcpAdapterPaths.deleteAdapter(adapterId) }
                     }
                     resetDownloadProbeState(adapterId)
                 } catch (e: Exception) {
@@ -415,16 +413,15 @@ internal fun AcpBridge.installAdapterQueries() {
         val adapterId = parseIdOnlyPayload(payload)
         if (adapterId != null) {
             scope.launch(Dispatchers.IO) {
-                val target = AcpAdapterPaths.getExecutionTarget()
                 service.stopSharedProcess(adapterId)
                 AcpConfigOptionsCache.remove(adapterId)
-                resetUpdateCheckState(adapterId, target)
+                resetUpdateCheckState(adapterId)
                 resetDownloadProbeState(adapterId)
-                val deleted = AcpAdapterPaths.deleteAdapter(adapterId, target)
+                val deleted = AcpAdapterPaths.deleteAdapter(adapterId)
                 if (deleted) {
                     downloadStatuses.remove(adapterId)
                     authErrors.remove(adapterId)
-                    setDownloadProbeState(adapterId, target, downloaded = false)
+                    setDownloadProbeState(adapterId, downloaded = false)
                     host.eval("if(window.__onAdapterDeleted) window.__onAdapterDeleted(${adapterId.jsStringLiteral()});")
                 } else {
                     downloadStatuses[adapterId] = "Error: Unable to remove adapter files"
@@ -447,7 +444,7 @@ internal fun AcpBridge.installAdapterQueries() {
                 try {
                     val adapterInfo = AcpAdapterPaths.getAdapterInfo(adapterId)
                     val isUpdateCheckSupported = AcpAdapterUpdates.isUpdateCheckSupported(adapterInfo)
-                    val installedVersion = AcpAdapterPaths.installedVersion(adapterId, AcpAdapterPaths.getExecutionTarget())
+                    val installedVersion = AcpAdapterPaths.installedVersion(adapterId)
                     val isStaticUpdateAvailable = installedVersion != null && installedVersion != adapterInfo.getConfiguredVersion()
 
                     if (!isUpdateCheckSupported && !isStaticUpdateAvailable) {
@@ -470,9 +467,8 @@ internal fun AcpBridge.installAdapterQueries() {
 
                     service.stopSharedProcess(adapterId)
                     AcpConfigOptionsCache.remove(adapterId)
-                    val target = AcpAdapterPaths.getExecutionTarget()
                     val targetDir = File(AcpAdapterPaths.getDependenciesDir(), adapterInfo.id)
-                    val deleted = AcpAdapterPaths.deleteAdapter(adapterId, target)
+                    val deleted = AcpAdapterPaths.deleteAdapter(adapterId)
                     if (!deleted) {
                         throw IllegalStateException("Unable to remove old adapter files")
                     }
@@ -487,14 +483,13 @@ internal fun AcpBridge.installAdapterQueries() {
                         targetDir = targetDir,
                         adapterInfo = adapterInfo,
                         statusCallback = statusCallback,
-                        target = target,
                         versionOverride = latestVersion,
                         cancellation = cancellation
                     )
 
                     if (success) {
                         downloadStatuses.remove(adapterId)
-                        setDownloadProbeState(adapterId, target, downloaded = true, installedVersion = latestVersion)
+                        setDownloadProbeState(adapterId, downloaded = true, installedVersion = latestVersion)
                         service.initializeAdapterInBackground(adapterId)
                         refreshAdapterLoginStatus(adapterId)
                         pushAdapters(includeRuntimeChecks = true, adapterIdsToRefresh = setOf(adapterId))
@@ -506,7 +501,7 @@ internal fun AcpBridge.installAdapterQueries() {
                 } catch (_: CancellationException) {
                     downloadStatuses.remove(adapterId)
                     if (replacingRuntime) {
-                        runCatching { AcpAdapterPaths.deleteAdapter(adapterId, AcpAdapterPaths.getExecutionTarget()) }
+                        runCatching { AcpAdapterPaths.deleteAdapter(adapterId) }
                     }
                     resetDownloadProbeState(adapterId)
                 } catch (e: Exception) {

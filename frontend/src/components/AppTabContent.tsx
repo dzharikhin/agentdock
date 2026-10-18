@@ -9,7 +9,6 @@ interface AppTabContentProps {
   pendingHandoff?: PendingHandoffContext;
   onUserMessageSent: () => void;
   onAssistantActivity: () => void;
-  onAtBottomChange: (isAtBottom: boolean) => void;
   onCanMarkReadChange: (canMarkRead: boolean) => void;
   onPermissionRequestChange: (hasPendingPermission: boolean) => void;
   onProcessingChange: (isProcessing: boolean) => void;
@@ -28,7 +27,6 @@ export function AppTabContent({
   pendingHandoff,
   onUserMessageSent,
   onAssistantActivity,
-  onAtBottomChange,
   onCanMarkReadChange,
   onPermissionRequestChange,
   onProcessingChange,
@@ -55,7 +53,6 @@ export function AppTabContent({
         isActive={isActive}
         onUserMessageSent={onUserMessageSent}
         onAssistantActivity={onAssistantActivity}
-        onAtBottomChange={onAtBottomChange}
         onCanMarkReadChange={onCanMarkReadChange}
         onPermissionRequestChange={onPermissionRequestChange}
         onProcessingChange={onProcessingChange}

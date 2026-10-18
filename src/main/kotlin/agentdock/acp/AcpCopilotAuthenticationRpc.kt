@@ -41,10 +41,9 @@ internal object AcpCopilotAuthenticationRpc {
         action: (RpcSession) -> T
     ): T? {
         val adapterInfo = runCatching { AcpAdapterConfig.getAdapterInfo(adapterId) }.getOrNull() ?: return null
-        val target = AcpAdapterPaths.getExecutionTarget()
         val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId)
         if (!AcpAdapterPaths.isDownloaded(adapterId)) return null
-        val launchPath = AcpAdapterPaths.resolveLaunchPath(adapterRoot, adapterInfo, target) ?: return null
+        val launchPath = resolveAdapterLaunchPath(adapterRoot, adapterInfo) ?: return null
         val runtime = AcpNodeRuntimeResolver.resolveAvailable() ?: return null
 
         val commandLine = com.intellij.execution.configurations.GeneralCommandLine(runtime.node)

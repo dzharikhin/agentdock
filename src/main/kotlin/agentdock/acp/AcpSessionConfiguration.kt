@@ -29,9 +29,7 @@ internal fun AcpClientService.updateSessionRuntimeMetadata(
     }
     val metadata = freshMetadata.copy(configOptionsByModel = optionsByModel)
     context.runtimeMetadataRef.set(metadata)
-    context.activeModelIdRef.set(metadata.currentModelId)
     context.activeModeIdRef.set(metadata.currentModeId)
-    context.activeReasoningEffortIdRef.set(metadata.currentReasoningEffortId)
     context.activeConfigValues.clear()
     context.activeConfigValues.putAll(metadata.configOptions.associate { it.id to it.currentValue })
     if (!context.configOptionsUpdateInProgress) {

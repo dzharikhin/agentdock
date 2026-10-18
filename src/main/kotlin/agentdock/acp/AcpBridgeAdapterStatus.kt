@@ -18,8 +18,6 @@ private const val RUNTIME_CHECK_MAX_ATTEMPTS = 3
 private const val RUNTIME_CHECK_RETRY_DELAY_MS = 1_000L
 private val LOG = Logger.getInstance("agentdock.acp.AcpBridgeAdapterStatus")
 
-private fun downloadProbeKey(target: AcpExecutionTarget, adapterId: String) = "${target.name}:$adapterId"
-
 private suspend fun runRuntimeCheckWithRetries(check: suspend (attempt: Int) -> Boolean): Boolean {
     for (attempt in 1..RUNTIME_CHECK_MAX_ATTEMPTS) {
         if (check(attempt)) return true
@@ -89,13 +87,11 @@ private fun AcpAdapterConfig.ModeInfo.toReasoningEffortPayload(): AdapterReasoni
 
 internal fun AcpBridge.setDownloadProbeState(
     adapterId: String,
-    target: AcpExecutionTarget,
     downloaded: Boolean,
     installedVersion: String? = null
 ) {
-    val key = downloadProbeKey(target, adapterId)
-    downloadProbeJobs.remove(key)?.cancel()
-    downloadProbeStates[key] = AdapterDownloadProbeState(
+    downloadProbeJobs.remove(adapterId)?.cancel()
+    downloadProbeStates[adapterId] = AdapterDownloadProbeState(
         downloaded = downloaded,
         downloadedKnown = true,
         installedVersion = installedVersion
@@ -105,10 +101,9 @@ internal fun AcpBridge.setDownloadProbeState(
 @OptIn(com.agentclientprotocol.annotations.UnstableApi::class)
 private fun AcpBridge.buildAdapterPayload(
     info: AcpAdapterConfig.AdapterInfo,
-    target: AcpExecutionTarget,
     preferences: AcpAgentPreferencesState
 ): AdapterPayload {
-    val probeState = downloadProbeStates[downloadProbeKey(target, info.id)]
+    val probeState = downloadProbeStates[info.id]
     val downloadedKnown = probeState?.downloadedKnown == true
     val downloaded = probeState?.downloaded
     val initStatus = service.adapterInitializationStatus(info.id)
@@ -146,8 +141,7 @@ private fun AcpBridge.buildAdapterPayload(
         installedVersion != info.getConfiguredVersion()
     val updateSupported = downloaded == true &&
         (AcpAdapterUpdates.isUpdateCheckSupported(info) || isStaticUpdateAvailable)
-    val updateKey = "${target.name}:${info.id}"
-    val updateChecking = updateCheckJobs[updateKey]?.isActive == true
+    val updateChecking = updateCheckJobs[info.id]?.isActive == true
     val latestVersion = if (!updateSupported) {
         null
     } else if (AcpAdapterUpdates.isUpdateCheckSupported(info)) {
@@ -160,9 +154,8 @@ private fun AcpBridge.buildAdapterPayload(
     val isAuthenticating = authActionJobs[info.id]?.isActive == true
     val cliAvailable = downloaded == true && info.cli != null && cli.isIdeTerminalAvailable()
     val cliResumeAvailable = cliAvailable && info.cli.resumeArgs.isNotEmpty()
-    val rawInitError = service.adapterInitializationError(info.id) ?: ""
+    val initError = service.adapterInitializationError(info.id) ?: ""
     val initializationDetail = if (isInitializing) service.adapterInitializationDetail(info.id).orEmpty() else ""
-    val initError = rawInitError
 
     val isReady = when {
         !downloadedKnown -> null
@@ -212,7 +205,7 @@ private fun AcpBridge.buildAdapterPayload(
         downloaded = downloaded,
         downloadedKnown = downloadedKnown,
         downloadPath = if (downloaded == true) {
-            info.customCommand ?: AcpAdapterPaths.getDownloadPath(info.id, target)
+            info.customCommand ?: AcpAdapterPaths.getDownloadPath(info.id)
         } else "",
         loginMethod = exposedLoginMethod,
         authMethods = authMethods,
@@ -244,21 +237,18 @@ private fun AcpBridge.buildAdapterPayload(
     )
 }
 
-private fun AcpBridge.ensureDownloadProbeStarted(
-    info: AcpAdapterConfig.AdapterInfo,
-    target: AcpExecutionTarget
-) {
-    val key = downloadProbeKey(target, info.id)
+private fun AcpBridge.ensureDownloadProbeStarted(info: AcpAdapterConfig.AdapterInfo) {
+    val key = info.id
     if (downloadProbeStates[key]?.downloadedKnown == true) return
 
     launchRuntimeCheck(downloadProbeJobs, key) {
         val succeeded = runRuntimeCheckWithRetries { attempt ->
             try {
-                val downloaded = AcpAdapterPaths.isDownloaded(adapterName = info.id, target = target)
+                val downloaded = AcpAdapterPaths.isDownloaded(info.id)
                 downloadProbeStates[key] = AdapterDownloadProbeState(
                     downloaded = downloaded,
                     downloadedKnown = true,
-                    installedVersion = if (downloaded) AcpAdapterPaths.installedVersion(info.id, target) else null
+                    installedVersion = if (downloaded) AcpAdapterPaths.installedVersion(info.id) else null
                 )
                 if (
                     downloaded &&
@@ -287,7 +277,6 @@ private fun AcpBridge.ensureDownloadProbeStarted(
 
 private fun AcpBridge.ensureLoginStatusCheckStarted(
     info: AcpAdapterConfig.AdapterInfo,
-    target: AcpExecutionTarget,
     force: Boolean = false
 ) {
     if (info.loginStatusMethod == null) return
@@ -298,7 +287,7 @@ private fun AcpBridge.ensureLoginStatusCheckStarted(
     launchRuntimeCheck(loginStatusJobs, info.id) {
         runRuntimeCheckWithRetries { attempt ->
             try {
-                val loggedIn = AcpLoginStatus.resolve(info, target)
+                val loggedIn = AcpLoginStatus.resolve(info)
                 if (loggedIn != null) {
                     val becameLoggedIn = loggedIn && service.loginStatusStates[info.id] == false
                     service.loginStatusStates[info.id] = loggedIn
@@ -335,10 +324,9 @@ internal fun AcpBridge.refreshAdapterLoginStatus(adapterId: String) {
         return
     }
 
-    val target = AcpAdapterPaths.getExecutionTarget()
     loginStatusJobs.remove(adapterId)?.cancel()
     pushAdapters()
-    ensureLoginStatusCheckStarted(info, target, force = true)
+    ensureLoginStatusCheckStarted(info, force = true)
 }
 
 internal fun AcpBridge.pushAdapters(
@@ -348,12 +336,11 @@ internal fun AcpBridge.pushAdapters(
     try {
         val unique = linkedMapOf<String, AcpAdapterConfig.AdapterInfo>()
         AcpAdapterConfig.getAllAdapters().values.forEach { info -> unique[info.id] = info }
-        val target = AcpAdapterPaths.getExecutionTarget()
 
         if (includeRuntimeChecks) {
             unique.values.forEach { info ->
                 if (adapterIdsToRefresh?.contains(info.id) == false) return@forEach
-                ensureDownloadProbeStarted(info, target)
+                ensureDownloadProbeStarted(info)
             }
         }
 
@@ -362,7 +349,6 @@ internal fun AcpBridge.pushAdapters(
         val adapters = unique.values.sortedBy { it.name.lowercase() }.map { info ->
             buildAdapterPayload(
                 info = info,
-                target = target,
                 preferences = preferences
             )
         }
@@ -378,7 +364,6 @@ internal fun AcpBridge.pushAdapters(
             if (adapters.firstOrNull { it.id == info.id }?.downloaded != true) return@forEach
             ensureLoginStatusCheckStarted(
                 info = info,
-                target = target,
                 force = refreshingAdapters.containsKey(info.id)
             )
         }
@@ -386,7 +371,7 @@ internal fun AcpBridge.pushAdapters(
         unique.values.forEach { info ->
             if (!includeRuntimeChecks) return@forEach
             if (adapterIdsToRefresh?.contains(info.id) == false) return@forEach
-            val key = "${target.name}:${info.id}"
+            val key = info.id
             if (updateCheckJobs[key]?.isActive == true) return@forEach
             val downloaded = adapters.firstOrNull { it.id == info.id }?.downloaded == true
             if (!downloaded || !AcpAdapterUpdates.isUpdateCheckSupported(info)) return@forEach
@@ -438,7 +423,7 @@ internal fun AcpBridge.pushAdapters(
                                     "(attempt $attempt/$RUNTIME_CHECK_MAX_ATTEMPTS)"
                             )
                         } else {
-                            val workDir = AcpAdapterPaths.getDownloadPath(info.id, target)
+                            val workDir = AcpAdapterPaths.getDownloadPath(info.id)
                                 .takeIf { it.isNotBlank() }
                                 ?.let(::File)
                             val builder = ProcessBuilder(cmd)
@@ -501,13 +486,11 @@ internal fun AcpBridge.refreshAdapters(adapterIds: Collection<String>) {
 }
 
 internal fun AcpBridge.finishAdapterRefreshesIfIdle() {
-    val target = AcpAdapterPaths.getExecutionTarget()
     val finished = refreshingAdapters.keys.filter { adapterId ->
-        val targetKey = downloadProbeKey(target, adapterId)
         val checks = listOf(
-            downloadProbeJobs[targetKey],
+            downloadProbeJobs[adapterId],
             loginStatusJobs[adapterId],
-            updateCheckJobs[targetKey],
+            updateCheckJobs[adapterId],
             agentVersionJobs[adapterId]
         )
         checks.none { it?.isCompleted == false } && refreshingAdapters.remove(adapterId, false)
@@ -521,12 +504,9 @@ internal fun AcpBridge.finishAdapterRefreshesIfIdle() {
 private fun AcpBridge.resetAdapterRefreshState(adapterId: String) {
     authErrors.remove(adapterId)
     downloadStatuses.computeIfPresent(adapterId) { _, status -> status.takeUnless { it.startsWith("Error:") } }
-    AcpExecutionTarget.entries.forEach { target ->
-        val key = downloadProbeKey(target, adapterId)
-        downloadProbeJobs.remove(key)?.cancel()
-        downloadProbeStates.remove(key)
-        updateCheckJobs.remove(key)?.cancel()
-    }
+    downloadProbeJobs.remove(adapterId)?.cancel()
+    downloadProbeStates.remove(adapterId)
+    updateCheckJobs.remove(adapterId)?.cancel()
     loginStatusJobs.remove(adapterId)?.cancel()
     completedLoginStatusRefreshes.remove(adapterId)
     latestVersionStates.remove(adapterId)
@@ -535,7 +515,6 @@ private fun AcpBridge.resetAdapterRefreshState(adapterId: String) {
 }
 
 internal fun AcpBridge.resetDownloadProbeState(adapterId: String? = null) {
-    val targets = AcpExecutionTarget.entries
     if (adapterId == null) {
         downloadProbeJobs.values.forEach { it.cancel() }
         downloadProbeJobs.clear()
@@ -549,11 +528,8 @@ internal fun AcpBridge.resetDownloadProbeState(adapterId: String? = null) {
         agentVersionStates.clear()
         return
     }
-    targets.forEach { target ->
-        val key = downloadProbeKey(target, adapterId)
-        downloadProbeJobs.remove(key)?.cancel()
-        downloadProbeStates.remove(key)
-    }
+    downloadProbeJobs.remove(adapterId)?.cancel()
+    downloadProbeStates.remove(adapterId)
     loginStatusJobs.remove(adapterId)?.cancel()
     service.loginStatusStates.remove(adapterId)
     completedLoginStatusRefreshes.remove(adapterId)
@@ -561,11 +537,7 @@ internal fun AcpBridge.resetDownloadProbeState(adapterId: String? = null) {
     agentVersionStates.remove(adapterId)
 }
 
-internal fun AcpBridge.resetUpdateCheckState(
-    adapterId: String,
-    target: AcpExecutionTarget = AcpAdapterPaths.getExecutionTarget()
-) {
-    val key = "${target.name}:$adapterId"
-    updateCheckJobs.remove(key)?.cancel()
+internal fun AcpBridge.resetUpdateCheckState(adapterId: String) {
+    updateCheckJobs.remove(adapterId)?.cancel()
     latestVersionStates.remove(adapterId)
 }

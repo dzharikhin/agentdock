@@ -38,12 +38,6 @@ internal object HistorySessionChangesStore {
         }
     }
 
-    fun deleteSessionChanges(projectPath: String, sessionId: String, adapterName: String): Boolean {
-        return updateSessionEntry(projectPath, sessionId, adapterName) { session ->
-            session.copy(changes = null)
-        }
-    }
-
     private fun updateSessionEntry(
         projectPath: String,
         sessionId: String,

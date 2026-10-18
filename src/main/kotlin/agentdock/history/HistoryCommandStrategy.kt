@@ -1,8 +1,7 @@
 package agentdock.history
 
-import agentdock.acp.AcpExecutionTarget
+import agentdock.acp.AcpExecutionMode
 import agentdock.acp.buildAdapterCliCommandParts
-import agentdock.acp.isWindowsLocalTarget
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
@@ -20,7 +19,7 @@ internal fun runAgentHistoryCliCommand(
     val (_, commandParts) = buildAdapterCliCommandParts(adapterId, args)
         ?: throw IllegalStateException("Unable to build history command for adapter '$adapterId'")
     val localCommandParts = if (
-        isWindowsLocalTarget(AcpExecutionTarget.LOCAL) &&
+        AcpExecutionMode.isWindowsHost() &&
         commandParts.firstOrNull()?.let { it.endsWith(".cmd", true) || it.endsWith(".bat", true) } == true
     ) {
         listOf("cmd.exe", "/c") + commandParts

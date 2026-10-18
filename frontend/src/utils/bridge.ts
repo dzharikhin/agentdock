@@ -251,8 +251,6 @@ export const ACPBridge = {
       } else if (payload.category === 'INTERNAL') {
         if (isDev) console.log('[ACP INTERNAL]', payload.json);
       }
-
-      window.dispatchEvent(new CustomEvent(EVENT_NAMES.LOG, { detail: payload }));
     };
 
     window.__onHistoryList = (list) => {
@@ -456,8 +454,6 @@ export const ACPBridge = {
   },
 
   onUsageData: (callback: (e: CustomEvent<{ adapterId: string; json: string }>) => void) => onBridgeEvent(EVENT_NAMES.USAGE_DATA, callback),
-
-  onLog: (callback: (e: CustomEvent) => void) => onBridgeEvent(EVENT_NAMES.LOG, callback),
 
   requestHistoryList: (projectPath?: string) => {
     window.__requestHistoryList?.(projectPath);

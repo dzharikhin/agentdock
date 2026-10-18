@@ -76,7 +76,7 @@ private fun AcpClientService.stopOwnedSharedProcess(
     adapterId: String,
     sharedProcess: AcpClientService.SharedProcess?
 ) {
-    if (sharedProcess != null && activeProcesses.remove(processKey(adapterId), sharedProcess)) {
+    if (sharedProcess != null && activeProcesses.remove(adapterId, sharedProcess)) {
         sharedProcess.stop()
     }
 }

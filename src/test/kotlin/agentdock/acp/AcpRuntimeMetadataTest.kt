@@ -74,10 +74,8 @@ class AcpRuntimeMetadataTest {
         assertEquals("model", metadata.modelConfigId)
         assertEquals("gpt-5.5", metadata.currentModelId)
         assertEquals(listOf("gpt-5.5"), metadata.availableModels.map { it.modelId })
-        assertEquals("mode", metadata.modeConfigId)
         assertEquals("build", metadata.currentModeId)
         assertEquals(listOf("build", "plan"), metadata.availableModes.map { it.id })
-        assertEquals("reasoning_effort", metadata.reasoningEffortConfigId)
         assertEquals("medium", metadata.currentReasoningEffortId)
         assertEquals(listOf("low", "medium", "high"), metadata.availableReasoningEfforts.map { it.id })
         assertEquals("brief", metadata.configOptions.first { it.id == "verbosity" }.currentValue)
@@ -113,10 +111,8 @@ class AcpRuntimeMetadataTest {
         assertEquals(null, metadata.modelConfigId)
         assertEquals(null, metadata.currentModelId)
         assertEquals(emptyList(), metadata.availableModels)
-        assertEquals(null, metadata.modeConfigId)
         assertEquals(null, metadata.currentModeId)
         assertEquals(emptyList(), metadata.availableModes)
-        assertEquals(null, metadata.reasoningEffortConfigId)
         assertEquals(null, metadata.currentReasoningEffortId)
         assertEquals(emptyList(), metadata.availableReasoningEfforts)
     }
@@ -199,7 +195,6 @@ class AcpRuntimeMetadataTest {
 
         assertEquals(emptyList(), initialMetadata.availableReasoningEfforts)
         assertEquals("openai/gpt-5.4", changedMetadata.currentModelId)
-        assertEquals("reasoning_effort", changedMetadata.reasoningEffortConfigId)
         assertEquals("low", changedMetadata.currentReasoningEffortId)
         assertEquals(listOf("none", "low", "medium", "high", "xhigh"), changedMetadata.availableReasoningEfforts.map { it.id })
     }
@@ -227,7 +222,6 @@ class AcpRuntimeMetadataTest {
 
         val metadata = runtimeMetadataFromSessionResponseJson(response, adapterInfo())
 
-        assertEquals(null, metadata.reasoningEffortConfigId)
         assertEquals(emptyList(), metadata.availableReasoningEfforts)
     }
 
@@ -326,7 +320,6 @@ class AcpRuntimeMetadataTest {
         assertEquals("session-2", sessionId)
         assertEquals("session-2", extractSessionUpdateSessionId(params))
         val metadata = runtimeMetadataFromConfigOptionsJson(configOptions, adapterInfo())
-        assertEquals("reasoning_effort", metadata.reasoningEffortConfigId)
         assertEquals("high", metadata.currentReasoningEffortId)
     }
 

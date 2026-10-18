@@ -57,7 +57,7 @@ class AcpPlatformCompatibilityTest {
         assertEquals("acp", adapter.sessionDeleteMethod)
         assertEquals(
             listOf("cmd.exe", "/c", File("C:/agent/node_modules/.bin/kimi.cmd").absolutePath, "acp"),
-            buildAdapterLaunchCommand("C:/agent", adapter, "C:/project", AcpExecutionTarget.LOCAL)
+            buildAdapterLaunchCommand("C:/agent", adapter)
         )
         assertEquals(listOf("--session", "{sessionId}"), adapter.cli?.resumeArgs)
     }
@@ -77,7 +77,7 @@ class AcpPlatformCompatibilityTest {
         assertEquals("grokBuildAuthFile", adapter.loginStatusMethod)
         assertEquals(
             listOf("cmd.exe", "/c", File("C:/agent/node_modules/.bin/grok.cmd").absolutePath) + adapter.args,
-            buildAdapterLaunchCommand("C:/agent", adapter, "C:/project", AcpExecutionTarget.LOCAL)
+            buildAdapterLaunchCommand("C:/agent", adapter)
         )
     }
 
@@ -110,11 +110,7 @@ class AcpPlatformCompatibilityTest {
             writeText("""{"version":"1.5.0"}""")
         }
 
-        assertTrue(AcpAdapterPaths.hasInstalledAdapterLaunch(
-            runtimeDir,
-            adapter,
-            AcpExecutionTarget.LOCAL
-        ))
+        assertTrue(AcpAdapterPaths.hasInstalledAdapterLaunch(runtimeDir, adapter))
         assertFalse(isInstalledVersionSupported(adapter, installedVersionFromRuntimeDir(runtimeDir, adapter)))
     }
 
@@ -122,7 +118,7 @@ class AcpPlatformCompatibilityTest {
     fun `local Linux and macOS use unix npm launch binaries`() = withOsName("Linux") {
         val adapter = npmAdapter()
 
-        val launchPath = resolveAdapterLaunchPath("/tmp/agent", adapter, AcpExecutionTarget.LOCAL).orEmpty()
+        val launchPath = resolveAdapterLaunchPath("/tmp/agent", adapter).orEmpty()
             .replace("\\", "/")
 
         assertEquals("/tmp/agent/node_modules/.bin/tool", launchPath)
@@ -142,7 +138,7 @@ class AcpPlatformCompatibilityTest {
             launchPath = "dist/index.js"
         )
 
-        val command = buildAdapterLaunchCommand("/tmp/agent", adapter, "/tmp/project", AcpExecutionTarget.LOCAL)
+        val command = buildAdapterLaunchCommand("/tmp/agent", adapter)
 
         assertEquals("node", command.first())
     }

@@ -22,25 +22,6 @@ internal object BridgeScripts {
                 catch (e) { console.error('[AgentDock] bridge call failed: ' + name, e); }
             };
 
-            // Callbacks the backend pushes into. Defined as no-ops so a push that arrives before
-            // React has registered its own handler is dropped instead of throwing.
-            var callbacks = [
-                '__onAcpLog', '__onContentChunk', '__onStatus', '__onBridgeOperationResult',
-                '__onSessionId', '__onAdapters', '__onAvailableCommands',
-                '__onMode', '__onSessionConfigOptions', '__onPermissionRequest', '__onUndoResult',
-                '__onChangesState', '__onFileChangeStats', '__onConversationTranscriptSaved',
-                '__onConversationReplayLoaded', '__onAdapterDeleted', '__onFilesResult',
-                '__onFileIconResult', '__onLocalImageResult', '__onThemeChanged', '__onHistoryList', '__onHistoryDeleteResult',
-                '__onHistorySearchResult',
-                '__onAssistantActivity',
-                '__onMcpServers', '__onMcpStatus', '__onPromptLibrary', '__onSystemInstructions',
-                '__onAudioTranscriptionFeature', '__onAudioTranscriptionResult',
-                '__onAudioRecordingState', '__onSpeechResult', '__onGlobalSettings'
-            ];
-            callbacks.forEach(function(name) {
-                window[name] = window[name] || function() {};
-            });
-
             window.__notifyReady = function() {
                 var isDark = getComputedStyle(document.documentElement).getPropertyValue('--ide-theme-is-dark').trim();
                 invoke('ready', isDark === '0' ? 'light' : 'dark');
@@ -140,6 +121,7 @@ internal object BridgeScripts {
             window.__agentDockPlaySound = function(sound) { invoke('playSound', sound); };
             window.__requestHostRepaint = function(reason) { invoke('repaint', reason || ''); };
             window.__readUiVisibility = function() { invoke('readUiVisibility', ''); };
+            window.__readUiZoom = function() { invoke('readUiZoom', ''); };
             window.__setAttentionBadge = function(level) { invoke('setAttentionBadge', level || ''); };
 
             window.__settingsBridgeReady = true;

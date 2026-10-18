@@ -25,12 +25,9 @@ import agentdock.acp.AcpAdapterConfig
 import agentdock.acp.AcpAdapterPaths
 import agentdock.acp.AcpClientService
 import agentdock.acp.awaitPendingSessionUpdates
-import agentdock.acp.ensureExecutionTargetCurrent
 import agentdock.acp.ensureSharedProcessStarted
 import agentdock.acp.findReasoningEffortOption
-import agentdock.acp.processKey
 import agentdock.acp.resolveModelToApply
-import agentdock.acp.resolveSessionCwd
 import agentdock.acp.runtimeMetadataFromSetConfigOptionResponseJson
 import agentdock.acp.serializeContentBlock
 import agentdock.acp.setSessionConfigOptionRaw
@@ -53,16 +50,15 @@ internal class GitCommitAcpExecutor(
         config: GitCommitGenerationConfig,
         prompt: String,
     ): String = withContext(Dispatchers.IO) {
-        acpService.ensureExecutionTargetCurrent()
 
         val adapterInfo = AcpAdapterPaths.getAdapterInfo(config.adapterId)
-        val sharedProcess = acpService.activeProcesses.computeIfAbsent(acpService.processKey(adapterInfo.id)) {
+        val sharedProcess = acpService.activeProcesses.computeIfAbsent(adapterInfo.id) {
             acpService.createSharedProcess(adapterInfo.id)
         }
         acpService.ensureSharedProcessStarted(sharedProcess, adapterInfo)
 
         val client = sharedProcess.client ?: error("ACP client is not initialized for ${adapterInfo.id}")
-        val cwd = acpService.resolveSessionCwd(project.basePath ?: System.getProperty("user.dir"))
+        val cwd = project.basePath ?: System.getProperty("user.dir")
         val runtimeMetadata = acpService.adapterRuntimeMetadata(adapterInfo.id)
         val selectedModelId = acpService.resolveModelToApply(
             config.modelId,

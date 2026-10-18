@@ -3,14 +3,12 @@ package agentdock.acp
 internal object AcpAgentVersionCommand {
     fun buildAgentVersionCommand(adapterInfo: AcpAdapterConfig.AdapterInfo): List<String>? {
         val versionConfig = adapterInfo.agentVersionConfig ?: return null
-        val target = AcpAdapterPaths.getExecutionTarget()
-        val downloadPath = AcpAdapterPaths.getDownloadPath(adapterInfo.id, target)
+        val downloadPath = AcpAdapterPaths.getDownloadPath(adapterInfo.id)
         if (downloadPath.isEmpty()) return null
         val baseCommand = when (versionConfig.command) {
-            "adapter" -> AcpAdapterPaths.buildLaunchCommand(
+            "adapter" -> buildAdapterLaunchCommand(
                 adapterRootPath = downloadPath,
-                adapterInfo = adapterInfo.copy(args = emptyList()),
-                target = target
+                adapterInfo = adapterInfo.copy(args = emptyList())
             )
             "cli" -> buildAdapterCliCommandParts(adapterInfo.id)?.second ?: return null
             else -> return null

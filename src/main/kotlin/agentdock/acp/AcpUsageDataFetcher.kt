@@ -205,10 +205,9 @@ internal object AcpUsageDataFetcher {
 
     private fun fetchCopilotUsageDataUncached(adapterId: String): String {
         val adapterInfo = runCatching { AcpAdapterConfig.getAdapterInfo(adapterId) }.getOrNull() ?: return ""
-        val target = AcpAdapterPaths.getExecutionTarget()
         val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId)
         if (!AcpAdapterPaths.isDownloaded(adapterId)) return ""
-        val launchPath = AcpAdapterPaths.resolveLaunchPath(adapterRoot, adapterInfo, target) ?: return ""
+        val launchPath = resolveAdapterLaunchPath(adapterRoot, adapterInfo) ?: return ""
         val runtime = AcpNodeRuntimeResolver.resolveAvailable() ?: return ""
 
         val commandLine = com.intellij.execution.configurations.GeneralCommandLine(runtime.node)

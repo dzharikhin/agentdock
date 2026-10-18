@@ -156,7 +156,6 @@ function App() {
     closeActiveSection,
     handleUserMessageSent,
     handleAssistantActivity,
-    handleAtBottomChange,
     handleCanMarkReadChange,
     handlePermissionRequestChange,
     handleProcessingChange,
@@ -308,7 +307,6 @@ function App() {
               pendingHandoff={pendingHandoffsByTab[tab.id]}
               onUserMessageSent={() => handleUserMessageSent(tab.id)}
               onAssistantActivity={() => handleAssistantActivity(tab.id)}
-              onAtBottomChange={(isAtBottom) => handleAtBottomChange(tab.id, isAtBottom)}
               onCanMarkReadChange={(canMarkRead) => handleCanMarkReadChange(tab.id, canMarkRead)}
               onPermissionRequestChange={(hasPendingPermission) => handlePermissionRequestChange(tab.id, hasPendingPermission)}
               onProcessingChange={(isProcessing) => handleProcessingChange(tab.id, isProcessing)}

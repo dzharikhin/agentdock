@@ -23,7 +23,6 @@ export default function ChatInput(props: ChatInputProps) {
     queueError,
     onStop,
     isSending,
-    promptQueueEnabled,
     agentOptions,
     selectedAgentId,
     onAgentChange,
@@ -175,7 +174,6 @@ export default function ChatInput(props: ChatInputProps) {
             onScheduleModeChange={onScheduleModeChange}
             hasAttachments={attachments.length > 0}
             onStop={onStop}
-            promptQueueEnabled={promptQueueEnabled}
           />
         </div>
       </div>

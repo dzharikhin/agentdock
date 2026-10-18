@@ -111,24 +111,9 @@ internal fun parseBlocksPayload(payload: String): ParsedBlocksPayload {
         val adapterId = obj["adapterId"]?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
         val configValues = parseConfigValues(obj)
 
-        // 1. Try to get blocks directly if present
-        val blocksElement = obj["blocks"]
-        if (blocksElement != null) {
-            return ParsedBlocksPayload(
-                requestId = requestId,
-                chatId = chatId,
-                blocks = parseContentBlocks(blocksElement),
-                rawBlocks = blocksElement.jsonArray.mapNotNull { it as? JsonObject },
-                forkBase = forkBase,
-                adapterId = adapterId,
-                configValues = configValues
-            )
-        }
-
-        // 2. Fallback to text field
         val textValue = obj["text"]?.jsonPrimitive?.content ?: ""
 
-        // 3. If textValue looks like a JSON array of blocks, try to parse it (compatibility with current UI)
+        // The UI sends content blocks as a JSON array inside the text field.
         if (textValue.startsWith("[") && textValue.endsWith("]")) {
             runCatching {
                 val rawBlocks = Json.parseToJsonElement(textValue).jsonArray.mapNotNull { it as? JsonObject }
@@ -147,7 +132,7 @@ internal fun parseBlocksPayload(payload: String): ParsedBlocksPayload {
             }
         }
 
-        // 4. Final fallback: treat as plain text
+        // Fallback: treat as plain text
         ParsedBlocksPayload(
             requestId = requestId,
             chatId = chatId,

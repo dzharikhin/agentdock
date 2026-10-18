@@ -123,12 +123,7 @@ export function useChatSession({
   const pendingHandoffRef = useRef<PendingHandoffContext | null>(null);
   const consumedHandoffIdRef = useRef<string | null>(null);
   const resetSessionAfterInitialCancelRef = useRef(false);
-  const startedAgentIdRef = useRef<string>('');
-  const startedModelIdRef = useRef<string>('');
-  const startedModeIdRef = useRef<string>('');
-  const startedReasoningEffortIdRef = useRef<string>('');
   const historyLoadRequestedRef = useRef<string | null>(null);
-  const statusRef = useRef<string>('not started');
   const startTimeRef = useRef<number | null>(null);
   const historyLoadTimerRef = useRef<number | null>(null);
   const lastMetadataFingerprintRef = useRef<string>('');
@@ -183,19 +178,16 @@ export function useChatSession({
   }, [onHandoffConsumed]);
 
   const selectedAgent = availableAgents.find((agent) => agent.id === selectedAgentId);
-  const pinnedAgentId = selectedAgentId;
 
   useEffect(() => {
-    const snapshotSourceId = pinnedAgentId;
-    if (!snapshotSourceId) return;
-    const matchingAgent = availableAgents.find((agent) => agent.id === snapshotSourceId);
+    if (!selectedAgentId) return;
+    const matchingAgent = availableAgents.find((agent) => agent.id === selectedAgentId);
     if (!matchingAgent) return;
     pinnedAgentSnapshotRef.current = toPinnedAgentSnapshot(matchingAgent);
-  }, [availableAgents, pinnedAgentId]);
+  }, [availableAgents, selectedAgentId]);
 
-  const resolvedSelectedAgent = resolveSelectedAgent(selectedAgent, pinnedAgentSnapshotRef.current, pinnedAgentId);
+  const resolvedSelectedAgent = resolveSelectedAgent(selectedAgent, pinnedAgentSnapshotRef.current, selectedAgentId);
   const availableCommands = useAvailableCommands(availableAgents, selectedAgentId);
-  const effectiveSelectedAgent = resolvedSelectedAgent;
 
   const {
     availableModels,
@@ -208,7 +200,6 @@ export function useChatSession({
     configValues,
     selectedConfigOptions,
     restoreConfigValues,
-    modelIdForStart,
     handleSessionConfigOptions,
     handleModelChange,
     handleReportedModeChange,
@@ -217,7 +208,7 @@ export function useChatSession({
     handleConfigOptionChange,
   } = useAgentRuntimeOptions({
     availableAgents,
-    effectiveSelectedAgent,
+    effectiveSelectedAgent: resolvedSelectedAgent,
     selectedAgentId,
     sessionActive: status === 'ready' || status === 'prompting',
   });
@@ -230,7 +221,7 @@ export function useChatSession({
 
   const adapterDisplayName = resolvedSelectedAgent?.name || '';
   const agentOptions = useMemo(
-    () => buildAgentOptions(availableAgents, pinnedAgentSnapshotRef.current, pinnedAgentId).map((option) => (
+    () => buildAgentOptions(availableAgents, pinnedAgentSnapshotRef.current, selectedAgentId).map((option) => (
       option.id === selectedAgentId
         ? {
             ...option,
@@ -242,7 +233,7 @@ export function useChatSession({
           }
         : option
     )),
-    [availableAgents, availableModels, pinnedAgentId, selectedAgentId]
+    [availableAgents, availableModels, selectedAgentId]
   );
   const modeOptions = useMemo(
     () => buildModeOptions(availableModes, selectedModeId),
@@ -258,7 +249,6 @@ export function useChatSession({
     const startedAt = startTimeRef.current ?? Date.now();
     pendingPromptRef.current = null;
     setPermissionQueue([]);
-    statusRef.current = 'error';
     setStatus('error');
     setIsSending(false);
     markFlushUnscheduled();
@@ -353,13 +343,8 @@ export function useChatSession({
   // Drops the session back to its pre-start state. Every value the agent start records has to be
   // cleared together, so both reset paths go through here rather than repeating the list.
   const resetSessionToNotStarted = useCallback(() => {
-    statusRef.current = 'not started';
     setStatus('not started');
     setAcpSessionId('');
-    startedAgentIdRef.current = '';
-    startedModelIdRef.current = '';
-    startedModeIdRef.current = '';
-    startedReasoningEffortIdRef.current = '';
   }, []);
 
   useEffect(() => {
@@ -386,13 +371,7 @@ export function useChatSession({
     }
 
     try {
-      startedAgentIdRef.current = selectedAgentId;
-      startedModelIdRef.current = modelIdForStart || '';
-      startedModeIdRef.current = selectedModeId || '';
-      startedReasoningEffortIdRef.current = selectedReasoningEffortId || '';
-
       clearBufferedChunks();
-      statusRef.current = 'initializing';
       setStatus('initializing');
       ACPBridge.startAgent(
         conversationId,
@@ -409,7 +388,7 @@ export function useChatSession({
       console.warn('[useChatSession] Failed to auto-start agent:', e);
       return false;
     }
-  }, [clearBufferedChunks, configValues, conversationId, failActivePromptLocally, historySession, modelIdForStart, requestRuntimeRecovery, selectedAgent, selectedAgentId, selectedModeId, selectedReasoningEffortId]);
+  }, [clearBufferedChunks, configValues, conversationId, failActivePromptLocally, historySession, requestRuntimeRecovery, selectedAgent, selectedAgentId]);
 
   // Restarts whatever backend work can bring the session back to 'ready' after it
   // broke, so a prompt does not have to wait for a session that nobody restarts.
@@ -421,7 +400,6 @@ export function useChatSession({
     // being sent; reloading it back into history would otherwise duplicate them.
     setLiveMessages((prev) => prev.slice(-2));
     clearBufferedChunks();
-    statusRef.current = 'initializing';
     setStatus('initializing');
     ACPBridge.loadHistoryConversation(
       conversationId,
@@ -462,7 +440,6 @@ export function useChatSession({
     const unsubStatus = ACPBridge.onStatus((e) => {
       if (e.detail.chatId !== conversationId) return;
       const s = e.detail.status;
-      statusRef.current = s;
       if (s === 'ready' && resetSessionAfterInitialCancelRef.current) {
         resetSessionAfterInitialCancelRef.current = false;
         resetSessionToNotStarted();
@@ -523,7 +500,6 @@ export function useChatSession({
 
     const unsubMode = ACPBridge.onMode((e) => {
       if (e.detail.chatId !== conversationId) return;
-      startedModeIdRef.current = e.detail.modeId;
       if (!isQueuedPromptRef.current) handleReportedModeChange(e.detail.modeId);
     });
 
@@ -590,11 +566,6 @@ export function useChatSession({
     setLiveMessages([]);
     setStatus('initializing');
     setIsHistoryReplaying(true);
-
-    startedAgentIdRef.current = historySession.adapterName;
-    startedModelIdRef.current = historySession.modelId || '';
-    startedModeIdRef.current = historySession.modeId || '';
-    startedReasoningEffortIdRef.current = '';
 
     if (historyLoadTimerRef.current !== null) {
       window.clearTimeout(historyLoadTimerRef.current);
@@ -763,7 +734,6 @@ export function useChatSession({
     reorderQueuedPrompt,
     sendQueuedPromptNow,
   } = usePromptQueue({
-    enabled: true,
     canDrain: canDrainQueuedPrompts,
     canPreempt: canPreemptQueuedPrompts,
     onDrain: handleDrainQueuedPrompt,
