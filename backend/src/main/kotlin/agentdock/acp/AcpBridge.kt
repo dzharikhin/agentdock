@@ -4,6 +4,7 @@ import agentdock.bridge.BridgeHost
 import agentdock.utils.jsCallback
 import com.intellij.openapi.application.ApplicationManager
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.sync.Mutex
@@ -31,6 +32,11 @@ class AcpBridge(
     @Volatile internal var fileSearchJob: Job? = null
     /** Runs undo requests one at a time, so two requests never restore the same file at once. */
     internal val undoMutex = Mutex()
+    /**
+     * Runs change-state reads and writes one at a time, in the order they arrived: each write
+     * rewrites the whole saved state, so two at once would lose one of them.
+     */
+    internal val changesStateDispatcher = Dispatchers.IO.limitedParallelism(1)
 
     internal val promptJobs = ConcurrentHashMap<String, Job>()
     internal val lastStatusByChatId = ConcurrentHashMap<String, String>()
@@ -57,11 +63,11 @@ class AcpBridge(
     internal val historyReplayCaptures = ConcurrentHashMap<String, HistoryReplayCapture>()
     internal val historyLoadMutexes = ConcurrentHashMap<String, HistoryLoadMutexEntry>()
     internal val replayFreshnessProbes = ConcurrentHashMap<String, ReplayFreshnessProbe>()
-    internal val suppressReplayForChatIds: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
-    internal val todoToolCallKeys: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
+    internal val suppressReplayForChatIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    internal val todoToolCallKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
     // Tool calls whose output is never truncated; updates often omit the kind that identifies them.
-    internal val fullOutputToolCallKeys: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
-    internal val emittedTodoPlanKeys: MutableSet<String> = ConcurrentHashMap.newKeySet<String>()
+    internal val fullOutputToolCallKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    internal val emittedTodoPlanKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     internal val cli = AcpBridgeCli(service.project, host::openTerminal)
 

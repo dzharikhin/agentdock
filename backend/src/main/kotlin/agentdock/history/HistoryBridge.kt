@@ -9,8 +9,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
@@ -73,7 +71,7 @@ class HistoryBridge(
         val defaultProjectPath = project.basePath ?: System.getProperty("user.dir")
         val canonicalProjectPath = canonicalHistoryProjectPath(defaultProjectPath)
 
-        scope.launch(start = CoroutineStart.UNDISPATCHED) {
+        scope.launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
             HistorySyncService.backgroundSyncCompletions.collect { projectPath ->
                 if (projectPath != canonicalProjectPath) return@collect
                 try {

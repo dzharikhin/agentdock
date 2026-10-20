@@ -84,51 +84,57 @@ internal fun AcpBridge.installFileChangeQueries() {
     }
 
     host.register("processFile") { payload ->
-        runCatching {
-            val obj = Json.parseToJsonElement(payload).jsonObject
-            val sessionId = obj["sessionId"]?.jsonPrimitive?.content ?: ""
-            val adapterName = obj["adapterName"]?.jsonPrimitive?.content ?: ""
-            val filePath = obj["filePath"]?.jsonPrimitive?.content ?: ""
-            val toolCallIds = obj["toolCallIds"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-            if (sessionId.isNotEmpty() && adapterName.isNotEmpty() && filePath.isNotEmpty() && toolCallIds.isNotEmpty()) {
-                ChangesStateService.markFileProcessed(
-                    service.project.basePath.orEmpty(),
-                    sessionId,
-                    adapterName,
-                    filePath,
-                    toolCallIds
-                )
+        scope.launch(changesStateDispatcher) {
+            runCatching {
+                val obj = Json.parseToJsonElement(payload).jsonObject
+                val sessionId = obj["sessionId"]?.jsonPrimitive?.content ?: ""
+                val adapterName = obj["adapterName"]?.jsonPrimitive?.content ?: ""
+                val filePath = obj["filePath"]?.jsonPrimitive?.content ?: ""
+                val toolCallIds = obj["toolCallIds"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+                if (sessionId.isNotEmpty() && adapterName.isNotEmpty() && filePath.isNotEmpty() && toolCallIds.isNotEmpty()) {
+                    ChangesStateService.markFileProcessed(
+                        service.project.basePath.orEmpty(),
+                        sessionId,
+                        adapterName,
+                        filePath,
+                        toolCallIds
+                    )
+                }
             }
         }
     }
 
     host.register("keepAll") { payload ->
-        runCatching {
-            val obj = Json.parseToJsonElement(payload).jsonObject
-            val sessionId = obj["sessionId"]?.jsonPrimitive?.content ?: ""
-            val adapterName = obj["adapterName"]?.jsonPrimitive?.content ?: ""
-            val toolCallIds = obj["toolCallIds"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
-            if (sessionId.isNotEmpty() && adapterName.isNotEmpty()) {
-                ChangesStateService.markAllProcessed(
-                    service.project.basePath.orEmpty(),
-                    sessionId,
-                    adapterName,
-                    toolCallIds
-                )
+        scope.launch(changesStateDispatcher) {
+            runCatching {
+                val obj = Json.parseToJsonElement(payload).jsonObject
+                val sessionId = obj["sessionId"]?.jsonPrimitive?.content ?: ""
+                val adapterName = obj["adapterName"]?.jsonPrimitive?.content ?: ""
+                val toolCallIds = obj["toolCallIds"]?.jsonArray?.mapNotNull { it.jsonPrimitive.contentOrNull }.orEmpty()
+                if (sessionId.isNotEmpty() && adapterName.isNotEmpty()) {
+                    ChangesStateService.markAllProcessed(
+                        service.project.basePath.orEmpty(),
+                        sessionId,
+                        adapterName,
+                        toolCallIds
+                    )
+                }
             }
         }
     }
 
     host.register("getChangesState") { payload ->
-        runCatching {
-            val obj = Json.parseToJsonElement(payload).jsonObject
-            val chatId = obj["chatId"]?.jsonPrimitive?.content ?: ""
-            val sessionId = obj["sessionId"]?.jsonPrimitive?.content ?: ""
-            val adapterName = obj["adapterName"]?.jsonPrimitive?.content ?: ""
-            if (chatId.isNotEmpty() && sessionId.isNotEmpty() && adapterName.isNotEmpty()) {
-                val state = ChangesStateService.loadState(service.project.basePath.orEmpty(), sessionId, adapterName)
-                val hasPluginEdits = state != null
-                pushChangesState(chatId, state ?: ChangesState(sessionId, adapterName), hasPluginEdits)
+        scope.launch(changesStateDispatcher) {
+            runCatching {
+                val obj = Json.parseToJsonElement(payload).jsonObject
+                val chatId = obj["chatId"]?.jsonPrimitive?.content ?: ""
+                val sessionId = obj["sessionId"]?.jsonPrimitive?.content ?: ""
+                val adapterName = obj["adapterName"]?.jsonPrimitive?.content ?: ""
+                if (chatId.isNotEmpty() && sessionId.isNotEmpty() && adapterName.isNotEmpty()) {
+                    val state = ChangesStateService.loadState(service.project.basePath.orEmpty(), sessionId, adapterName)
+                    val hasPluginEdits = state != null
+                    pushChangesState(chatId, state ?: ChangesState(sessionId, adapterName), hasPluginEdits)
+                }
             }
         }
     }
@@ -140,7 +146,7 @@ internal fun AcpBridge.installFileChangeQueries() {
             Json.parseToJsonElement(payload).jsonObject["requestId"]?.jsonPrimitive?.content
         }.getOrNull().orEmpty()
 
-        if (requestId.isNotBlank()) {
+        if (requestId.isNotBlank()) scope.launch(Dispatchers.IO) {
             val files = runCatching {
                 adapterJson.decodeFromString<FileChangeStatsRequestPayload>(payload).files.mapNotNull { file ->
                     val operations = file.operations.map { UndoOperation(oldText = it.oldText, newText = it.newText) }

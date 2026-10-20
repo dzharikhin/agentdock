@@ -11,6 +11,7 @@ import agentdock.settings.AudioTranscriptionSettings
 import agentdock.settings.StopRecordingRequest
 import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
+import com.intellij.openapi.application.ApplicationManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.CoroutineScope
@@ -20,7 +21,6 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -217,11 +217,10 @@ internal class AudioInputBridge(
                 }
                 return@register
             }
-            val startCompletion = pendingStart
             launchTranscription(requestId, ownerId) {
-                if (startCompletion != null) {
-                    startCompletion.join()
-                    if (startCompletion.isCancelled || !AudioCaptureManager.isRecording(ownerId)) {
+                if (pendingStart != null) {
+                    pendingStart.join()
+                    if (pendingStart.isCancelled ||!AudioCaptureManager.isRecording(ownerId)) {
                         return@launchTranscription AudioTranscriptionResultPayload(
                             requestId = requestId,
                             success = false,
@@ -241,8 +240,11 @@ internal class AudioInputBridge(
         recordingStartJobs.clear()
         transcriptionJobs.values.forEach { it.cancel() }
         transcriptionJobs.clear()
-        owners.forEach { ownerId ->
-            AudioCaptureManager.cancelRecording(ownerId)
+        // Stopping waits for the writer thread, so it is kept off the EDT that disposes the bridge.
+        ApplicationManager.getApplication().executeOnPooledThread {
+            owners.forEach { ownerId ->
+                AudioCaptureManager.cancelRecording(ownerId)
+            }
         }
         recordingOwners.clear()
     }
