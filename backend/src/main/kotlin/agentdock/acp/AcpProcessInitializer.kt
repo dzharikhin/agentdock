@@ -95,7 +95,7 @@ private suspend fun AcpClientService.initializeSharedProcessWithinBudget(
         } catch (error: Exception) {
             if (error is CancellationException) throw error
             lastError = error
-            if (attempt == ACP_INITIALIZE_MAX_ATTEMPTS) break
+            if (attempt == ACP_INITIALIZE_MAX_ATTEMPTS || sharedProcess.retired) break
             delay(ACP_INITIALIZE_RETRY_DELAY)
         }
     }
@@ -136,7 +136,7 @@ private suspend fun AcpClientService.initializeFreshProcessAttempt(
         }
 
         val process = withContext(Dispatchers.IO) {
-            commandLine.createProcess().also { sharedProcess.process = it }
+            commandLine.createProcess().also { sharedProcess.attachProcess(it) }
         }
         AcpProcessRegistry.registerProcess(adapterInfo.id, adapterRoot, adapterInfo.isCustom, process)
         reportProgress("Opening ACP stdio transport... (attempt $attempt/$ACP_INITIALIZE_MAX_ATTEMPTS)")

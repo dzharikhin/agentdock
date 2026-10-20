@@ -158,7 +158,7 @@ internal fun AcpClientService.replaceSharedProcess(adapterName: String): AcpClie
 internal fun AcpClientService.teardownAdapterProcess(
     shared: AcpClientService.SharedProcess?
 ) {
-    runCatching { shared?.stop() }
+    runCatching { shared?.retire() }
 }
 
 internal fun AcpClientService.resetRuntime(restartDownloadedAdapters: Boolean) {

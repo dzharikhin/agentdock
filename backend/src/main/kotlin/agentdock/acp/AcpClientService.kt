@@ -220,8 +220,29 @@ class AcpClientService private constructor(val project: Project) {
         @Volatile var sessionUpdateWorker: Job? = null
         val configGeneration = AtomicLong(0)
 
+        /** Set once this object leaves [activeProcesses]; it must never start another process. */
+        @Volatile var retired: Boolean = false
+            private set
+
         fun markConfigMutated() {
             configGeneration.incrementAndGet()
+        }
+
+        /** Publishes a started process, or kills it when this object was retired meanwhile. */
+        fun attachProcess(newProcess: Process) {
+            synchronized(this) {
+                if (!retired) {
+                    process = newProcess
+                    return
+                }
+            }
+            AcpProcessUtils.destroyProcessTree(newProcess.toHandle())
+            throw IllegalStateException("The agent process was stopped during initialization.")
+        }
+
+        fun retire() {
+            synchronized(this) { retired = true }
+            stop()
         }
 
         fun stop() {
