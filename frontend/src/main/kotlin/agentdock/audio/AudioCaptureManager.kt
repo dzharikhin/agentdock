@@ -15,7 +15,8 @@ import javax.sound.sampled.DataLine
 import javax.sound.sampled.TargetDataLine
 
 object AudioCaptureManager {
-    private const val MAX_RECORDING_DURATION_MS = 2 * 60 * 1000L
+    // A safety net only: the UI stops and transcribes at two minutes, so this fires only when it cannot.
+    private const val MAX_RECORDING_DURATION_MS = (2 * 60 + 15) * 1000L
     private const val STALE_SESSION_AGE_MS = 10 * 60 * 1000L
     private const val WRITER_WAIT_TIMEOUT_MS = 2_000L
     private const val WRITER_INTERRUPT_GRACE_MS = 500L
@@ -324,7 +325,6 @@ object AudioCaptureManager {
         onStopped: ((String) -> Unit)?,
         error: Throwable,
     ) {
-        var notify = false
         synchronized(this) {
             if (!isCurrentRecording(ownerId, outputFile)) return
 
@@ -344,11 +344,8 @@ object AudioCaptureManager {
                 file.delete()
                 closeSessionIfIdle()
             }
-            notify = true
         }
-        if (notify) {
-            onStopped?.invoke(error.message?.takeIf(String::isNotBlank) ?: "Audio recording failed.")
-        }
+        onStopped?.invoke(error.message?.takeIf(String::isNotBlank) ?: "Audio recording failed.")
     }
 
     private fun waitForWriter(thread: Thread?): WriterWaitResult {

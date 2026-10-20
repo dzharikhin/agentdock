@@ -44,7 +44,7 @@ function ActiveVoiceInputButton({ conversationId, insertText }: VoiceInputButton
 
   return (
     <Tooltip variant="minimal" content={isRecording ? 'Stop recording' : 'Voice input'} className="h-full">
-      <button type="button" onClick={onRecord}
+      <button type="button" onClick={() => void onRecord()}
         className={`flex items-center h-full px-1.5 rounded appearance-none border-0 outline-none text-ide-small
           focus-visible:shadow-[0_0_0_1px_var(--ide-Button-default-focusColor)]
           ${recordClassName}`}
