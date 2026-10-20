@@ -7,12 +7,8 @@ import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import java.util.zip.ZipInputStream
@@ -23,13 +19,10 @@ object WhisperFeatureManager : AudioTranscriptionService {
     private const val WINDOWS_ARCHIVE_URL = "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.4/whisper-bin-x64.zip"
     private const val MODEL_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin?download=true"
     private const val MODEL_FILE_NAME = "ggml-base.bin"
-    private val httpClient by lazy {
-        HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.ALWAYS)
-            .connectTimeout(Duration.ofSeconds(30))
-            .build()
-    }
     private val runtimeLock = ReentrantReadWriteLock()
+
+    @Volatile
+    private var installCancelled = false
 
     private fun featureRoot(): File = File(AgentDockPaths.baseRuntimeDir(), "features/whisper")
     private fun runtimeRoot(): File = File(featureRoot(), "runtime")
@@ -91,12 +84,23 @@ object WhisperFeatureManager : AudioTranscriptionService {
         if (!isSupportedPlatform()) {
             throw IllegalStateException("Whisper runtime is currently supported only on 64-bit Windows.")
         }
+        installCancelled = false
         cleanupTemporaryArtifacts()
         featureRoot().mkdirs()
         modelRoot().mkdirs()
-        installWindowsRuntime()
-        downloadModel()
+        try {
+            installWindowsRuntime()
+            downloadModel()
+        } catch (error: Throwable) {
+            // A cancelled or failed installation leaves nothing behind, as uninstall would.
+            featureRoot().deleteRecursively()
+            throw error
+        }
         currentState(settings, installing = false)
+    }
+
+    override fun cancelInstall() {
+        installCancelled = true
     }
 
     override fun uninstall(
@@ -143,7 +147,7 @@ object WhisperFeatureManager : AudioTranscriptionService {
             if (language != "auto") {
                 args.addAll(listOf("-l", language))
             }
-            val (output, exitCode) = runCommand(args, timeoutMinutes = 5)
+            val (output, exitCode) = runCommand(args)
             if (exitCode != 0) {
                 throw IllegalStateException(output.ifBlank { "Whisper transcription failed." })
             }
@@ -217,13 +221,20 @@ object WhisperFeatureManager : AudioTranscriptionService {
         target.parentFile?.mkdirs()
         val tempFile = File(target.parentFile, "${target.name}.part")
         try {
-            val request = HttpRequest.newBuilder(URI.create(url)).GET().build()
-            val response = httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream())
-            response.body().use { input ->
-                if (response.statusCode() !in 200..299) {
-                    throw IllegalStateException("Download failed with HTTP ${response.statusCode()}")
+            val connection = URI(url).toURL().openConnection()
+            connection.connectTimeout = 30_000
+            // Unlike HttpClient's, this also bounds reads of the body, so a stalled transfer fails instead of hanging forever.
+            connection.readTimeout = 30_000
+            connection.getInputStream().use { input ->
+                tempFile.outputStream().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        check(!installCancelled) { "Whisper installation was cancelled." }
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                    }
                 }
-                Files.copy(input, tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
             }
             Files.move(tempFile.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
         } finally {
@@ -254,7 +265,7 @@ object WhisperFeatureManager : AudioTranscriptionService {
         }
     }
 
-    private fun runCommand(command: List<String>, timeoutMinutes: Long = 10): Pair<String, Int> {
+    private fun runCommand(command: List<String>): Pair<String, Int> {
         val process = ProcessBuilder(command)
             .redirectErrorStream(true)
             .start()
@@ -270,7 +281,7 @@ object WhisperFeatureManager : AudioTranscriptionService {
         readerThread.start()
 
         val finished = try {
-            process.waitFor(timeoutMinutes, TimeUnit.MINUTES)
+            process.waitFor(5, TimeUnit.MINUTES)
         } catch (interrupted: InterruptedException) {
             process.destroyForcibly()
             runCatching { readerThread.join(1000) }

@@ -74,6 +74,10 @@ internal class AudioInputBridge(
             }
         }
 
+        commands.register("cancelAudioTranscriptionFeatureInstall") { payload ->
+            selectedService(requestedSettings(payload))?.cancelInstall()
+        }
+
         commands.register("uninstallAudioTranscriptionFeature") { payload ->
             val settings = requestedSettings(payload)
             scope.launch(Dispatchers.IO) {

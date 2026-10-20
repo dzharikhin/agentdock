@@ -22,13 +22,16 @@ interface AudioTranscriptionService {
         settings: AudioTranscriptionSettings,
     ): AudioTranscriptionFeatureState = currentState(settings)
 
+    /** Makes a running [install] fail soon; it removes what it has written so far. */
+    fun cancelInstall() = Unit
+
     fun uninstall(
         settings: AudioTranscriptionSettings,
     ): AudioTranscriptionFeatureState = currentState(settings)
 }
 
 object AudioTranscriptionServices {
-    private val services = mapOf<String, () -> AudioTranscriptionService>(
+    private val services = mapOf(
         AudioTranscriptionProviders.GPT_TRANSCRIBER to { GptTranscriber },
         AudioTranscriptionProviders.GEMINI_TRANSCRIBER to { GeminiTranscriber },
         AudioTranscriptionProviders.WHISPER to { WhisperFeatureManager },

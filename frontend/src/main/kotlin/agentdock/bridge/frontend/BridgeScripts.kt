@@ -108,6 +108,7 @@ internal object BridgeScripts {
             // Answered by the client itself - see FrontendCommands.
             window.__loadAudioTranscriptionFeature = function(payload) { invoke('loadAudioTranscriptionFeature', payload || ''); };
             window.__installAudioTranscriptionFeature = function(payload) { invoke('installAudioTranscriptionFeature', payload || ''); };
+            window.__cancelAudioTranscriptionFeatureInstall = function(payload) { invoke('cancelAudioTranscriptionFeatureInstall', payload || ''); };
             window.__uninstallAudioTranscriptionFeature = function(payload) { invoke('uninstallAudioTranscriptionFeature', payload || ''); };
             window.__startAudioRecording = function(ownerId) { invoke('startAudioRecording', ownerId || ''); };
             window.__stopAudioRecording = function(payload) { invoke('stopAudioRecording', payload); };

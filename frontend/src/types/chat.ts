@@ -709,6 +709,7 @@ declare global {
     __saveSystemInstructions?: (json: string) => void;
     __loadAudioTranscriptionFeature?: (payload?: string) => void;
     __installAudioTranscriptionFeature?: (payload?: string) => void;
+    __cancelAudioTranscriptionFeatureInstall?: (payload?: string) => void;
     __uninstallAudioTranscriptionFeature?: (payload?: string) => void;
     __onAudioTranscriptionFeature?: (state: AudioTranscriptionFeatureState) => void;
     __onAudioTranscriptionResult?: (payload: AudioTranscriptionResultPayload) => void;

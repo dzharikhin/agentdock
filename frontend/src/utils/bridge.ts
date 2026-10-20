@@ -689,6 +689,10 @@ export const ACPBridge = {
     window.__installAudioTranscriptionFeature?.(JSON.stringify(settings));
   },
 
+  cancelAudioTranscriptionFeatureInstall: (settings: AudioTranscriptionSettings) => {
+    window.__cancelAudioTranscriptionFeatureInstall?.(JSON.stringify(settings));
+  },
+
   uninstallAudioTranscriptionFeature: (settings: AudioTranscriptionSettings) => {
     window.__uninstallAudioTranscriptionFeature?.(JSON.stringify(settings));
   },

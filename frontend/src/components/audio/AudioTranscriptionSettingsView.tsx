@@ -179,7 +179,7 @@ export function AudioTranscriptionSettingsView({
             </SettingsField>
 
             {activeFeature.installable && activeFeature.supported && (
-              <div>
+              <div className='flex gap-2'>
                 <Button
                   onClick={handleAudioInputAction}
                   disabled={activeFeature.installing}
@@ -188,6 +188,15 @@ export function AudioTranscriptionSettingsView({
                 >
                   {actionLabel}
                 </Button>
+                {/* Uninstalling also reports `installing`, but only an installation can be cancelled. */}
+                {activeFeature.installing && !activeFeature.installed && (
+                  <Button
+                    onClick={() => ACPBridge.cancelAudioTranscriptionFeatureInstall(settings)}
+                    variant='accentOutline'
+                  >
+                    Cancel
+                  </Button>
+                )}
               </div>
             )}
           </>
