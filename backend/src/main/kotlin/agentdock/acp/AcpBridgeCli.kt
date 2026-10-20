@@ -244,7 +244,9 @@ internal fun toShellCommand(
     }
 }
 
-internal fun quotePowerShellArg(value: String): String = "'" + value.replace("'", "''") + "'"
+/** PowerShell also ends a single-quoted string at the typographic quotes `‘ ’ ‚ ‛`, so they are doubled too. */
+internal fun quotePowerShellArg(value: String): String =
+    "'" + value.replace(Regex("['‘’‚‛]")) { it.value.repeat(2) } + "'"
 
 internal fun quoteCmdArg(value: String): String {
     if (value.isEmpty()) return "\"\""

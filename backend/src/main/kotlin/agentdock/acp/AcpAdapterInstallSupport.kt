@@ -81,7 +81,7 @@ internal fun downloadArchiveDistribution(
                     "-NoProfile",
                     "-NonInteractive",
                     "-Command",
-                    "\$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri '$downloadUrl' -OutFile '${tempFile.absolutePath}'"
+                    "\$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri ${quotePowerShellArg(downloadUrl)} -OutFile ${quotePowerShellArg(tempFile.absolutePath)}"
                 ),
                 statusCallback,
                 cancellation
