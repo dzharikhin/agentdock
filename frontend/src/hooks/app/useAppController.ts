@@ -94,6 +94,8 @@ export function useAppController() {
   chatsRef.current = chats;
   const activeTabIdRef = useRef(activeTabId);
   activeTabIdRef.current = activeTabId;
+  const tabSessionStateRef = useRef(tabSessionState);
+  tabSessionStateRef.current = tabSessionState;
 
   const activateChat = useCallback((id: string) => {
     setActiveSection(null);
@@ -224,25 +226,6 @@ export function useAppController() {
       if (toClose.length > 0) removeTabs(toClose);
     });
   }, [removeTabs]);
-
-  useEffect(() => {
-    return ACPBridge.onAdapterDeleted((e) => {
-      const deletedId = e.detail.adapterId;
-      setChats(prev => {
-        const toClose = prev.filter(tab => {
-          if (tab.closed) return false;
-          const currentAdapter = tabSessionState[tab.id]?.adapterName;
-          return currentAdapter ? currentAdapter === deletedId : tab.agentId === deletedId;
-        });
-        if (toClose.length === 0) return prev;
-        toClose.forEach(tab => {
-          try { window.__stopAgent?.(tab.conversationId); } catch (_) {}
-          cleanupTabUi(tab.id);
-        });
-        return prev.filter(tab => !toClose.some(c => c.id === tab.id));
-      });
-    });
-  }, [cleanupTabUi, tabSessionState]);
 
   const runnableAgents = useMemo(() => availableAgents.filter(isAgentRunnable), [availableAgents]);
   const pendingAgentName = pendingAgentSwitch
@@ -490,22 +473,23 @@ export function useAppController() {
     setPendingCloseTabIds(null);
   };
 
-  const tabUsesAdapter = (tab: ChatTab, adapterId: string) =>
-    !tab.closed && (tabSessionState[tab.id]?.adapterName || tab.agentId) === adapterId;
+  const tabUsesAdapter = useCallback((tab: ChatTab, adapterId: string) => (
+    !tab.closed && (tabSessionStateRef.current[tab.id]?.adapterName || tab.agentId) === adapterId
+  ), []);
 
   const hasOpenConversationsForAdapter = (adapterId: string) =>
     tabs.some((tab) => tabUsesAdapter(tab, adapterId));
 
+  /** Stops and closes the open chats of the adapter. */
+  const closeAdapterTabs = useCallback((adapterId: string) => {
+    closeTabs(chatsRef.current.filter((tab) => tabUsesAdapter(tab, adapterId)).map((tab) => tab.id));
+  }, [closeTabs, tabUsesAdapter]);
+
+  useEffect(() => ACPBridge.onAdapterDeleted((e) => closeAdapterTabs(e.detail.adapterId)), [closeAdapterTabs]);
+
   const handleUpdateAgent = (adapterId: string) => {
     if (typeof window.__updateAgent !== 'function') return;
-
-    const currentTabs = chatsRef.current;
-    currentTabs.filter((tab) => tabUsesAdapter(tab, adapterId)).forEach((tab) => {
-      try { window.__stopAgent?.(tab.conversationId); } catch (_) {}
-      cleanupTabUi(tab.id);
-    });
-    setChats(currentTabs.filter((tab) => !tabUsesAdapter(tab, adapterId)));
-
+    closeAdapterTabs(adapterId);
     window.__updateAgent(adapterId);
   };
 
