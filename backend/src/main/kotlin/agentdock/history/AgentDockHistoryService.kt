@@ -57,7 +57,7 @@ object AgentDockHistoryService {
     }
 
     fun loadConversationReplay(projectPath: String?, conversationId: String?): ConversationReplayData? {
-        synchronized(this) {
+        synchronized(HistoryConversationIndexService) {
             val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
             val cleanConversationId = runCatching {
                 HistoryStorage.requireSafeConversationId(conversationId.orEmpty())
@@ -76,7 +76,7 @@ object AgentDockHistoryService {
     }
 
     fun saveConversationReplay(projectPath: String?, conversationId: String, data: ConversationReplayData): Boolean {
-        synchronized(this) {
+        synchronized(HistoryConversationIndexService) {
             val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
             val cleanConversationId = runCatching {
                 HistoryStorage.requireSafeConversationId(conversationId)
@@ -110,7 +110,7 @@ object AgentDockHistoryService {
         assistantMeta: ConversationAssistantMetadata? = null,
         forkBase: ForkConversationBase? = null
     ): Boolean {
-        synchronized(this) {
+        synchronized(HistoryConversationIndexService) {
             val cleanProjectPath = canonicalHistoryProjectPath(projectPath)
             val cleanConversationId = runCatching {
                 HistoryStorage.requireSafeConversationId(conversationId)
@@ -177,7 +177,7 @@ object AgentDockHistoryService {
         adapterName: String,
         update: (MutableList<JsonObject>) -> Unit
     ) {
-        synchronized(this) {
+        synchronized(HistoryConversationIndexService) {
             val current = loadConversationReplay(projectPath, conversationId) ?: return
             val session = current.sessions.lastOrNull() ?: return
             if (session.sessionId != sessionId || session.adapterName != adapterName) return

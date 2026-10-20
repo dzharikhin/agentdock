@@ -3,6 +3,10 @@ package agentdock.history
 import agentdock.utils.atomicWriteText
 import java.time.Instant
 
+/**
+ * Every read-modify-write of a project's index or conversation files holds this object's monitor, which its
+ * `@Synchronized` methods use; otherwise a writer working from an older read overwrites the others' changes.
+ */
 internal object HistoryConversationIndexService {
     @Synchronized
     fun upsertRuntimeSessionMetadata(

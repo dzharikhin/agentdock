@@ -40,24 +40,26 @@ internal object HistorySessionChangesStore {
     ): Boolean {
         if (projectPath.isBlank()) return false
 
-        val indexFile = HistoryStorage.ensureProjectIndexFile(projectPath)
-        val synced = HistoryStorage.readProjectIndex(indexFile)
+        synchronized(HistoryConversationIndexService) {
+            val indexFile = HistoryStorage.ensureProjectIndexFile(projectPath)
+            val synced = HistoryStorage.readProjectIndex(indexFile)
 
-        var updated = false
-        val rewritten = synced.map { conversation ->
-            val sessions = conversation.sessions.map { session ->
-                if (session.sessionId == sessionId && session.adapterName == adapterName) {
-                    updated = true
-                    transform(session)
-                } else {
-                    session
+            var updated = false
+            val rewritten = synced.map { conversation ->
+                val sessions = conversation.sessions.map { session ->
+                    if (session.sessionId == sessionId && session.adapterName == adapterName) {
+                        updated = true
+                        transform(session)
+                    } else {
+                        session
+                    }
                 }
+                conversation.copy(sessions = sessions)
             }
-            conversation.copy(sessions = sessions)
-        }
 
-        if (!updated) return false
-        HistoryStorage.writeProjectIndex(indexFile, rewritten)
-        return true
+            if (!updated) return false
+            HistoryStorage.writeProjectIndex(indexFile, rewritten)
+            return true
+        }
     }
 }

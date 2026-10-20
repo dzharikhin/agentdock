@@ -17,38 +17,45 @@ internal object HistoryDeletionService {
         if (conversationIds.isEmpty()) return DeleteConversationsResult(success = true)
 
         val indexFile = HistoryStorage.ensureProjectIndexFile(cleanProjectPath)
-        val existing = HistoryStorage.readProjectIndex(indexFile)
         val targetIds = conversationIds.mapNotNull { id ->
             runCatching { HistoryStorage.requireSafeConversationId(id) }.getOrNull()
         }.toSet()
-        val kept = mutableListOf<HistoryConversationIndexEntry>()
+        // Deleting the agents' session files can be slow, so the index is re-read under its lock only afterwards.
+        val deletedSessions = HistoryStorage.readProjectIndex(indexFile)
+            .filter { it.id in targetIds }
+            .flatMap { it.sessions }
+            .filter { session -> deleteSessionArtifacts(cleanProjectPath, session) }
+            .mapTo(hashSetOf()) { it.adapterName to it.sessionId }
         val failures = mutableListOf<DeleteConversationFailure>()
 
-        existing.forEach { conversation ->
-            if (conversation.id !in targetIds) {
-                kept.add(conversation)
-                return@forEach
-            }
+        synchronized(HistoryConversationIndexService) {
+            val kept = mutableListOf<HistoryConversationIndexEntry>()
+            HistoryStorage.readProjectIndex(indexFile).forEach { conversation ->
+                if (conversation.id !in targetIds) {
+                    kept.add(conversation)
+                    return@forEach
+                }
 
-            val remainingSessions = conversation.sessions.filterNot { session ->
-                deleteSessionArtifacts(cleanProjectPath, session)
-            }
+                val remainingSessions = conversation.sessions.filterNot { session ->
+                    (session.adapterName to session.sessionId) in deletedSessions
+                }
 
-            if (remainingSessions.isNotEmpty()) {
-                kept.add(conversation.copy(sessions = remainingSessions))
-                failures.add(
-                    DeleteConversationFailure(
-                        conversationId = conversation.id,
-                        message = buildDeleteFailureMessage(remainingSessions)
+                if (remainingSessions.isNotEmpty()) {
+                    kept.add(conversation.copy(sessions = remainingSessions))
+                    failures.add(
+                        DeleteConversationFailure(
+                            conversationId = conversation.id,
+                            message = buildDeleteFailureMessage(remainingSessions)
+                        )
                     )
-                )
-            } else {
-                HistoryReplayStore.deleteConversationReplay(cleanProjectPath, conversation.id)
-                deleteConversationTranscript(cleanProjectPath, conversation)
+                } else {
+                    HistoryReplayStore.deleteConversationReplay(cleanProjectPath, conversation.id)
+                    deleteConversationTranscript(cleanProjectPath, conversation)
+                }
             }
-        }
 
-        HistoryStorage.writeProjectIndex(indexFile, kept)
+            HistoryStorage.writeProjectIndex(indexFile, kept)
+        }
         return DeleteConversationsResult(
             success = failures.isEmpty(),
             failures = failures
@@ -87,28 +94,30 @@ internal object HistoryDeletionService {
 
         val deletedArtifacts = deleteSessionArtifacts(cleanProjectPath, sessionEntry)
 
-        val indexFile = HistoryStorage.ensureProjectIndexFile(cleanProjectPath)
-        val existing = HistoryStorage.readProjectIndex(indexFile)
-        var indexChanged = false
-        val rewritten = existing.mapNotNull { conversation ->
-            val remainingSessions = conversation.sessions.filterNot {
-                it.sessionId == cleanSessionId && it.adapterName == cleanAdapterName
+        synchronized(HistoryConversationIndexService) {
+            val indexFile = HistoryStorage.ensureProjectIndexFile(cleanProjectPath)
+            val existing = HistoryStorage.readProjectIndex(indexFile)
+            var indexChanged = false
+            val rewritten = existing.mapNotNull { conversation ->
+                val remainingSessions = conversation.sessions.filterNot {
+                    it.sessionId == cleanSessionId && it.adapterName == cleanAdapterName
+                }
+                if (remainingSessions.size == conversation.sessions.size) {
+                    return@mapNotNull conversation
+                }
+                indexChanged = true
+                if (remainingSessions.isEmpty()) {
+                    HistoryReplayStore.deleteConversationReplay(cleanProjectPath, conversation.id)
+                    deleteConversationTranscript(cleanProjectPath, conversation)
+                    null
+                } else {
+                    conversation.copy(sessions = remainingSessions)
+                }
             }
-            if (remainingSessions.size == conversation.sessions.size) {
-                return@mapNotNull conversation
-            }
-            indexChanged = true
-            if (remainingSessions.isEmpty()) {
-                HistoryReplayStore.deleteConversationReplay(cleanProjectPath, conversation.id)
-                deleteConversationTranscript(cleanProjectPath, conversation)
-                null
-            } else {
-                conversation.copy(sessions = remainingSessions)
-            }
-        }
 
-        if (indexChanged) {
-            HistoryStorage.writeProjectIndex(indexFile, rewritten)
+            if (indexChanged) {
+                HistoryStorage.writeProjectIndex(indexFile, rewritten)
+            }
         }
 
         return deletedArtifacts

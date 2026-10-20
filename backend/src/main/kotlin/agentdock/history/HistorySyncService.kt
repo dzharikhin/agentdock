@@ -100,12 +100,22 @@ internal object HistorySyncService {
     }
 
     private suspend fun syncProjectIndexLocked(projectPath: String): List<HistoryConversationIndexEntry> {
+        // Listing can take up to SESSION_LIST_TIMEOUT, so the index is read only afterwards, under the index lock.
+        val availableSessionResult = collectSyncedAvailableSessionMeta(projectPath)
+        return synchronized(HistoryConversationIndexService) {
+            applyAvailableSessions(projectPath, availableSessionResult)
+        }
+    }
+
+    private fun applyAvailableSessions(
+        projectPath: String,
+        availableSessionResult: AvailableSessionMetaResult
+    ): List<HistoryConversationIndexEntry> {
         val indexFile = HistoryStorage.ensureProjectIndexFile(projectPath)
         val rawExisting = HistoryStorage.readProjectIndex(indexFile)
         val existing = rawExisting.filter { conversation ->
             runCatching { HistoryStorage.requireSafeConversationId(conversation.id) }.isSuccess
         }
-        val availableSessionResult = collectSyncedAvailableSessionMeta(projectPath)
         val availableSessions = availableSessionResult.sessions
         val scannedAdapters = availableSessionResult.scannedAdapters
 
