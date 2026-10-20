@@ -10,9 +10,7 @@ import com.intellij.psi.search.GlobalSearchScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import kotlinx.serialization.decodeFromString
 import agentdock.changes.AgentChangeCalculator
 import agentdock.changes.AgentDiffViewer
 import agentdock.changes.ChangesState
@@ -29,8 +27,7 @@ import java.io.File
 internal fun AcpBridge.installFileChangeQueries() {
     host.register("undoFile") { payload ->
         val request = runCatching {
-            val raw = payload
-            val obj = Json.parseToJsonElement(raw).jsonObject
+            val obj = Json.parseToJsonElement(payload).jsonObject
             UndoSingleFileRequest(
                 chatId = obj["chatId"]?.jsonPrimitive?.content ?: "",
                 filePath = obj["filePath"]?.jsonPrimitive?.content ?: "",
@@ -137,16 +134,15 @@ internal fun AcpBridge.installFileChangeQueries() {
     }
 
     host.register("computeFileChangeStats") { payload ->
-        val raw = payload
         // The id is read before anything that can fail, so a failure is still answered
         // instead of leaving the frontend request pending until its timeout.
         val requestId = runCatching {
-            Json.parseToJsonElement(raw).jsonObject["requestId"]?.jsonPrimitive?.content
+            Json.parseToJsonElement(payload).jsonObject["requestId"]?.jsonPrimitive?.content
         }.getOrNull().orEmpty()
 
         if (requestId.isNotBlank()) {
             val files = runCatching {
-                adapterJson.decodeFromString<FileChangeStatsRequestPayload>(raw).files.mapNotNull { file ->
+                adapterJson.decodeFromString<FileChangeStatsRequestPayload>(payload).files.mapNotNull { file ->
                     val operations = file.operations.map { UndoOperation(oldText = it.oldText, newText = it.newText) }
                     AgentChangeCalculator.computeFileStats(
                         project = service.project,
@@ -181,7 +177,7 @@ internal fun AcpBridge.installFileChangeQueries() {
                 )
             } ?: emptyList()
             if (filePath.isNotEmpty()) {
-                runOnEdt {
+                scope.launch(Dispatchers.IO) {
                     AgentDiffViewer.showAgentDiff(service.project, filePath, status, ops)
                 }
             }
@@ -196,7 +192,7 @@ internal fun AcpBridge.installMiscQueries() {
             ?: return@register
         val rawQuery = request.query.trim()
         fileSearchJob?.cancel()
-        fileSearchJob = scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        fileSearchJob = scope.launch(Dispatchers.IO) {
             val results = mutableListOf<RankedFileSearchItem>()
             val seenPaths = mutableSetOf<String>()
             val project = service.project
@@ -232,7 +228,7 @@ internal fun AcpBridge.installMiscQueries() {
 
             readAction {
                 // Priority 1: Open files
-                com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openFiles.forEach {
+                FileEditorManager.getInstance(project).openFiles.forEach {
                     if (results.size < 50) addCandidate(it)
                 }
 
@@ -242,10 +238,9 @@ internal fun AcpBridge.installMiscQueries() {
                 }
 
                 if (matcher != null && results.size < 50) {
-                    val activeMatcher = matcher
                     FilenameIndex.processAllFileNames({ fileName ->
                         if (results.size >= FILE_SEARCH_MAX_CANDIDATES) return@processAllFileNames false
-                        if (!activeMatcher.matches(fileName)) return@processAllFileNames true
+                        if (!matcher.matches(fileName)) return@processAllFileNames true
 
                         FilenameIndex.getVirtualFilesByName(fileName, searchScope).forEach { virtualFile ->
                             if (results.size >= FILE_SEARCH_MAX_CANDIDATES) return@processAllFileNames false
@@ -309,7 +304,7 @@ internal fun AcpBridge.installMiscQueries() {
                         val base64 = if (canInline && size < 2 * 1024 * 1024) {
                             try {
                                 java.util.Base64.getEncoder().encodeToString(ioFile.readBytes())
-                            } catch (e: Exception) {
+                            } catch (_: Exception) {
                                 null
                             }
                         } else {

@@ -4,10 +4,14 @@ import com.github.difflib.DiffUtils
 import com.intellij.diff.DiffContentFactory
 import com.intellij.diff.DiffManager
 import com.intellij.diff.requests.SimpleDiffRequest
+import com.intellij.openapi.application.EDT
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.fileTypes.FileTypes
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
@@ -58,11 +62,11 @@ object AgentDiffViewer {
         if (agentChanges.any { agent -> userChanges.any { user -> overlaps(agent, user) } }) return null
 
         val merged = base.toMutableList()
-        for (change in (userChanges + agentChanges).sortedWith(
+        for ((position, sourceSize, target) in (userChanges + agentChanges).sortedWith(
             compareByDescending<LineChange> { it.position }.thenByDescending { it.sourceSize }
         )) {
-            merged.subList(change.position, change.position + change.sourceSize).clear()
-            merged.addAll(change.position, change.target)
+            merged.subList(position, position + sourceSize).clear()
+            merged.addAll(position, target)
         }
         return merged.joinToString("\n")
     }
@@ -80,9 +84,9 @@ object AgentDiffViewer {
 
     /**
      * Show agent diff (before vs after) in IDE diff viewer.
-     * NOTE: Must be called on EDT (callers use runOnEdt).
+     * Reads the file and rebuilds its content off the EDT; only the diff window is opened there.
      */
-    fun showAgentDiff(
+    suspend fun showAgentDiff(
         project: Project,
         filePath: String,
         status: String,
@@ -96,18 +100,22 @@ object AgentDiffViewer {
             val vf = LocalFileSystem.getInstance().refreshAndFindFileByIoFile(file)
             val snapshot = AgentChangeCalculator.buildSnapshot(project, filePath, status, operations) ?: return
 
-            val fileName = file.name
-            val fileType = (if (vf != null && vf.exists()) vf.fileType else null)?.takeIf { it != FileTypes.UNKNOWN }
-                ?: FileTypeManager.getInstance().getFileTypeByFileName(fileName)
+            withContext(Dispatchers.EDT) {
+                val fileName = file.name
+                val fileType = (if (vf != null && vf.exists()) vf.fileType else null)?.takeIf { it != FileTypes.UNKNOWN }
+                    ?: FileTypeManager.getInstance().getFileTypeByFileName(fileName)
 
-            val contentFactory = DiffContentFactory.getInstance()
-            val leftContent = contentFactory.create(project, snapshot.beforeContent, fileType)
-            val rightContent = contentFactory.create(project, snapshot.afterContent, fileType)
-            val leftTitle = if (status == "A") "(empty)" else "Before (agent edit)"
-            val rightTitle = "After (agent edit)"
-            val request = SimpleDiffRequest("Agent changes: $fileName", leftContent, rightContent, leftTitle, rightTitle)
-            DiffManager.getInstance().showDiff(project, request)
-        } catch (e: Exception) {
+                val contentFactory = DiffContentFactory.getInstance()
+                val leftContent = contentFactory.create(project, snapshot.beforeContent, fileType)
+                val rightContent = contentFactory.create(project, snapshot.afterContent, fileType)
+                val leftTitle = if (status == "A") "(empty)" else "Before (agent edit)"
+                val rightTitle = "After (agent edit)"
+                val request = SimpleDiffRequest("Agent changes: $fileName", leftContent, rightContent, leftTitle, rightTitle)
+                DiffManager.getInstance().showDiff(project, request)
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
         }
     }
 }
