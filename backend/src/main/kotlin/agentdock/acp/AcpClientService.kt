@@ -558,9 +558,11 @@ internal suspend fun AcpClientService.markChatSessionBroken(chatId: String) {
 }
 
 internal sealed interface QueuedSessionUpdate {
+    val completed: CompletableDeferred<Unit>
+
     data class Notification(
         val notification: JsonRpcNotification,
-        val completed: CompletableDeferred<Unit>
+        override val completed: CompletableDeferred<Unit>
     ) : QueuedSessionUpdate
-    data class Barrier(val completed: CompletableDeferred<Unit>) : QueuedSessionUpdate
+    data class Barrier(override val completed: CompletableDeferred<Unit>) : QueuedSessionUpdate
 }

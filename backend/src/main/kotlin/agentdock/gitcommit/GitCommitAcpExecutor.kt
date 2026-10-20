@@ -65,7 +65,7 @@ internal class GitCommitAcpExecutor(
         val blockedPermissionTitles = ConcurrentLinkedQueue<String>()
 
         var ephemeralSessionId: String? = null
-        var session: ClientSession?
+        var session: ClientSession? = null
         val commitChatId = "git-commit:${UUID.randomUUID()}"
         try {
             val factory = object : ClientOperationsFactory {
@@ -91,35 +91,37 @@ internal class GitCommitAcpExecutor(
                 }
             }
 
-            session = client.newSession(
-                SessionCreationParameters(cwd = cwd, mcpServers = emptyList()),
-                factory
-            )
-            ephemeralSessionId = session.sessionId.value
-            AgentDockHistoryService.registerEphemeralSession(project.basePath, adapterInfo.id, ephemeralSessionId)
-
-            val metadata = runtimeMetadata ?: AcpClientService.AdapterRuntimeMetadata(emptyList())
-            val preferredValues = buildMap {
-                metadata.modelConfigId?.let { id -> selectedModelId?.let { put(id, it) } }
-                metadata.configOptions.findReasoningEffortOption()?.let { option ->
-                    config.reasoningEffortId.trim().takeIf(String::isNotEmpty)?.let { put(option.id, it) }
-                }
-            }
-            // The context is not registered as a chat, so applying options publishes nothing to the UI.
-            val context = acpService.createAgentContext(commitChatId).also {
-                it.session = session
-                it.sharedProcess = sharedProcess
-                it.sessionIdRef.set(session.sessionId.value)
-                it.runtimeMetadataRef.set(metadata)
-            }
-            if (!acpService.applySessionConfigOptions(context, adapterInfo.id, preferredValues)) {
-                error("Failed to apply session config options")
-            }
-
             val responseText = StringBuilder()
             try {
+                // Covers the session setup too: the SDK has no request timeout, and an agent without network
+                // access may never answer session/new or session/set_config_option.
                 withTimeout(GENERATION_TIMEOUT) {
-                    session.prompt(listOf(ContentBlock.Text(prompt))).collect { event ->
+                    val newSession = client.newSession(
+                        SessionCreationParameters(cwd = cwd, mcpServers = emptyList()),
+                        factory
+                    ).also { session = it }
+                    ephemeralSessionId = newSession.sessionId.value
+                    AgentDockHistoryService.registerEphemeralSession(project.basePath, adapterInfo.id, newSession.sessionId.value)
+
+                    val metadata = runtimeMetadata ?: AcpClientService.AdapterRuntimeMetadata(emptyList())
+                    val preferredValues = buildMap {
+                        metadata.modelConfigId?.let { id -> selectedModelId?.let { put(id, it) } }
+                        metadata.configOptions.findReasoningEffortOption()?.let { option ->
+                            config.reasoningEffortId.trim().takeIf(String::isNotEmpty)?.let { put(option.id, it) }
+                        }
+                    }
+                    // The context is not registered as a chat, so applying options publishes nothing to the UI.
+                    val context = acpService.createAgentContext(commitChatId).also {
+                        it.session = newSession
+                        it.sharedProcess = sharedProcess
+                        it.sessionIdRef.set(newSession.sessionId.value)
+                        it.runtimeMetadataRef.set(metadata)
+                    }
+                    if (!acpService.applySessionConfigOptions(context, adapterInfo.id, preferredValues)) {
+                        error("Failed to apply session config options")
+                    }
+
+                    newSession.prompt(listOf(ContentBlock.Text(prompt))).collect { event ->
                         if (event is Event.SessionUpdateEvent) {
                             appendVisibleAssistantText(responseText, event.update)
                         }
@@ -128,7 +130,7 @@ internal class GitCommitAcpExecutor(
                 }
             } catch (_: TimeoutCancellationException) {
                 withContext(NonCancellable) {
-                    runCatching { session.cancel() }
+                    runCatching { session?.cancel() }
                     runCatching { acpService.awaitPendingSessionUpdates(adapterInfo.id) }
                 }
                 error("Commit message generation timed out after 2 minutes. You can write the message manually.")

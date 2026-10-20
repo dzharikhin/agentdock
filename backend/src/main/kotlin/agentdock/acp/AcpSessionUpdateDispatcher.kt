@@ -42,7 +42,12 @@ internal fun AcpClientService.ensureAsyncSessionUpdates(sharedProcess: AcpClient
             sharedProcess.sessionUpdateScope = updateScope
             sharedProcess.sessionUpdateQueue = queue
             sharedProcess.sessionUpdateWorker = updateScope.launch {
-                for (entry in queue) dispatchQueuedSessionUpdate(entry, original)
+                try {
+                    for (entry in queue) dispatchQueuedSessionUpdate(entry, original)
+                } finally {
+                    // The queue is closed before this worker is cancelled, so nothing is enqueued after this drain.
+                    generateSequence { queue.tryReceive().getOrNull() }.forEach { it.completed.complete(Unit) }
+                }
             }
 
             val wrapped: suspend (JsonRpcNotification) -> Unit = { notification ->
