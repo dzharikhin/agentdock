@@ -4,6 +4,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeout
@@ -209,6 +210,9 @@ internal fun AcpBridge.installConversationQueries() {
                         }
                     }
                 } catch (e: kotlinx.coroutines.CancellationException) {
+                    // The bridges are torn down with their UI (a Split Mode reconnect or project
+                    // close), so this prompt never finishes: keep what was captured in history.
+                    if (!scope.isActive) runCatching { flushLivePromptCapture(chatId, captureId) }
                     if (service.status(chatId) == AcpClientService.Status.Error) {
                         pushStatus(chatId, "error")
                     } else {
