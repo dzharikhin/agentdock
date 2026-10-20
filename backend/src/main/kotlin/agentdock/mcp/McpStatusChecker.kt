@@ -1,5 +1,6 @@
 package agentdock.mcp
 
+import agentdock.acp.AcpProcessUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
@@ -112,7 +113,7 @@ object McpStatusChecker {
                 readInitializeResponse(process.inputStream, output)
             }
             readerExecutor.submit<Unit> {
-                readDiagnostics(process.errorStream, output, "stderr")
+                readDiagnostics(process.errorStream, output)
             }
 
             try {
@@ -161,14 +162,9 @@ object McpStatusChecker {
         } finally {
             runCatching { stdin.close() }
 
-            if (process.isAlive) {
-                process.destroy()
-
-                if (!process.waitFor(250, TimeUnit.MILLISECONDS)) {
-                    process.destroyForcibly()
-                    process.waitFor(1, TimeUnit.SECONDS)
-                }
-            }
+            // The tree is killed at once: launchers such as npx or cmd.exe do not take their
+            // children down, and once the parent is gone its children can no longer be found.
+            if (process.isAlive) AcpProcessUtils.destroyProcessTree(process.toHandle())
 
             readerExecutor.shutdownNow()
         }
@@ -207,14 +203,13 @@ object McpStatusChecker {
 
     private fun readDiagnostics(
         inputStream: InputStream,
-        output: ProcessOutputBuffer,
-        source: String
+        output: ProcessOutputBuffer
     ) {
         inputStream
             .bufferedReader(StandardCharsets.UTF_8)
             .useLines { lines ->
                 for (line in lines) {
-                    output.add(source, line)
+                    output.add("stderr", line)
                 }
             }
     }

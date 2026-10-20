@@ -5,8 +5,6 @@ import java.io.File
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import java.util.zip.ZipInputStream
@@ -115,13 +113,13 @@ internal fun downloadArchiveDistribution(
                 ProcessBuilder(
                     "sh",
                     "-c",
-                    """
+                    $$"""
                     set -e
-                    temp_file=${quoteUnixShellArg(tempFile.absolutePath)}
-                    first_entry=${'$'}(tar -tzf "${'$'}temp_file" | sed -n '1p')
-                    case "${'$'}first_entry" in
-                      */*) tar --strip-components=1 -xzf "${'$'}temp_file" -C ${quoteUnixShellArg(targetDir.absolutePath)} ;;
-                      *) tar -xzf "${'$'}temp_file" -C ${quoteUnixShellArg(targetDir.absolutePath)} ;;
+                    temp_file=$${quoteUnixShellArg(tempFile.absolutePath)}
+                    first_entry=$(tar -tzf "$temp_file" | sed -n '1p')
+                    case "$first_entry" in
+                      */*) tar --strip-components=1 -xzf "$temp_file" -C $${quoteUnixShellArg(targetDir.absolutePath)} ;;
+                      *) tar -xzf "$temp_file" -C $${quoteUnixShellArg(targetDir.absolutePath)} ;;
                     esac
                     """.trimIndent()
                 ),
@@ -309,7 +307,7 @@ private fun runArchiveCommand(
             cancellation?.throwIfCancelled()
             if (process.waitFor(250, TimeUnit.MILLISECONDS)) break
             if (System.nanoTime() >= deadlineNanos) {
-                process.destroyForcibly()
+                AcpProcessUtils.destroyProcessTree(process.toHandle())
                 outputDrainer.join(1000)
                 statusCallback?.invoke("Error: Command timed out")
                 return -1
