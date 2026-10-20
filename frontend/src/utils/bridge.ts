@@ -34,6 +34,7 @@ import {
   ConversationTranscriptSavedEvent,
   EVENT_NAMES,
   FileChangeStatsEvent,
+  FilesResultEvent,
   GlobalSettingsEvent,
   HistoryDeleteResultEvent,
   HistoryListEvent,
@@ -358,14 +359,8 @@ export const ACPBridge = {
       window.dispatchEvent(new CustomEvent('acp-theme-changed'));
     };
 
-    window.__onFilesResult = (filesJson) => {
-      let files = [];
-      try {
-        files = typeof filesJson === "string" ? JSON.parse(filesJson) : filesJson;
-      } catch (e) {
-        console.warn('[bridge] Failed to parse files result', e);
-      }
-      window.dispatchEvent(new CustomEvent("acp-files-result", { detail: { files } }));
+    window.__onFilesResult = (payload) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.FILES_RESULT, { detail: { payload } }));
     };
 
     if (window.__notifyReady) window.__notifyReady();
@@ -579,15 +574,14 @@ export const ACPBridge = {
 
   onConversationReplayLoaded: (callback: (e: CustomEvent<ConversationReplayLoadedEvent>) => void) => onBridgeEvent(EVENT_NAMES.CONVERSATION_REPLAY_LOADED, callback),
 
-  searchFiles: (query: string) => {
-    window.__searchFiles?.(query);
+  /** Starts a file search and returns its request ID, which the result carries. */
+  searchFiles: (query: string): string => {
+    const requestId = nextBridgeRequestId('file-search');
+    window.__searchFiles?.(JSON.stringify({ requestId, query }));
+    return requestId;
   },
 
-  onFilesResult: (callback: (e: CustomEvent<{ files: { path: string, name: string }[] }>) => void) => {
-    const fn = (e: Event) => callback(e as CustomEvent);
-    window.addEventListener('acp-files-result', fn);
-    return () => window.removeEventListener('acp-files-result', fn);
-  },
+  onFilesResult: (callback: (e: CustomEvent<FilesResultEvent>) => void) => onBridgeEvent(EVENT_NAMES.FILES_RESULT, callback),
 
   requestFileIcon: (path: string): Promise<string | null> => {
     const cached = fileIconCache.get(path);

@@ -411,6 +411,11 @@ export interface FileChangeStatsResultPayload {
   files: FileChangeStatsPayload[];
 }
 
+export interface FileSearchResultPayload {
+  requestId: string;
+  files: { path: string; name: string }[];
+}
+
 export interface ProcessedFileState {
   filePath: string;
   toolCallIds: string[];
@@ -680,8 +685,8 @@ declare global {
     __onMcpStatus?: (update: unknown) => void;
     __onCustomAcpConfigs?: (configs: unknown) => void;
     __onCustomAcpStatus?: (update: import('./customAcp').CustomAcpStatusUpdate) => void;
-    __onFilesResult?: (filesJson: unknown) => void;
-    __searchFiles?: (query: string) => void;
+    __onFilesResult?: (payload: FileSearchResultPayload) => void;
+    __searchFiles?: (payload: string) => void;
     __requestFileIcon?: (path: string) => void;
     __onFileIconResult?: (result: { path: string; icon: string }) => void;
     __readLocalImage?: (path: string) => void;

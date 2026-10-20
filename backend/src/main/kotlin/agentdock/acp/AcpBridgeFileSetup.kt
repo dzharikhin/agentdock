@@ -193,8 +193,11 @@ internal fun AcpBridge.installFileChangeQueries() {
 
 internal fun AcpBridge.installMiscQueries() {
     host.register("searchFiles") { payload ->
-        val rawQuery = payload.trim()
-        scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+        val request = runCatching { adapterJson.decodeFromString<FileSearchRequestPayload>(payload) }.getOrNull()
+            ?: return@register
+        val rawQuery = request.query.trim()
+        fileSearchJob?.cancel()
+        fileSearchJob = scope.launch(kotlinx.coroutines.Dispatchers.IO) {
             val results = mutableListOf<RankedFileSearchItem>()
             val seenPaths = mutableSetOf<String>()
             val project = service.project
@@ -271,8 +274,8 @@ internal fun AcpBridge.installMiscQueries() {
                     .map { it.item }
                     .take(50)
             }
-            val json = try { kotlinx.serialization.json.Json.encodeToString<List<FileSearchItem>>(list) } catch (e: Exception) { "[]" }
-            host.eval(jsCallback("__onFilesResult", json))
+            val json = adapterJson.encodeToString(FileSearchResultPayload(request.requestId, list))
+            host.eval(jsCallback("__onFilesResult", "JSON.parse(${json.jsStringLiteral()})"))
         }
     }
     host.register("openFile") { payload ->

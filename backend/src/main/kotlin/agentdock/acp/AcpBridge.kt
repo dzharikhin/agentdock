@@ -27,6 +27,8 @@ class AcpBridge(
     internal val scope: CoroutineScope
 ) {
     internal var fileIconProvider: FileIconProvider? = null
+    /** The running file search; a new one cancels it, as only the latest one is shown. */
+    @Volatile internal var fileSearchJob: Job? = null
 
     internal val promptJobs = ConcurrentHashMap<String, Job>()
     internal val lastStatusByChatId = ConcurrentHashMap<String, String>()

@@ -40,9 +40,9 @@ internal object AcpUsageDataFetcher {
 
     /**
      * Returns the adapter's usage JSON, or an empty string for adapters without usage data.
-     * A cached value younger than [maxAge] is returned without a request.
+     * A cached value younger than [maxAge] is returned without a request; an older one is passed to [onStale] first.
      */
-    fun fetchUsageData(adapterId: String, maxAge: Duration): String {
+    fun fetchUsageData(adapterId: String, maxAge: Duration, onStale: ((String) -> Unit)? = null): String {
         if (runCatching { !AcpAdapterPaths.isDownloaded(adapterId) }.getOrDefault(true)) return ""
         val minInterval = if (adapterId == "antigravity") ANTIGRAVITY_MIN_USAGE_REQUEST_INTERVAL else MIN_USAGE_REQUEST_INTERVAL
         val lock = usageCacheLocks.computeIfAbsent(adapterId) { Any() }
@@ -52,6 +52,7 @@ internal object AcpUsageDataFetcher {
             if (cached != null && now - cached.attemptedAtNanos < maxOf(maxAge, minInterval).inWholeNanoseconds) {
                 return@synchronized cached.value
             }
+            cached?.value?.takeIf { it.isNotBlank() }?.let { onStale?.invoke(it) }
             val value = when (adapterId) {
                 "claude-code" -> fetchClaudeUsageDataUncached()
                 "codex" -> fetchCodexUsageDataUncached()

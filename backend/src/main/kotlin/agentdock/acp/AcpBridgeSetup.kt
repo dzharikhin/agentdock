@@ -528,16 +528,21 @@ internal fun AcpBridge.installAdapterQueries() {
         val (parsedAdapterId, view) = parseFetchUsagePayload(payload)
         val adapterId = parsedAdapterId ?: payload.trim()
         scope.launch(Dispatchers.IO) {
-            val maxAge = if (view) AcpUsageDataFetcher.VIEW_MAX_AGE else Duration.ZERO
-            val result = AcpUsageDataFetcher.fetchUsageData(adapterId, maxAge)
+            val push: (String) -> Unit = { json ->
+                host.eval(jsCallback("__onUsageData", adapterId.jsStringLiteral(), json.jsStringLiteral()))
+            }
+            // A view keeps showing the older data until the newer data arrives.
+            val result = AcpUsageDataFetcher.fetchUsageData(
+                adapterId,
+                if (view) AcpUsageDataFetcher.VIEW_MAX_AGE else Duration.ZERO,
+                onStale = push.takeIf { view }
+            )
             if (result.isNotBlank()) {
                 AcpQuotaService.getInstance().updateQuotaForAdapter(adapterId, result)
             } else if (adapterId == "cursor-cli") {
                 AcpQuotaService.getInstance().clearQuotaForAdapter(adapterId)
             }
-            val escapedAdapterId = adapterId.jsStringLiteral()
-            val escapedResult = result.jsStringLiteral()
-            host.eval(jsCallback("__onUsageData", escapedAdapterId, escapedResult))
+            push(result)
         }
     }
 

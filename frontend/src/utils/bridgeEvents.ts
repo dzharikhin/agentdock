@@ -10,6 +10,7 @@ import {
   ConversationReplayLoadedPayload,
   ConversationTranscriptSavedPayload,
   FileChangeStatsResultPayload,
+  FileSearchResultPayload,
   GlobalSettingsPayload,
   HistoryDeleteResultPayload,
   HistorySearchResultPayload,
@@ -43,6 +44,7 @@ export interface ConversationTranscriptSavedEvent { payload: ConversationTranscr
 export interface BridgeOperationResultEvent { payload: BridgeOperationResultPayload; }
 export interface ConversationReplayLoadedEvent { payload: ConversationReplayLoadedPayload; }
 export interface FileChangeStatsEvent { payload: FileChangeStatsResultPayload; }
+export interface FilesResultEvent { payload: FileSearchResultPayload; }
 export interface McpServersEvent { servers: McpServerConfig[]; }
 export interface McpStatusEvent { update: McpStatusUpdate; }
 export interface CustomAcpConfigsEvent { configs: CustomAcpConfig[]; }
@@ -82,6 +84,7 @@ export const EVENT_NAMES = {
   CHANGES_STATE: 'acp-changes-state',
   BRIDGE_OPERATION_RESULT: 'acp-bridge-operation-result',
   FILE_CHANGE_STATS: 'acp-file-change-stats',
+  FILES_RESULT: 'acp-files-result',
   ATTACHMENTS_ADDED: 'acp-attachments-added',
   TOOL_CALL: 'acp-tool-call',
   TOOL_CALL_UPDATE: 'acp-tool-call-update',

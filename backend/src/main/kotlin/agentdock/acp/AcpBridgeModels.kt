@@ -203,3 +203,9 @@ internal data class HistoryReplayCapture(
 
 @Serializable
 internal data class FileSearchItem(val path: String, val name: String)
+
+@Serializable
+internal data class FileSearchRequestPayload(val requestId: String, val query: String = "")
+
+@Serializable
+internal data class FileSearchResultPayload(val requestId: String, val files: List<FileSearchItem>)

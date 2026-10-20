@@ -66,7 +66,7 @@ internal object BridgeScripts {
             window.__openHistoryConversationCli = function(payload) {
                 invoke('openHistoryConversationCli', JSON.stringify(payload));
             };
-            window.__searchFiles = function(query) { invoke('searchFiles', query); };
+            window.__searchFiles = function(payload) { invoke('searchFiles', payload); };
             window.__requestFileIcon = function(path) { invoke('iconFile', JSON.stringify({ path: path })); };
             window.__readLocalImage = function(path) { invoke('readLocalImage', JSON.stringify({ path: path })); };
             window.__undoFile = function(payload) { invoke('undoFile', payload); };
