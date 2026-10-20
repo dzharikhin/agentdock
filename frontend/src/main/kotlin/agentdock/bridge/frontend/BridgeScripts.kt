@@ -49,9 +49,6 @@ internal object BridgeScripts {
             window.__loadHistoryConversation = function(chatId, projectPath, conversationId) {
                 invoke('loadConversation', JSON.stringify({ chatId: chatId, projectPath: (projectPath || ''), conversationId: (conversationId || '') }));
             };
-            window.__recoverRuntime = function(reason, requestId) {
-                invoke('recoverRuntime', JSON.stringify({ requestId: (requestId || ''), reason: (reason || '') }));
-            };
             window.__downloadAgent = function(adapterId) { invoke('downloadAgent', adapterId); };
             window.__cancelAgentInstall = function(adapterId) { invoke('cancelAgentInstall', adapterId); };
             window.__deleteAgent = function(adapterId) { invoke('deleteAgent', adapterId); };

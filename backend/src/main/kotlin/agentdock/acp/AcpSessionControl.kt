@@ -89,7 +89,7 @@ internal fun AcpClientService.prompt(chatId: String, blocks: List<ContentBlock>)
             stopReason?.let { emit(AcpEvent.PromptDone(it)) }
         }
     } catch (e: Exception) {
-        if (e is kotlinx.coroutines.CancellationException) throw e
+        if (e is CancellationException) throw e
         if (context.promptGeneration.get() == promptGeneration && !context.ignoreUpdatesUntilPrompt) {
             emit(AcpEvent.Error(formatAcpError(e)))
         }
@@ -102,14 +102,11 @@ internal fun AcpClientService.prompt(chatId: String, blocks: List<ContentBlock>)
 
 internal suspend fun AcpClientService.cancel(chatId: String) {
     val context = sessions[chatId] ?: return
-    cancelWithContext(context)
+    context.lifecycleMutex.withLock { context.session }?.let { session ->
+        context.ignoreUpdatesUntilPrompt = true
+        session.cancel()
+    }
     context.cancelPendingPermissions()
-}
-
-internal suspend fun AcpClientService.cancelWithContext(context: AcpClientService.AgentContext) {
-    val session = context.lifecycleMutex.withLock { context.session } ?: return
-    context.ignoreUpdatesUntilPrompt = true
-    session.cancel()
 }
 
 internal suspend fun AcpClientService.stopAgent(chatId: String) {
@@ -161,7 +158,8 @@ internal fun AcpClientService.teardownAdapterProcess(
     runCatching { shared?.retire() }
 }
 
-internal fun AcpClientService.resetRuntime(restartDownloadedAdapters: Boolean) {
+internal fun AcpClientService.shutdown() {
+    scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
     adapterInitializationJobs.values.forEach { it.cancel() }
     adapterInitializationJobs.clear()
     adapterInitializationState.clear()
@@ -182,26 +180,6 @@ internal fun AcpClientService.resetRuntime(restartDownloadedAdapters: Boolean) {
     processes.forEach { shared ->
         runCatching { teardownAdapterProcess(shared) }
     }
-
-    startupInitializationStarted.set(false)
-    if (restartDownloadedAdapters) {
-        initializeDownloadedAdaptersInBackground()
-    }
-}
-
-internal fun AcpClientService.recoverRuntime(): Boolean {
-    if (!runtimeRecoveryInProgress.compareAndSet(false, true)) return false
-    return try {
-        resetRuntime(restartDownloadedAdapters = true)
-        true
-    } finally {
-        runtimeRecoveryInProgress.set(false)
-    }
-}
-
-internal fun AcpClientService.shutdown() {
-    scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
-    resetRuntime(restartDownloadedAdapters = false)
 }
 
 internal suspend fun AcpClientService.awaitPendingSessionUpdates(adapterName: String) {

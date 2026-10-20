@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 export interface ToolCallDiffEntry {
   type: 'diff';
   path: string;
@@ -210,7 +212,7 @@ export interface DropdownOption {
   label: string;
   description?: string;
   className?: string;
-  icon?: string | React.ReactNode;
+  icon?: string | ReactNode;
   iconPath?: string;
   subOptions?: DropdownOption[];
 }
@@ -486,7 +488,7 @@ export interface ConversationTranscriptSavedPayload {
 export interface BridgeOperationResultPayload {
   requestId: string;
   chatId: string;
-  operation: 'start_agent' | 'send_prompt' | 'cancel_prompt' | 'recover_runtime';
+  operation: 'start_agent' | 'send_prompt' | 'cancel_prompt';
   ok: boolean;
   error?: string;
 }
@@ -629,7 +631,6 @@ declare global {
     __renameHistoryGroup?: (payload: { projectPath: string; group: string; newGroup: string }) => void;
     __searchHistoryConversations?: (payload: { projectPath: string; conversationIds: string[]; query: string }) => void;
     __loadHistoryConversation?: (conversationId: string, projectPath: string, historyConversationId: string) => void;
-    __recoverRuntime?: (reason?: string, requestId?: string) => void;
     __loginAgent?: (adapterId: string, methodId: string) => void;
     __logoutAgent?: (adapterId: string) => void;
     __cancelAgentAuth?: (adapterId: string) => void;

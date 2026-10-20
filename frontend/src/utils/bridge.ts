@@ -114,17 +114,17 @@ function awaitBridgeResponse<P extends { requestId: string }>(
   });
 }
 
-function awaitBridgeOperation(
+async function awaitBridgeOperation(
   operation: BridgeOperationResultPayload['operation'],
   invoke: (requestId: string) => void,
   timeoutMs = BRIDGE_OPERATION_TIMEOUT_MS,
 ): Promise<void> {
   const requestId = nextBridgeRequestId(operation);
-  return awaitBridgeResponse(ACPBridge.onBridgeOperationResult, requestId, () => invoke(requestId), {
+  await awaitBridgeResponse(ACPBridge.onBridgeOperationResult, requestId, () => invoke(requestId), {
     timeoutMs,
     timeoutMessage: `Bridge request '${operation}' was not acknowledged. Connection to the agent may be broken.`,
     failure: (payload) => (payload.ok ? undefined : payload.error || `Bridge request '${operation}' failed.`),
-  }).then(() => undefined);
+  });
 }
 
 const FILE_ICON_REQUEST_TIMEOUT_MS = 5_000;
@@ -439,15 +439,6 @@ export const ACPBridge = {
 
   clearConversationToolCache: (conversationId: string) => {
     toolCallRawInputCache.clearChat(conversationId);
-  },
-
-  recoverRuntime: (reason?: string) => {
-    if (typeof window.__recoverRuntime !== 'function') {
-      return Promise.reject(new Error('Runtime recovery bridge is not available.'));
-    }
-    return awaitBridgeOperation('recover_runtime', (requestId) => {
-      window.__recoverRuntime?.(reason, requestId);
-    });
   },
 
   /** `view`: the user opened a view showing the data, so a recently cached value is enough. */

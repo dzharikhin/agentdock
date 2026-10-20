@@ -78,7 +78,7 @@ internal suspend fun AcpClientService.startAgent(
                         createdSessionMetadata = sessionResponse.runtimeMetadata(adapterInfo)
                         context.sessionIdRef.compareAndSet(null, sessionId.value)
                         bindLiveSessionOwner(chatId, sessionId.value)
-                        return createSharedSessionOperations(sessionId.value, requestedAdapterName)
+                        return createSharedSessionOperations(sessionId.value)
                     }
                 }
 
@@ -259,7 +259,7 @@ internal suspend fun AcpClientService.loadSessionIntoContext(
             if (deliverReplay) {
                 replayOwnerBySessionId[sessionId.value] = context.chatId
             }
-            return createSharedSessionOperations(sessionId.value, requestedAdapterName)
+            return createSharedSessionOperations(sessionId.value)
         }
     }
 

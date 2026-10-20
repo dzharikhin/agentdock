@@ -145,7 +145,6 @@ internal fun AcpBridge.installConversationQueries() {
                     service.markChatSessionBroken(chatId)
                     pushConversationError(chatId, dispatchFailure)
                     pushStatus(chatId, "error")
-                    recoverRuntimeAfterFailure(dispatchFailure)
                 }
                 return@register
             }
@@ -236,7 +235,6 @@ internal fun AcpBridge.installConversationQueries() {
                     service.markChatSessionBroken(chatId)
                     failLivePrompt(chatId, "[Error: $failure]", captureId)
                     job.cancel(kotlinx.coroutines.CancellationException(failure))
-                    recoverRuntimeAfterFailure(failure)
                     break
                 }
             }
@@ -284,8 +282,6 @@ internal fun AcpBridge.installConversationQueries() {
             pushBridgeOperationResult(parsed.requestId, parsed.chatId, "cancel_prompt", ok = false, error = "Invalid cancel request.")
         }
     }
-
-    installRuntimeRecoveryQuery()
 
     host.register("stopAgent") { chatIdPayload ->
         val chatId = chatIdPayload.trim()

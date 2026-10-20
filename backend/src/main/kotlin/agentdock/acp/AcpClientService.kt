@@ -7,7 +7,6 @@ import com.agentclientprotocol.model.*
 import com.agentclientprotocol.protocol.Protocol
 import com.agentclientprotocol.rpc.JsonRpcNotification
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -69,7 +68,7 @@ class AcpClientService private constructor(val project: Project) {
         private val instances = ConcurrentHashMap<Project, AcpClientService>()
 
         private val pendingCleanups: MutableSet<Thread> =
-            Collections.newSetFromMap(ConcurrentHashMap<Thread, Boolean>())
+            Collections.newSetFromMap(ConcurrentHashMap())
         private val shutdownTaskRegistered = AtomicBoolean(false)
 
         // Kept free of side effects: this runs on the EDT from the tool window and the commit action,
@@ -77,7 +76,7 @@ class AcpClientService private constructor(val project: Project) {
         fun getInstance(project: Project): AcpClientService =
             instances.computeIfAbsent(project) { p ->
                 val created = AcpClientService(p)
-                Disposer.register(p, Disposable { cleanupInBackground(created, p) })
+                Disposer.register(p) { cleanupInBackground(created, p) }
                 created
             }
 
@@ -300,7 +299,6 @@ class AcpClientService private constructor(val project: Project) {
     internal val availableCommandsByAdapter = ConcurrentHashMap<String, List<AvailableCommandPayload>>()
     internal val systemInstructionsInjectedSessionIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
     internal val historySyncAfterInitializationInFlight = AtomicBoolean(false)
-    internal val runtimeRecoveryInProgress = AtomicBoolean(false)
 
     fun status(chatId: String): Status = sessions[chatId]?.statusRef?.get() ?: Status.NotStarted
     fun sessionId(chatId: String): String? = sessions[chatId]?.sessionIdRef?.get()
@@ -313,7 +311,6 @@ class AcpClientService private constructor(val project: Project) {
     fun adapterInitializationError(adapterName: String): String? = adapterInitializationErrors[adapterName]
     fun adapterInitializationDetail(adapterName: String): String? = adapterInitializationDetails[adapterName]
     internal fun adapterRuntimeMetadata(adapterName: String): AdapterRuntimeMetadata? = adapterRuntimeMetadataMap[adapterName]
-    internal fun availableCommands(adapterName: String): List<AvailableCommandPayload> = availableCommandsByAdapter[adapterName] ?: emptyList()
     internal fun allAvailableCommands(): Map<String, List<AvailableCommandPayload>> = availableCommandsByAdapter.toMap()
     fun isAdapterReady(adapterName: String): Boolean {
         val sharedProc = activeProcesses[adapterName] ?: return false
@@ -461,12 +458,11 @@ class AcpClientService private constructor(val project: Project) {
 
     internal fun createAgentContext(chatId: String): AgentContext = AgentContext(chatId)
     internal fun createSharedProcess(adapterName: String): SharedProcess = SharedProcess(adapterName)
-    internal fun createSharedSessionOperations(sessionId: String, adapterName: String): ClientSessionOperations =
-        SharedSessionOperations(sessionId, adapterName)
+    internal fun createSharedSessionOperations(sessionId: String): ClientSessionOperations =
+        SharedSessionOperations(sessionId)
 
     private inner class SharedSessionOperations(
-        val sessionId: String,
-        val adapterName: String
+        val sessionId: String
     ) : ClientSessionOperations {
         override suspend fun requestPermissions(
             toolCall: SessionUpdate.ToolCallUpdate,
