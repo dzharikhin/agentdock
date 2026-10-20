@@ -28,8 +28,6 @@ export default function ChatInput(props: ChatInputProps) {
     onAgentChange,
     selectedModelId,
     onModelChange,
-    usageSessionKey,
-    status,
     modeOptions,
     selectedModeId,
     onModeChange,
@@ -149,8 +147,7 @@ export default function ChatInput(props: ChatInputProps) {
             approvalMode={approvalMode}
             isSending={isSending}
             hasSelectedAgent={hasSelectedAgent}
-            status={status}
-            usageSessionKey={usageSessionKey}
+            isActive={isActive}
             contextTokensUsed={contextTokensUsed}
             contextWindowSize={contextWindowSize}
             inputValue={inputValue}

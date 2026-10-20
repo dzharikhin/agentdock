@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 import java.io.File
+import kotlin.time.Duration
 internal fun AcpBridge.installServiceCallbacks() {
     service.callbackOwner = this
     if (BuildConfig.IS_DEV) {
@@ -524,16 +525,11 @@ internal fun AcpBridge.installAdapterQueries() {
     }
 
     host.register("fetchUsage") { payload ->
-        val adapterId = parseAdapterIdPayload(payload) ?: payload.trim()
+        val (parsedAdapterId, view) = parseFetchUsagePayload(payload)
+        val adapterId = parsedAdapterId ?: payload.trim()
         scope.launch(Dispatchers.IO) {
-            val result = when (adapterId) {
-                "claude-code" -> AcpUsageDataFetcher.fetchClaudeUsageData()
-                "codex" -> AcpUsageDataFetcher.fetchCodexUsageData()
-                "antigravity" -> AcpUsageDataFetcher.fetchAntigravityUsageData()
-                "github-copilot-cli" -> AcpUsageDataFetcher.fetchCopilotUsageData(adapterId)
-                "cursor-cli" -> AcpUsageDataFetcher.fetchCursorUsageData()
-                else -> ""
-            }
+            val maxAge = if (view) AcpUsageDataFetcher.VIEW_MAX_AGE else Duration.ZERO
+            val result = AcpUsageDataFetcher.fetchUsageData(adapterId, maxAge)
             if (result.isNotBlank()) {
                 AcpQuotaService.getInstance().updateQuotaForAdapter(adapterId, result)
             } else if (adapterId == "cursor-cli") {

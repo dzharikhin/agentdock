@@ -11,6 +11,8 @@ import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -18,26 +20,16 @@ import kotlin.time.Duration.Companion.seconds
  */
 internal object AcpUsageDataFetcher {
     private const val LOCAL_USAGE_TIMEOUT_SECONDS = 30L
-    private const val USAGE_CACHE_MS = 10_000L
-    private const val ANTIGRAVITY_USAGE_CACHE_MS = 60_000L
+    // Shortest interval between requests to a provider; frequent polling gets blocked.
+    private val MIN_USAGE_REQUEST_INTERVAL = 10.seconds
+    private val ANTIGRAVITY_MIN_USAGE_REQUEST_INTERVAL = 60.seconds
+    /** Age up to which cached data is good enough when the user opens a view showing it. */
+    val VIEW_MAX_AGE = 5.minutes
     private data class UsageCacheEntry(val attemptedAtNanos: Long, val value: String)
 
     private val usageCache = ConcurrentHashMap<String, UsageCacheEntry>()
     private val usageCacheLocks = ConcurrentHashMap<String, Any>()
     private var antigravityCliVerified = false
-
-    private fun cachedUsage(adapterId: String, cacheMs: Long = USAGE_CACHE_MS, fetch: () -> String): String {
-        val lock = usageCacheLocks.computeIfAbsent(adapterId) { Any() }
-        return synchronized(lock) {
-            val now = System.nanoTime()
-            val cached = usageCache[adapterId]
-            if (cached != null && now - cached.attemptedAtNanos < TimeUnit.MILLISECONDS.toNanos(cacheMs)) {
-                return@synchronized cached.value
-            }
-
-            fetch().also { usageCache[adapterId] = UsageCacheEntry(now, it) }
-        }
-    }
 
     fun discardCachedUsage(adapterId: String) {
         val lock = usageCacheLocks.computeIfAbsent(adapterId) { Any() }
@@ -46,7 +38,32 @@ internal object AcpUsageDataFetcher {
         }
     }
 
-    fun fetchClaudeUsageData(): String = cachedUsage("claude-code") { fetchClaudeUsageDataUncached() }
+    /**
+     * Returns the adapter's usage JSON, or an empty string for adapters without usage data.
+     * A cached value younger than [maxAge] is returned without a request.
+     */
+    fun fetchUsageData(adapterId: String, maxAge: Duration): String {
+        if (runCatching { !AcpAdapterPaths.isDownloaded(adapterId) }.getOrDefault(true)) return ""
+        val minInterval = if (adapterId == "antigravity") ANTIGRAVITY_MIN_USAGE_REQUEST_INTERVAL else MIN_USAGE_REQUEST_INTERVAL
+        val lock = usageCacheLocks.computeIfAbsent(adapterId) { Any() }
+        return synchronized(lock) {
+            val now = System.nanoTime()
+            val cached = usageCache[adapterId]
+            if (cached != null && now - cached.attemptedAtNanos < maxOf(maxAge, minInterval).inWholeNanoseconds) {
+                return@synchronized cached.value
+            }
+            val value = when (adapterId) {
+                "claude-code" -> fetchClaudeUsageDataUncached()
+                "codex" -> fetchCodexUsageDataUncached()
+                "antigravity" -> fetchAntigravityUsageDataUncached()
+                "github-copilot-cli" -> fetchCopilotUsageDataUncached(adapterId)
+                "cursor-cli" -> fetchCursorUsageDataUncached()
+                else -> ""
+            }
+            usageCache[adapterId] = UsageCacheEntry(now, value)
+            value
+        }
+    }
 
     private fun fetchClaudeUsageDataUncached(): String {
         val accessToken = try {
@@ -74,8 +91,6 @@ internal object AcpUsageDataFetcher {
             } else """{"authType":"subscription"}"""
         } catch (_: Exception) { """{"authType":"subscription"}""" }
     }
-
-    fun fetchCodexUsageData(): String = cachedUsage("codex") { fetchCodexUsageDataUncached() }
 
     private fun fetchCodexUsageDataUncached(): String {
         val authJson = try {
@@ -105,8 +120,6 @@ internal object AcpUsageDataFetcher {
         } catch (_: Exception) { """{"authType":"subscription"}""" }
     }
 
-    fun fetchCursorUsageData(): String = cachedUsage("cursor-cli") { fetchCursorUsageDataUncached() }
-
     private fun fetchCursorUsageDataUncached(): String {
         val accessToken = readCursorAccessToken() ?: return ""
         val cookie = cursorSessionCookie(accessToken) ?: return ""
@@ -127,17 +140,13 @@ internal object AcpUsageDataFetcher {
         }
     }
 
-    fun fetchAntigravityUsageData(): String = cachedUsage("antigravity", ANTIGRAVITY_USAGE_CACHE_MS) {
-        if (!antigravityCliVerified && !verifyAntigravityCli()) {
-            return@cachedUsage ""
-        }
+    private fun fetchAntigravityUsageDataUncached(): String {
+        if (!antigravityCliVerified && !verifyAntigravityCli()) return ""
 
         val (adapter, command) = buildAdapterCliCommandParts(
             adapterId = "antigravity",
             extraArgs = listOf("--output-format", "json", "--print", "/usage")
-        ) ?: run {
-            return@cachedUsage ""
-        }
+        ) ?: return ""
         val result = runCatching {
             AcpExecutionMode.runCommand(
                 command = command,
@@ -145,7 +154,7 @@ internal object AcpUsageDataFetcher {
                 timeout = LOCAL_USAGE_TIMEOUT_SECONDS.seconds
             )
         }.getOrNull()
-        if (result?.exitCode == 0) {
+        return if (result?.exitCode == 0) {
             normalizeAntigravityUsage(result.stdout)
         } else {
             ""
@@ -204,14 +213,9 @@ internal object AcpUsageDataFetcher {
         }.getOrDefault("")
     }
 
-    fun fetchCopilotUsageData(adapterId: String): String = cachedUsage(adapterId) {
-        fetchCopilotUsageDataUncached(adapterId)
-    }
-
     private fun fetchCopilotUsageDataUncached(adapterId: String): String {
         val adapterInfo = runCatching { AcpAdapterConfig.getAdapterInfo(adapterId) }.getOrNull() ?: return ""
         val adapterRoot = AcpAdapterPaths.getDownloadPath(adapterId)
-        if (!AcpAdapterPaths.isDownloaded(adapterId)) return ""
         val launchPath = resolveAdapterLaunchPath(adapterRoot, adapterInfo) ?: return ""
         val runtime = AcpNodeRuntimeResolver.resolveAvailable() ?: return ""
 

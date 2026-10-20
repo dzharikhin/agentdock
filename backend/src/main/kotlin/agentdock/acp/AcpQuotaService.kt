@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.serialization.json.*
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
 @Service(Service.Level.APP)
@@ -37,14 +38,15 @@ class AcpQuotaService : Disposable {
         pollingJob = scope.launch {
             while (isActive) {
                 delay(POLL_INTERVAL)
-                updateQuotas()
+                // Data fetched meanwhile for the plugin UI is fresh enough to skip.
+                updateQuotas(maxAge = POLL_INTERVAL)
             }
         }
     }
 
     fun onQuotaWidgetEnabledChanged(enabled: Boolean) {
         if (enabled) {
-            scope.launch { updateQuotas() }
+            scope.launch { updateQuotas(maxAge = AcpUsageDataFetcher.VIEW_MAX_AGE) }
             startPolling()
         } else {
             pollingJob?.cancel()
@@ -53,24 +55,17 @@ class AcpQuotaService : Disposable {
         }
     }
 
-    suspend fun updateQuotas() {
+    suspend fun updateQuotas(maxAge: Duration) {
         val adapters = AcpAdapterConfig.getAllAdapters().values
             .filter { AcpAdapterPaths.isDownloaded(it.id) }
         supervisorScope {
             adapters.forEach { adapter ->
                 launch(Dispatchers.IO) {
                     try {
-                        val rawJson = when (adapter.id) {
-                            "claude-code" -> AcpUsageDataFetcher.fetchClaudeUsageData()
-                            "codex" -> AcpUsageDataFetcher.fetchCodexUsageData()
-                            "antigravity" -> AcpUsageDataFetcher.fetchAntigravityUsageData()
-                            "github-copilot-cli" -> AcpUsageDataFetcher.fetchCopilotUsageData(adapter.id)
-                            "cursor-cli" -> AcpUsageDataFetcher.fetchCursorUsageData()
-                            else -> null
-                        }
+                        val rawJson = AcpUsageDataFetcher.fetchUsageData(adapter.id, maxAge)
                         // Preserve bridge-pushed data for existing providers on transient failures.
                         // Cursor has no fallback payload, so an empty response must clear its stale quota.
-                        if (!rawJson.isNullOrBlank()) {
+                        if (rawJson.isNotBlank()) {
                             updateQuotaForAdapter(adapter.id, rawJson)
                         } else if (adapter.id == "cursor-cli") {
                             clearQuotaForAdapter(adapter.id)
@@ -294,7 +289,7 @@ class AcpQuotaService : Disposable {
     }
 
     companion object {
-        private val POLL_INTERVAL = 5.minutes
+        private val POLL_INTERVAL = 15.minutes
         private const val CLOCK_SKEW_MS = 5L * 60 * 1000
         private const val MAX_DISPLAYABLE_RESET_MS = 100L * 24 * 60 * 60 * 1000
 

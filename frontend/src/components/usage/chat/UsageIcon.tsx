@@ -1,16 +1,14 @@
 import { Tooltip } from '../../chat/shared/Tooltip';
 import React from 'react';
 import { QuotaGauge } from '../shared/QuotaGauge';
-import { ACPBridge } from '../../../utils/bridge';
 
+// The tooltip content refreshes its usage data when it is shown.
 export function UsageIcon({
   children,
   percent,
-  adapterId,
 }: {
   children: React.ReactNode;
   percent?: number | null;
-  adapterId: string;
 }) {
   if (percent === null || percent === undefined) return null;
 
@@ -18,7 +16,7 @@ export function UsageIcon({
 
   return (
     <div className="min-w-0 flex-1 max-w-max">
-      <Tooltip className="h-full" content={children} onShow={() => ACPBridge.fetchAdapterUsage(adapterId)}>
+      <Tooltip className="h-full" content={children}>
         <button
           aria-label={`Usage quota: ${displayLabel} used`}
           className="flex h-full w-full min-w-0 items-center rounded border-0 bg-background-secondary px-1.5

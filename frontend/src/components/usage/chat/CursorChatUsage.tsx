@@ -17,7 +17,7 @@ export function CursorChatUsage({ modelId }: { modelId?: string }) {
   if (percent === null) return null;
 
   return (
-    <UsageIcon adapterId="cursor-cli" percent={percent}>
+    <UsageIcon percent={percent}>
       <CursorUsage stacked />
     </UsageIcon>
   );

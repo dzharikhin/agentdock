@@ -455,8 +455,9 @@ export const ACPBridge = {
     });
   },
 
-  fetchAdapterUsage: (adapterId: string, force?: boolean) => {
-    window.__fetchAdapterUsage?.(adapterId, force);
+  /** `view`: the user opened a view showing the data, so a recently cached value is enough. */
+  fetchAdapterUsage: (adapterId: string, view?: boolean) => {
+    window.__fetchAdapterUsage?.(adapterId, view);
   },
 
   cancelAgentInstall: (adapterId: string) => {

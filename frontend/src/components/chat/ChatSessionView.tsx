@@ -387,8 +387,6 @@ export default function ChatSessionView({
             queueError={queueError}
             onStop={handleStop}
             isSending={isSending}
-            usageSessionKey={acpSessionId || undefined}
-            status={status}
 
             agentOptions={agentOptions}
             selectedAgentId={selectedAgentId}

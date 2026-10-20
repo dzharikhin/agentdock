@@ -42,8 +42,7 @@ interface ChatInputControlsProps {
   approvalMode: ApprovalMode;
   isSending: boolean;
   hasSelectedAgent: boolean;
-  status: string;
-  usageSessionKey?: string;
+  isActive: boolean;
   contextTokensUsed?: number;
   contextWindowSize?: number;
   inputValue: string;
@@ -81,8 +80,7 @@ export function ChatInputControls({
   approvalMode,
   isSending,
   hasSelectedAgent,
-  status,
-  usageSessionKey,
+  isActive,
   contextTokensUsed,
   contextWindowSize,
   inputValue,
@@ -333,7 +331,7 @@ export function ChatInputControls({
 
       <div className="ml-auto flex shrink-0 items-stretch">
         {selectedAgentId && (
-          <AdapterUsageLifecycleProvider value={{ mode: 'chat', enabled: true, isSending, sessionKey: status === 'ready' ? usageSessionKey : undefined }}>
+          <AdapterUsageLifecycleProvider value={{ mode: 'chat', enabled: isActive, isSending }}>
             <ChatUsageIndicator agentId={selectedAgentId} modelId={selectedModelId} />
           </AdapterUsageLifecycleProvider>
         )}

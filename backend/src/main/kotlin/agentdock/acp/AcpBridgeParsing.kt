@@ -43,6 +43,7 @@ private class BridgePayload(
     val chatId: String? = null,
     val adapterId: String? = null,
     val methodId: String? = null,
+    val view: Boolean = false,
     val projectPath: String? = null,
     val conversationId: String? = null,
     val text: String? = null,
@@ -65,7 +66,10 @@ internal fun parseIdOnlyPayload(payload: String): String? {
     return payload.trim().takeIf { it.isNotEmpty() }
 }
 
-internal fun parseAdapterIdPayload(payload: String): String? = decodeBridgePayload(payload)?.adapterId.nonBlank()
+internal fun parseFetchUsagePayload(payload: String): Pair<String?, Boolean> {
+    val parsed = decodeBridgePayload(payload)
+    return parsed?.adapterId.nonBlank() to (parsed?.view ?: false)
+}
 
 internal fun parseAdapterAuthMethodPayload(payload: String): Pair<String?, String?> {
     val parsed = decodeBridgePayload(payload)
