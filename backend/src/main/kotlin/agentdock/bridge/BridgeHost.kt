@@ -24,7 +24,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.util.concurrent.ConcurrentHashMap
 
@@ -130,9 +129,12 @@ class BridgeHost(private val project: Project, private val scope: CoroutineScope
         attachment?.close()
         attachment = next
         val bridges = AgentDockBridges.install(project, this, scope)
+        // Removed by identity, so a newer attachment that already replaced them keeps its own.
+        val handlers = commands.toMap()
         next.send(UiMessage(UiMessage.TOPIC_FRONTEND_CAPABILITIES, ""))
         return Disposable {
             if (attachment === next) attachment = null
+            handlers.forEach { (name, handler) -> commands.remove(name, handler) }
             next.close()
             bridges.dispose()
         }
