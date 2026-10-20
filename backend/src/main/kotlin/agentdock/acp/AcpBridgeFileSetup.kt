@@ -9,6 +9,7 @@ import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import kotlinx.serialization.decodeFromString
@@ -44,16 +45,16 @@ internal fun AcpBridge.installFileChangeQueries() {
             )
         }.getOrNull()
 
-        if (request != null && request.chatId.isNotEmpty() && request.filePath.isNotEmpty()) {
-            runOnEdt {
-                val result = UndoFileHandler.undoSingleFile(
+        if (request != null && request.chatId.isNotEmpty() && request.filePath.isNotEmpty()) scope.launch(Dispatchers.IO) {
+            val result = undoMutex.withLock {
+                UndoFileHandler.undoSingleFile(
                     service.project,
                     request.filePath,
                     request.status,
                     request.operations
                 )
-                pushUndoResult(request.chatId, result)
             }
+            pushUndoResult(request.chatId, result)
         }
     }
 
@@ -79,11 +80,9 @@ internal fun AcpBridge.installFileChangeQueries() {
             )
         }.getOrNull()
 
-        if (request != null && request.chatId.isNotEmpty()) {
-            runOnEdt {
-                val result = UndoFileHandler.undoAllFiles(service.project, request.files)
-                pushUndoResult(request.chatId, result)
-            }
+        if (request != null && request.chatId.isNotEmpty()) scope.launch(Dispatchers.IO) {
+            val result = undoMutex.withLock { UndoFileHandler.undoAllFiles(service.project, request.files) }
+            pushUndoResult(request.chatId, result)
         }
     }
 

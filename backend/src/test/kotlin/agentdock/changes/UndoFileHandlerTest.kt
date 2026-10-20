@@ -2,6 +2,7 @@ package agentdock.changes
 
 import com.intellij.openapi.project.Project
 import agentdock.utils.LocalFilePathPolicy
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -98,10 +99,12 @@ class UndoFileHandlerTest {
         val project = projectWithBasePath(projectDir.path)
         val traversedPath = projectDir.resolve("../outside.txt").path
 
-        val result = UndoFileHandler.undoAllFiles(
-            project,
-            listOf(Triple(traversedPath, "M", listOf(UndoOperation("before", "after"))))
-        )
+        val result = runBlocking {
+            UndoFileHandler.undoAllFiles(
+                project,
+                listOf(Triple(traversedPath, "M", listOf(UndoOperation("before", "after"))))
+            )
+        }
 
         assertTrue(result.success, result.toString())
         assertEquals("before", outsideFile.readText())
@@ -118,12 +121,14 @@ class UndoFileHandlerTest {
         val project = projectWithBasePath(projectDir.path)
         val traversedPath = projectDir.resolve("../outside.txt").path
 
-        val result = UndoFileHandler.undoSingleFile(
-            project,
-            traversedPath,
-            "M",
-            listOf(UndoOperation("before", "after"))
-        )
+        val result = runBlocking {
+            UndoFileHandler.undoSingleFile(
+                project,
+                traversedPath,
+                "M",
+                listOf(UndoOperation("before", "after"))
+            )
+        }
 
         assertTrue(result.success, result.toString())
         assertEquals("before", outsideFile.readText())
@@ -174,12 +179,14 @@ class UndoFileHandlerTest {
         val deletedFile = projectDir.resolve("Deleted.kt")
         val project = projectWithBasePath(projectDir.path)
 
-        val result = UndoFileHandler.undoSingleFile(
-            project,
-            deletedFile.path,
-            "M",
-            listOf(UndoOperation("first\nsecond\n", ""))
-        )
+        val result = runBlocking {
+            UndoFileHandler.undoSingleFile(
+                project,
+                deletedFile.path,
+                "M",
+                listOf(UndoOperation("first\nsecond\n", ""))
+            )
+        }
 
         assertTrue(result.success, result.toString())
         assertEquals("first\nsecond\n", deletedFile.readText())

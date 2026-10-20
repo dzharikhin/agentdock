@@ -29,6 +29,8 @@ class AcpBridge(
     internal var fileIconProvider: FileIconProvider? = null
     /** The running file search; a new one cancels it, as only the latest one is shown. */
     @Volatile internal var fileSearchJob: Job? = null
+    /** Runs undo requests one at a time, so two requests never restore the same file at once. */
+    internal val undoMutex = Mutex()
 
     internal val promptJobs = ConcurrentHashMap<String, Job>()
     internal val lastStatusByChatId = ConcurrentHashMap<String, String>()
