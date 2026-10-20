@@ -295,36 +295,39 @@ internal fun AcpBridge.installMiscQueries() {
                 val descriptor = com.intellij.openapi.fileChooser.FileChooserDescriptor(true, false, false, false, false, true)
                 descriptor.title = "Select Files to Attach"
                 com.intellij.openapi.fileChooser.FileChooser.chooseFiles(descriptor, service.project, null) { files ->
-                    val results = files.map { file ->
-                        val ioFile = File(file.path)
-                        val size = ioFile.length()
-                        val name = file.name
-                        val mimeType = java.net.URLConnection.guessContentTypeFromName(name) ?: "application/octet-stream"
-                        val canInline = mimeType.startsWith("image/") || mimeType.startsWith("video/")
-                        val base64 = if (canInline && size < 2 * 1024 * 1024) {
-                            try {
-                                java.util.Base64.getEncoder().encodeToString(ioFile.readBytes())
-                            } catch (_: Exception) {
+                    // The chooser calls back on the EDT; the files are read off it.
+                    scope.launch(Dispatchers.IO) {
+                        val results = files.map { file ->
+                            val ioFile = File(file.path)
+                            val size = ioFile.length()
+                            val name = file.name
+                            val mimeType = java.net.URLConnection.guessContentTypeFromName(name) ?: "application/octet-stream"
+                            val canInline = mimeType.startsWith("image/") || mimeType.startsWith("video/")
+                            val base64 = if (canInline && size < 2 * 1024 * 1024) {
+                                try {
+                                    java.util.Base64.getEncoder().encodeToString(ioFile.readBytes())
+                                } catch (_: Exception) {
+                                    null
+                                }
+                            } else {
                                 null
                             }
-                        } else {
-                            null
+
+                            val fileId = java.util.UUID.randomUUID().toString().substring(0, 8)
+                            buildJsonObject {
+                                put("id", fileId)
+                                put("name", name)
+                                put("mimeType", mimeType)
+                                put("path", file.path)
+                                if (base64 != null) {
+                                    put("data", base64)
+                                }
+                            }.toString()
                         }
 
-                        val fileId = java.util.UUID.randomUUID().toString().substring(0, 8)
-                        buildJsonObject {
-                            put("id", fileId)
-                            put("name", name)
-                            put("mimeType", mimeType)
-                            put("path", file.path)
-                            if (base64 != null) {
-                                put("data", base64)
-                            }
-                        }.toString()
+                        val jsonArrayStr = results.joinToString(",")
+                        host.eval(jsCallback("__onAttachmentsAdded", normalizedChatId.jsStringLiteral(), "[$jsonArrayStr]"))
                     }
-
-                    val jsonArrayStr = results.joinToString(",")
-                    host.eval(jsCallback("__onAttachmentsAdded", normalizedChatId.jsStringLiteral(), "[$jsonArrayStr]"))
                 }
             }
         }
