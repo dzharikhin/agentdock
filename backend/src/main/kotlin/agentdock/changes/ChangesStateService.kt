@@ -13,22 +13,6 @@ data class ChangesState(
 )
 
 object ChangesStateService {
-    /**
-     * Check if two file paths refer to the same file.
-     * Handles relative vs absolute paths across Windows, Linux, and MacOS.
-     */
-    private fun pathsMatch(path1: String, path2: String): Boolean {
-        val p1 = path1.replace("\\", "/")
-        val p2 = path2.replace("\\", "/")
-
-        if (p1 == p2) return true
-
-        // Check if one path ends with the other (handles absolute vs relative)
-        if (p1.endsWith("/$p2")) return true
-        if (p2.endsWith("/$p1")) return true
-
-        return false
-    }
     fun loadState(projectPath: String, sessionId: String, adapterName: String): ChangesState? {
         val current = HistorySessionChangesStore.loadSessionChanges(projectPath, sessionId, adapterName) ?: return null
         return ChangesState(sessionId, adapterName, current.keptToolCallIds, current.processedFileStates)
@@ -60,9 +44,10 @@ object ChangesStateService {
         toolCallIds: List<String>
     ) {
         val current = loadState(projectPath, sessionId, adapterName) ?: ChangesState(sessionId, adapterName)
-        val previous = current.processedFileStates.firstOrNull { pathsMatch(it.filePath, filePath) }
+        // Paths are the agent's diff paths as sent, so the same spelling identifies the same file.
+        val previous = current.processedFileStates.firstOrNull { it.filePath == filePath }
         val updated = current.processedFileStates
-            .filterNot { pathsMatch(it.filePath, filePath) } + ProcessedFileState(
+            .filterNot { it.filePath == filePath } + ProcessedFileState(
                 filePath = filePath,
                 toolCallIds = (previous?.toolCallIds.orEmpty() + toolCallIds).distinct()
             )

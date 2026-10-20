@@ -48,7 +48,7 @@ object UndoFileHandler {
         }
 
         val fileResult = try {
-            restoreBeforeSnapshot(project, resolvedPath, status, operations)
+            restoreBeforeSnapshot(project, resolvedPath, status, operations).copy(filePath = filePath)
         } catch (e: Exception) {
             UndoFileResult(filePath = filePath, success = false, message = "Error: ${e.message}")
         }

@@ -15,35 +15,6 @@ const APPLIED_STATUSES = new Set(['success', 'completed']);
 
 type UndoError = { failures: UndoFileResultPayload[]; hadSuccess: boolean } | { message: string };
 
-/**
- * Check if two file paths refer to the same file.
- * Handles relative vs absolute paths across Windows, Linux, and MacOS.
- */
-function pathsMatch(path1: string, path2: string): boolean {
-  const normalize = (path: string) => {
-    const normalized = path
-      .trim()
-      .replace(/\\/g, '/')
-      .replace(/\/+/g, '/')
-      .replace(/^\.\//, '')
-      .replace(/\/$/, '');
-    return /^[A-Za-z]:\//.test(normalized) ? normalized.toLowerCase() : normalized;
-  };
-
-  const isAbsolute = (path: string) => /^[A-Za-z]:\//.test(path) || path.startsWith('/');
-  const p1 = normalize(path1);
-  const p2 = normalize(path2);
-  if (p1 === p2) return true;
-
-  const p1Absolute = isAbsolute(p1);
-  const p2Absolute = isAbsolute(p2);
-  if (p1Absolute === p2Absolute) return false;
-
-  const absolutePath = p1Absolute ? p1 : p2;
-  const relativePath = p1Absolute ? p2 : p1;
-  return relativePath.length > 0 && absolutePath.endsWith(`/${relativePath}`);
-}
-
 export function useFileChanges(
   conversationId: string,
   sessionId: string,
@@ -212,7 +183,7 @@ export function useFileChanges(
       for (const diff of event.diffs) {
         const filePath = diff.path;
         if (processedFileStates.some((processed) => (
-          pathsMatch(processed.filePath, filePath)
+          processed.filePath === filePath
           && Boolean(event.eventId)
           && processed.toolCallIds.includes(event.eventId!)
         ))) continue;
@@ -312,11 +283,10 @@ export function useFileChanges(
 
   /** Remove all diffs for given file paths from accumulated tool call events */
   const removeDiffsForFiles = useCallback((paths: Set<string>) => {
-    const pathsArray = Array.from(paths);
     const removeDiffs = (prev: ToolCallEvent[]) =>
       prev.map((event) => ({
         ...event,
-        diffs: event.diffs.filter((d) => !pathsArray.some(p => pathsMatch(p, d.path))),
+        diffs: event.diffs.filter((d) => !paths.has(d.path)),
       }));
     setReplayToolCallEvents(removeDiffs);
     setLiveToolCallEvents(removeDiffs);
@@ -324,8 +294,8 @@ export function useFileChanges(
 
   const upsertProcessedFileState = useCallback((filePath: string, toolCallIds: string[]) => {
     setProcessedFileStates((prev) => {
-      const existing = prev.find((processed) => pathsMatch(processed.filePath, filePath));
-      const next = prev.filter((processed) => !pathsMatch(processed.filePath, filePath));
+      const existing = prev.find((processed) => processed.filePath === filePath);
+      const next = prev.filter((processed) => processed.filePath !== filePath);
       next.push({
         filePath,
         toolCallIds: Array.from(new Set([...(existing?.toolCallIds || []), ...toolCallIds])),
@@ -421,7 +391,7 @@ export function useFileChanges(
       if (successfulFilePaths.length > 0) {
         const undoPaths = new Set(successfulFilePaths);
         for (const filePath of successfulFilePaths) {
-          const fc = fileChangesRef.current.find((file) => pathsMatch(file.filePath, filePath));
+          const fc = fileChangesRef.current.find((file) => file.filePath === filePath);
           if (!fc || !window.__processFile || !sessionId || !adapterName) continue;
           window.__processFile(JSON.stringify({
             sessionId,
