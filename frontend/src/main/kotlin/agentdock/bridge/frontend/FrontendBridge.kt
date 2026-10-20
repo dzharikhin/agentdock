@@ -168,7 +168,7 @@ internal class FrontendBridge(
         }, ModalityState.any())
     }
 
-    private fun openUrl(url: String) {
+    fun openUrl(url: String) {
         if (url.isBlank()) return
         ApplicationManager.getApplication().invokeLater({
             runCatching { BrowserUtil.browse(url) }

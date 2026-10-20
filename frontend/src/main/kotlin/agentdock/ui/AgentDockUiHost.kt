@@ -34,7 +34,10 @@ import com.intellij.util.net.ProxySettings
 import kotlinx.coroutines.CoroutineScope
 import org.cef.browser.CefBrowser
 import org.cef.browser.CefFrame
+import org.cef.handler.CefLifeSpanHandlerAdapter
 import org.cef.handler.CefLoadHandlerAdapter
+import org.cef.handler.CefRequestHandlerAdapter
+import org.cef.network.CefRequest
 import java.awt.AWTEvent
 import java.awt.BorderLayout
 import java.awt.FlowLayout
@@ -289,6 +292,7 @@ class AgentDockUiHost(
             val bridge = FrontendBridge(project, browser, scope) { loadContent(browser) }
             this.bridge = bridge
             bridge.install()
+            installNavigationGuard(browser, bridge)
 
             browser.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
                 override fun onLoadEnd(cefBrowser: CefBrowser, frame: CefFrame, httpStatusCode: Int) {
@@ -318,6 +322,27 @@ class AgentDockUiHost(
         } catch (e: Exception) {
             showStatus(JLabel("Error initializing browser: ${e.message}"))
         }
+    }
+
+    /**
+     * Keeps the plugin page in the browser: any other page loaded there would receive the bridge, so navigations
+     * and popups are cancelled and web links go to the system browser instead.
+     */
+    private fun installNavigationGuard(browser: JBCefBrowser, bridge: FrontendBridge) {
+        val leave = { url: String? ->
+            if (url != null && (url.startsWith("https://") || url.startsWith("http://"))) bridge.openUrl(url)
+            true
+        }
+        browser.jbCefClient.addRequestHandler(object : CefRequestHandlerAdapter() {
+            override fun onBeforeBrowse(
+                cefBrowser: CefBrowser, frame: CefFrame, request: CefRequest, userGesture: Boolean, isRedirect: Boolean,
+            ): Boolean = !request.url.startsWith(LOAD_HTML_URL_PREFIX) && leave(request.url)
+        }, browser.cefBrowser)
+        browser.jbCefClient.addLifeSpanHandler(object : CefLifeSpanHandlerAdapter() {
+            override fun onBeforePopup(
+                cefBrowser: CefBrowser, frame: CefFrame, targetUrl: String?, targetFrameName: String?,
+            ): Boolean = leave(targetUrl)
+        }, browser.cefBrowser)
     }
 
     private fun installBrowserChrome(browser: JBCefBrowser, bridge: FrontendBridge) {
@@ -404,6 +429,9 @@ class AgentDockUiHost(
 
     companion object {
         const val TOOL_WINDOW_ID = "Agent Dock"
+
+        /** The URL `JBCefBrowser.loadHTML` gives the page it loads (`JBCefFileSchemeHandlerFactory`). */
+        private const val LOAD_HTML_URL_PREFIX = "file:///jbcefbrowser/"
 
         fun getInstance(project: Project): AgentDockUiHost =
             project.getService(AgentDockUiHost::class.java)
