@@ -9,6 +9,7 @@ import agentdock.rpc.LocalBridgeHost
 import agentdock.rpc.NativeState
 import agentdock.rpc.TerminalLaunchRequest
 import agentdock.rpc.UiMessage
+import agentdock.rpc.batchWith
 import agentdock.settings.GlobalSettings
 import agentdock.settings.GlobalSettingsStore
 import com.intellij.openapi.Disposable
@@ -162,14 +163,7 @@ class BridgeHost(private val project: Project, private val scope: CoroutineScope
         }
 
         /** Suspends for the first message, then takes everything already queued behind it. */
-        suspend fun takeBatch(): List<UiMessage> {
-            val batch = ArrayList<UiMessage>()
-            batch.add(queue.receive())
-            while (true) {
-                batch.add(queue.tryReceive().getOrNull() ?: break)
-            }
-            return batch
-        }
+        suspend fun takeBatch(): List<UiMessage> = queue.batchWith(queue.receive())
     }
 
     companion object {

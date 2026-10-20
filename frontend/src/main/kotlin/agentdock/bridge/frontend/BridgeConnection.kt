@@ -3,8 +3,10 @@
 package agentdock.bridge.frontend
 
 import agentdock.rpc.AgentDockRpcApi
+import agentdock.rpc.BridgeCommand
 import agentdock.rpc.LocalBridgeHost
 import agentdock.rpc.UiMessage
+import agentdock.rpc.batchWith
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
@@ -41,7 +43,7 @@ internal class BridgeConnection(
     private var sendJob: Job? = null
 
     /** Commands are queued rather than launched one coroutine each, so the backend sees them in the order the user caused them. */
-    private val outbox = Channel<Pair<String, String>>(Channel.UNLIMITED)
+    private val outbox = Channel<BridgeCommand>(Channel.UNLIMITED)
 
     /**
      * Completed by the backend's first acknowledgement. The backend registers the command handlers
@@ -66,7 +68,7 @@ internal class BridgeConnection(
             local.invokeCommand(command, payload)
             return
         }
-        outbox.trySend(command to payload)
+        outbox.trySend(BridgeCommand(command, payload))
     }
 
     private suspend fun receiveRemote() {
@@ -98,13 +100,13 @@ internal class BridgeConnection(
 
     private suspend fun sendRemote() {
         attached.await()
-        for ((command, payload) in outbox) {
+        for (first in outbox) {
             try {
-                AgentDockRpcApi.getInstance().invokeCommand(project.projectId(), command, payload)
+                AgentDockRpcApi.getInstance().invokeCommands(project.projectId(), outbox.batchWith(first))
             } catch (e: CancellationException) {
                 throw e
             } catch (_: Exception) {
-                // A command lost to a broken link is not worth retrying: the reload that follows
+                // Commands lost to a broken link are not worth retrying: the reload that follows
                 // reconnection makes the UI ask again for whatever it still needs.
             }
         }

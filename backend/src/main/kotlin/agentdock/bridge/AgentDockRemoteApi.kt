@@ -3,6 +3,7 @@
 package agentdock.bridge
 
 import agentdock.rpc.AgentDockRpcApi
+import agentdock.rpc.BridgeCommand
 import agentdock.rpc.NativeState
 import agentdock.rpc.UiMessage
 import com.intellij.platform.project.ProjectId
@@ -18,9 +19,10 @@ import kotlinx.coroutines.flow.emptyFlow
  */
 private class AgentDockRemoteApi : AgentDockRpcApi {
 
-    override suspend fun invokeCommand(projectId: ProjectId, command: String, payload: String) {
+    override suspend fun invokeCommands(projectId: ProjectId, commands: List<BridgeCommand>) {
         val project = projectId.findProjectOrNull() ?: return
-        BridgeHost.getInstance(project).invokeCommand(command, payload)
+        val host = BridgeHost.getInstance(project)
+        commands.forEach { host.invokeCommand(it.name, it.payload) }
     }
 
     override suspend fun uiMessages(projectId: ProjectId): Flow<List<UiMessage>> {
