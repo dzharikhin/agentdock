@@ -59,7 +59,7 @@ internal object SessionListDeleteSupport {
             "cursor-cli", "github-copilot-cli" -> {
                 val path = sourceFilePath?.takeIf { it.isNotBlank() }
                     ?: resolveSourceFilePath(projectPath, adapterName, sessionId)
-                path.isBlank() || File(path).parentFile?.let(::deleteHistoryDirectoryIfExists) == true
+                path.isBlank() || deleteFileSessionDirectory(File(path).parentFile)
             }
             "kilo" -> runCatching {
                 runAgentHistoryCliCommand("kilo", projectPath, listOf("session", "delete", sessionId))
@@ -71,6 +71,17 @@ internal object SessionListDeleteSupport {
     private fun hasDefaultDeleteMethod(adapterName: String): Boolean = when (adapterName) {
         "cursor-cli", "github-copilot-cli", "kilo" -> true
         else -> false
+    }
+
+    /** Deletes [dir] only where Copilot and Cursor keep one session, so a wrong path never removes anything else. */
+    private fun deleteFileSessionDirectory(dir: File?): Boolean {
+        val sessionDir = dir?.let { runCatching { it.canonicalFile }.getOrNull() } ?: return false
+        val parent = sessionDir.parentFile ?: return false
+        val home = System.getProperty("user.home")
+        val isSessionDir = parent == File(home, ".copilot/session-state").canonicalFile ||
+            parent == File(home, ".cursor/acp-sessions").canonicalFile ||
+            parent.parentFile == File(home, ".cursor/chats").canonicalFile
+        return isSessionDir && deleteHistoryDirectoryIfExists(sessionDir)
     }
 
     private fun deleteAntigravitySession(sessionId: String): Boolean {
