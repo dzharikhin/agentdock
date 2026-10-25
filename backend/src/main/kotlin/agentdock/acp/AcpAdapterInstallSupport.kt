@@ -1,0 +1,355 @@
+package agentdock.acp
+
+import com.intellij.util.text.VersionComparatorUtil
+import java.io.File
+import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
+import java.util.zip.ZipInputStream
+
+private const val ARCHIVE_COMMAND_TIMEOUT_MINUTES = 10L
+private const val ZIP_COPY_BUFFER_BYTES = 64 * 1024
+private const val INSTALL_METADATA_FILE = ".install-metadata.json"
+private val adapterMetadataJson = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+
+@Serializable
+private data class InstallMetadata(
+    val version: String
+)
+
+private data class RuntimePlatform(
+    val platform: String,
+    val archiveArch: String,
+    val archiveExt: String,
+    val target: String,
+    val libc: String,
+    val libcSuffix: String,
+    val archToken: String,
+    val artifactArch: String
+)
+
+internal fun resolveInstallAdapterInfo(
+    adapterInfo: AcpAdapterConfig.AdapterInfo,
+    statusCallback: ((String) -> Unit)? = null
+): AcpAdapterConfig.AdapterInfo? {
+    if (adapterInfo.distribution.type != AcpAdapterConfig.DistributionType.ARCHIVE) {
+        return adapterInfo
+    }
+    val configuredVersion = adapterInfo.distribution.version.trim()
+    if (!configuredVersion.equals("latest", ignoreCase = true)) {
+        return adapterInfo
+    }
+
+    statusCallback?.invoke("Resolving latest ${adapterInfo.name} version...")
+    val resolvedVersion = AcpAdapterUpdates.latestAvailableVersion(adapterInfo)?.trim()?.takeIf { it.isNotEmpty() }
+    if (resolvedVersion == null) {
+        statusCallback?.invoke("Error: Unable to resolve latest version for ${adapterInfo.name}")
+        return null
+    }
+    return adapterInfo.withDistributionVersion(resolvedVersion)
+}
+
+internal fun downloadArchiveDistribution(
+    targetDir: File,
+    adapterInfo: AcpAdapterConfig.AdapterInfo,
+    statusCallback: ((String) -> Unit)?,
+    cancellation: AcpAdapterInstallCancellation?
+): Boolean {
+    val runtime = detectRuntimePlatform()
+    targetDir.mkdirs()
+
+    val rawUrl = adapterInfo.distribution.downloadUrl
+    if (rawUrl == null) {
+        statusCallback?.invoke("Error: Archive distribution for '${adapterInfo.id}' has no downloadUrl configured")
+        return false
+    }
+    val downloadUrl = resolveArchiveDownloadUrl(rawUrl, adapterInfo, runtime)
+    val archiveExt = if (downloadUrl.lowercase().endsWith(".zip")) "zip" else runtime.archiveExt
+    val tempFile = File(targetDir, "tool-download.$archiveExt")
+
+    return try {
+        cancellation?.throwIfCancelled()
+        statusCallback?.invoke("Downloading ${adapterInfo.name}...")
+        val downloadExitCode = if (runtime.platform == "windows") {
+            runArchiveCommand(
+                ProcessBuilder(
+                    "powershell",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    "\$ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest -Uri ${quotePowerShellArg(downloadUrl)} -OutFile ${quotePowerShellArg(tempFile.absolutePath)}"
+                ),
+                statusCallback,
+                cancellation
+            )
+        } else {
+            runArchiveCommand(
+                ProcessBuilder(
+                    "sh",
+                    "-c",
+                    "curl -fsSL ${quoteUnixShellArg(downloadUrl)} -o ${quoteUnixShellArg(tempFile.absolutePath)}"
+                ),
+                statusCallback,
+                cancellation
+            )
+        }
+        if (downloadExitCode != 0) return false
+
+        cancellation?.throwIfCancelled()
+        statusCallback?.invoke("Extracting package...")
+        if (archiveExt == "zip") {
+            try {
+                extractZipArchive(tempFile, targetDir, cancellation)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                statusCallback?.invoke("Error: ${e.message}")
+                return false
+            }
+        } else {
+            val extractExitCode = runArchiveCommand(
+                ProcessBuilder(
+                    "sh",
+                    "-c",
+                    $$"""
+                    set -e
+                    temp_file=$${quoteUnixShellArg(tempFile.absolutePath)}
+                    first_entry=$(tar -tzf "$temp_file" | sed -n '1p')
+                    case "$first_entry" in
+                      */*) tar --strip-components=1 -xzf "$temp_file" -C $${quoteUnixShellArg(targetDir.absolutePath)} ;;
+                      *) tar -xzf "$temp_file" -C $${quoteUnixShellArg(targetDir.absolutePath)} ;;
+                    esac
+                    """.trimIndent()
+                ),
+                statusCallback,
+                cancellation
+            )
+            if (extractExitCode != 0) return false
+        }
+
+        flattenConfiguredExtractSubdir(targetDir, adapterInfo)
+        if (runtime.platform != "windows") {
+            statusCallback?.invoke("Ensuring executables...")
+            ensureExtractedFilesExecutable(targetDir)
+        }
+        statusCallback?.invoke("${adapterInfo.name} installed successfully.")
+        true
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        statusCallback?.invoke("Error: ${e.message}")
+        false
+    } finally {
+        tempFile.delete()
+    }
+}
+
+internal fun prepareAdapterTargetDir(targetDir: File) {
+    if (targetDir.exists()) targetDir.deleteRecursively()
+    targetDir.mkdirs()
+}
+
+internal fun deleteAdapterRuntime(runtimeDir: File, adapterId: String): Boolean {
+    return runCatching {
+        AcpProcessUtils.stopProcessesUsingAdapterRoot(adapterId)
+        deleteDirectoryWithRetries(runtimeDir)
+    }.getOrDefault(false)
+}
+
+internal fun installedVersionFromRuntimeDir(
+    runtimeDir: File,
+    adapterInfo: AcpAdapterConfig.AdapterInfo
+): String? {
+    if (!runtimeDir.isDirectory) return null
+    return when (adapterInfo.distribution.type) {
+        AcpAdapterConfig.DistributionType.NPM -> {
+            val packageJson = File(resolveNpmPackageRootPath(runtimeDir.absolutePath, adapterInfo), "package.json")
+            runCatching {
+                adapterMetadataJson.parseToJsonElement(packageJson.readText()).jsonObject["version"]?.toString()?.trim('"')
+            }.getOrNull()?.takeIf { it.isNotBlank() }
+        }
+        AcpAdapterConfig.DistributionType.ARCHIVE -> readInstallMetadata(runtimeDir)
+    }
+}
+
+internal fun isInstalledVersionSupported(
+    adapterInfo: AcpAdapterConfig.AdapterInfo,
+    installedVersion: String?
+): Boolean {
+    val minimumVersion = adapterInfo.distribution.minimumVersion?.trim().orEmpty()
+    return minimumVersion.isEmpty() ||
+        (!installedVersion.isNullOrBlank() && VersionComparatorUtil.compare(installedVersion, minimumVersion) >= 0)
+}
+
+internal fun writeInstallMetadata(runtimeDir: File, version: String) {
+    runtimeDir.mkdirs()
+    File(runtimeDir, INSTALL_METADATA_FILE).writeText(
+        adapterMetadataJson.encodeToString(InstallMetadata(version.trim()))
+    )
+}
+
+private fun detectRuntimePlatform(): RuntimePlatform {
+    val os = System.getProperty("os.name").lowercase()
+    val arch = System.getProperty("os.arch").lowercase()
+    val isArm64 = arch.contains("aarch64") || arch.contains("arm64")
+    val archiveArch = if (isArm64) "arm64" else "x64"
+    val targetArch = if (isArm64) "aarch64" else "x86_64"
+    val archToken = if (isArm64) "arm64" else "x86_64"
+    val artifactArch = if (isArm64) "aarch64" else "amd64"
+
+    return when {
+        os.contains("win") -> RuntimePlatform("windows", archiveArch, "zip", "$targetArch-pc-windows-msvc", "msvc", "", archToken, artifactArch)
+        os.contains("mac") -> RuntimePlatform("darwin", archiveArch, "tar.gz", "$targetArch-apple-darwin", "", "", archToken, artifactArch)
+        else -> RuntimePlatform("linux", archiveArch, "tar.gz", "$targetArch-unknown-linux-gnu", "gnu", "", archToken, artifactArch)
+    }
+}
+
+private fun resolveArchiveDownloadUrl(
+    template: String,
+    adapterInfo: AcpAdapterConfig.AdapterInfo,
+    runtime: RuntimePlatform
+): String {
+    return template
+        .replace("{platform}", runtime.platform)
+        .replace("{arch}", runtime.archiveArch)
+        .replace("{archToken}", runtime.archToken)
+        .replace("{artifactArch}", runtime.artifactArch)
+        .replace("{osDir}", AcpExecutionMode.hostPlatform())
+        .replace("{ext}", runtime.archiveExt)
+        .replace("{target}", runtime.target)
+        .replace("{libc}", runtime.libc)
+        .replace("{libcSuffix}", runtime.libcSuffix)
+        .replace("{version}", adapterInfo.distribution.version)
+}
+
+private fun flattenConfiguredExtractSubdir(targetDir: File, adapterInfo: AcpAdapterConfig.AdapterInfo) {
+    val extractSubdir = adapterInfo.distribution.extractSubdir?.trim().orEmpty()
+    if (extractSubdir.isEmpty()) return
+    val nestedDir = File(targetDir, extractSubdir)
+    if (!nestedDir.isDirectory) return
+    nestedDir.listFiles()?.forEach { child ->
+        child.copyRecursively(File(targetDir, child.name), overwrite = true)
+    }
+    nestedDir.deleteRecursively()
+}
+
+private fun ensureExtractedFilesExecutable(targetDir: File) {
+    targetDir.walkTopDown()
+        .filter { it.isFile }
+        .forEach { it.setExecutable(true) }
+}
+
+private fun extractZipArchive(
+    zipFile: File,
+    targetDir: File,
+    cancellation: AcpAdapterInstallCancellation?
+) {
+    val canonicalTarget = targetDir.canonicalFile
+    val buffer = ByteArray(ZIP_COPY_BUFFER_BYTES)
+    ZipInputStream(zipFile.inputStream().buffered()).use { zip ->
+        while (true) {
+            cancellation?.throwIfCancelled()
+            val entry = zip.nextEntry ?: break
+            val normalizedName = entry.name.replace('\\', '/')
+            val outFile = File(targetDir, normalizedName)
+            if (!outFile.canonicalFile.toPath().startsWith(canonicalTarget.toPath())) {
+                throw SecurityException("Blocked archive entry outside target directory: ${entry.name}")
+            }
+            if (entry.isDirectory || normalizedName.endsWith('/')) {
+                outFile.mkdirs()
+            } else {
+                outFile.parentFile?.mkdirs()
+                outFile.outputStream().use { output ->
+                    // Entries can reach hundreds of megabytes, so cancellation is checked per chunk
+                    // instead of once per entry.
+                    while (true) {
+                        cancellation?.throwIfCancelled()
+                        val read = zip.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                    }
+                }
+            }
+            zip.closeEntry()
+        }
+    }
+}
+
+private fun runArchiveCommand(
+    builder: ProcessBuilder,
+    statusCallback: ((String) -> Unit)? = null,
+    cancellation: AcpAdapterInstallCancellation? = null
+): Int {
+    cancellation?.throwIfCancelled()
+    val process = builder.redirectErrorStream(true).start()
+    cancellation?.register(process)
+    val recentOutput = java.util.Collections.synchronizedList(mutableListOf<String>())
+    val outputDrainer = Thread {
+        process.inputStream.bufferedReader().useLines { lines ->
+            lines.forEach { line ->
+                val trimmed = line.trim()
+                if (trimmed.isNotBlank()) {
+                    recentOutput.add(trimmed)
+                    if (recentOutput.size > 8) recentOutput.removeAt(0)
+                    statusCallback?.invoke(trimmed)
+                }
+            }
+        }
+    }
+    outputDrainer.isDaemon = true
+    outputDrainer.start()
+
+    try {
+        val deadlineNanos = System.nanoTime() + TimeUnit.MINUTES.toNanos(ARCHIVE_COMMAND_TIMEOUT_MINUTES)
+        while (true) {
+            cancellation?.throwIfCancelled()
+            if (process.waitFor(250, TimeUnit.MILLISECONDS)) break
+            if (System.nanoTime() >= deadlineNanos) {
+                AcpProcessUtils.destroyProcessTree(process.toHandle())
+                outputDrainer.join(1000)
+                statusCallback?.invoke("Error: Command timed out")
+                return -1
+            }
+        }
+    } catch (e: CancellationException) {
+        process.destroyForcibly()
+        outputDrainer.join(1000)
+        throw e
+    } finally {
+        cancellation?.unregister(process)
+    }
+
+    cancellation?.throwIfCancelled()
+    outputDrainer.join(1000)
+    val exitCode = process.exitValue()
+    if (exitCode != 0) {
+        val detail = recentOutput.joinToString("\n").takeIf { it.isNotBlank() }
+        statusCallback?.invoke(
+            if (detail == null) {
+                "Error: Command failed with exit code $exitCode"
+            } else {
+                "Error: Command failed with exit code $exitCode\n$detail"
+            }
+        )
+    }
+    return exitCode
+}
+
+private fun readInstallMetadata(runtimeDir: File): String? {
+    val metadataFile = File(runtimeDir, INSTALL_METADATA_FILE)
+    if (!metadataFile.isFile) return null
+    return runCatching {
+        adapterMetadataJson.decodeFromString<InstallMetadata>(metadataFile.readText()).version.trim()
+    }.getOrNull()?.takeIf { it.isNotEmpty() }
+}
+
+private fun deleteDirectoryWithRetries(dir: File, attempts: Int = 3): Boolean {
+    repeat(attempts) { attempt ->
+        if (!dir.exists()) return true
+        if (dir.deleteRecursively() && !dir.exists()) return true
+        if (attempt < attempts - 1) Thread.sleep(250)
+    }
+    return !dir.exists()
+}

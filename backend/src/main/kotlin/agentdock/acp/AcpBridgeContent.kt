@@ -1,0 +1,377 @@
+package agentdock.acp
+
+import com.agentclientprotocol.model.ContentBlock
+import com.agentclientprotocol.model.SessionUpdate
+import com.agentclientprotocol.model.ToolCallContent
+import com.intellij.openapi.diagnostic.logger
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.*
+import agentdock.changes.ChangesState
+import agentdock.changes.ChangesStateService
+import agentdock.history.ConversationAssistantMetadata
+import agentdock.history.ConversationReplayData
+import agentdock.utils.jsCallback
+import agentdock.utils.jsStringLiteral
+
+private val LOG = logger<AcpBridge>()
+
+@kotlinx.serialization.Serializable
+internal data class BridgeOperationResultPayload(
+    val requestId: String,
+    val chatId: String,
+    val operation: String,
+    val ok: Boolean,
+    val error: String? = null
+)
+
+/**
+ * Unified content delivery: all live content goes through pushContentChunk so the
+ * frontend has a single ingestion path. History replay never reaches this pipeline;
+ * it is captured into ConversationReplayData and delivered by pushConversationReplayLoaded.
+ */
+internal fun AcpBridge.pushContentChunk(chatId: String, role: String, type: String, text: String? = null, data: String? = null, mimeType: String? = null) {
+    val json = buildJsonObject {
+        put("chatId", chatId)
+        put("role", role)
+        put("type", type)
+        if (text != null) put("text", text)
+        if (data != null) put("data", data)
+        if (mimeType != null) put("mimeType", mimeType)
+    }.toString()
+    dispatchContentChunkJson(json)
+}
+
+internal fun AcpBridge.pushConversationReplayLoaded(chatId: String, data: ConversationReplayData) {
+    val payload = buildJsonObject {
+        put("chatId", chatId)
+        put("data", Json.encodeToJsonElement(data))
+    }.toString().jsStringLiteral()
+    host.eval(jsCallback("__onConversationReplayLoaded", "JSON.parse($payload)"))
+}
+
+/** Convenience: send a ContentBlock from the ACP SDK through the unified pipeline. */
+internal fun AcpBridge.pushContentBlock(chatId: String, role: String, content: ContentBlock, isThought: Boolean) {
+    val serialized = serializeContentBlock(content, if (isThought) "thinking" else "text") ?: return
+    pushContentChunk(
+        chatId = chatId,
+        role = role,
+        type = serialized.type,
+        text = serialized.text,
+        data = serialized.data,
+        mimeType = serialized.mimeType
+    )
+}
+
+/** Sends a tool call ([type] `tool_call`) or its update (`tool_call_update`) to the UI. */
+internal fun AcpBridge.pushToolCallChunk(chatId: String, type: String, toolCallId: String, raw: JsonObject, fullOutput: Boolean) {
+    val display = compactToolRawJson(raw, fullOutput)
+    val json = buildJsonObject {
+        put("chatId", chatId)
+        put("role", "assistant")
+        put("type", type)
+        put("toolCallId", toolCallId)
+        put("toolKind", display["kind"]?.jsonPrimitive?.contentOrNull ?: "")
+        put("toolTitle", display["title"]?.jsonPrimitive?.contentOrNull ?: "")
+        put("toolStatus", display["status"]?.jsonPrimitive?.contentOrNull ?: "")
+        put("toolRawJson", display.toString())
+    }.toString()
+    dispatchContentChunkJson(json)
+}
+
+internal fun extractTodoPlanEntriesFromToolRawJson(raw: JsonObject): JsonArray? {
+    val rawInput = raw["rawInput"] as? JsonObject ?: return null
+    val todos = rawInput["todos"] as? JsonArray ?: return null
+
+    val entries = buildJsonArray {
+        todos.forEach { item ->
+            val todo = item as? JsonObject ?: return@forEach
+            val content = todo["content"]?.jsonPrimitive?.contentOrNull?.trim().orEmpty()
+            if (content.isBlank()) return@forEach
+            add(buildJsonObject {
+                put("content", content)
+                put("status", normalizeTodoPlanStatus(todo["status"]?.jsonPrimitive?.contentOrNull))
+                todo["priority"]?.jsonPrimitive?.contentOrNull?.let { priority ->
+                    put("priority", priority)
+                }
+            })
+        }
+    }
+
+    return entries.takeIf { it.isNotEmpty() }
+}
+
+internal fun isTodoWriteToolCallJson(raw: JsonObject): Boolean {
+    val kind = raw["kind"]?.jsonPrimitive?.contentOrNull
+    val title = raw["title"]?.jsonPrimitive?.contentOrNull
+    if (kind == "todowrite") return true
+    if (title == "todowrite") return true
+    val rawInput = raw["rawInput"] as? JsonObject ?: return false
+    return rawInput["todos"] is JsonArray
+}
+
+private fun normalizeTodoPlanStatus(status: String?): String {
+    return when (status?.lowercase()) {
+        "completed", "complete", "done" -> "completed"
+        "in_progress", "in-progress", "running", "active" -> "in_progress"
+        "cancelled", "canceled" -> "cancelled"
+        "failed", "error" -> "failed"
+        else -> "pending"
+    }
+}
+
+internal fun AcpBridge.recordUsageUpdate(
+    chatId: String,
+    sessionId: String,
+    adapterName: String,
+    used: Long?,
+    size: Long?,
+    isReplay: Boolean
+) {
+    if (isReplay) {
+        val capture = historyReplayCaptures[chatId] ?: return
+        if (sessionId.isBlank() || adapterName.isBlank()) return
+        val session = getOrCreateReplaySession(capture, sessionId, adapterName)
+        val prompt = getOrCreateReplayPrompt(session)
+        val current = prompt.assistantMeta ?: buildAssistantMetadata(
+            adapterName = adapterName
+        )
+        prompt.assistantMeta = current?.copy(
+            contextTokensUsed = used ?: current.contextTokensUsed,
+            contextWindowSize = size ?: current.contextWindowSize
+        )
+        return
+    }
+
+    val capture = livePromptCaptures[chatId] ?: return
+    synchronized(capture) {
+        if (capture.closed) return
+        if (used != null) capture.contextTokensUsed = used
+        if (size != null) capture.contextWindowSize = size
+    }
+}
+
+internal fun AcpBridge.extractUsageUpdate(update: SessionUpdate, meta: JsonElement?): Pair<Long?, Long?>? {
+    val updateObj = when {
+        meta is JsonObject -> meta["update"]?.jsonObject ?: meta
+        else -> try {
+            Json.parseToJsonElement(Json.encodeToString(update)).jsonObject
+        } catch (e: Exception) {
+            LOG.debug("Failed to parse usage update", e)
+            null
+        }
+    } ?: return null
+
+    if (updateObj["sessionUpdate"]?.jsonPrimitive?.contentOrNull != "usage_update") {
+        return null
+    }
+
+    val used = updateObj["used"]?.jsonPrimitive?.longOrNull
+    val size = updateObj["size"]?.jsonPrimitive?.longOrNull
+    return used to size
+}
+
+internal fun AcpBridge.isPlanUpdate(update: SessionUpdate, _meta: JsonElement?): Boolean {
+    if (_meta is JsonObject) {
+        val updateObj = _meta["update"]?.jsonObject ?: _meta
+        if (updateObj["sessionUpdate"]?.jsonPrimitive?.contentOrNull == "plan") return true
+    }
+    return try {
+        val parsed = Json.parseToJsonElement(Json.encodeToString(update)).jsonObject
+        parsed["sessionUpdate"]?.jsonPrimitive?.contentOrNull == "plan"
+    } catch (e: Exception) {
+        LOG.debug("Failed to check plan update", e)
+        false
+    }
+}
+
+internal fun AcpBridge.extractPlanEntries(plan: SessionUpdate, _meta: JsonElement?): JsonArray? {
+    if (_meta is JsonObject) {
+        val updateObj = _meta["update"]?.jsonObject ?: _meta
+        updateObj["entries"]?.jsonArray?.let { return it }
+    }
+    return try {
+        Json.parseToJsonElement(Json.encodeToString(plan)).jsonObject["entries"]?.jsonArray
+    } catch (e: Exception) {
+        LOG.debug("Failed to extract plan entries", e)
+        null
+    }
+}
+
+internal fun AcpBridge.pushPlanChunk(chatId: String, plan: SessionUpdate, _meta: JsonElement? = null) {
+    val entries = try {
+        extractPlanEntries(plan, _meta)
+    } catch (e: Exception) {
+        null
+    }
+
+    if (entries == null || entries.isEmpty()) {
+        return
+    }
+
+    pushPlanChunk(chatId, entries)
+}
+
+internal fun AcpBridge.pushPlanChunk(chatId: String, entries: JsonArray) {
+    if (entries.isEmpty()) {
+        return
+    }
+
+    val chunk = buildJsonObject {
+        put("chatId", chatId)
+        put("role", "assistant")
+        put("type", "plan")
+        put("planEntries", entries)
+    }
+
+    val json = chunk.toString()
+    dispatchContentChunkJson(json)
+}
+
+internal fun AcpBridge.pushStatus(chatId: String, status: String) {
+    if (status != "ready") awaitingBackgroundOutput.remove(chatId)
+    val previousStatus = lastStatusByChatId.put(chatId, status)
+    val escapedStatus = status.jsStringLiteral()
+    val escapedChatId = chatId.jsStringLiteral()
+    host.eval(jsCallback("__onStatus", escapedChatId, escapedStatus))
+    if (previousStatus == "prompting" && status == "ready") {
+        host.eval(jsCallback("__agentDockPlaySound", "'responseComplete'"))
+    }
+}
+
+internal fun AcpBridge.pushMode(chatId: String, modeId: String?) {
+    if (modeId == null) return
+    val escapedModeId = modeId.jsStringLiteral()
+    val escapedChatId = chatId.jsStringLiteral()
+    host.eval(jsCallback("__onMode", escapedChatId, escapedModeId))
+}
+
+internal fun AcpBridge.pushSessionConfigOptions(
+    chatId: String,
+    metadata: AcpClientService.AdapterRuntimeMetadata,
+    applyCurrentValues: Boolean
+) {
+    val payload = Json.encodeToString(
+        SessionConfigOptionsPayload(
+            chatId = chatId,
+            configOptions = metadata.configOptions,
+            configOptionsByModel = metadata.configOptionsByModel,
+            applyCurrentValues = applyCurrentValues
+        )
+    ).jsStringLiteral()
+    host.eval(jsCallback("__onSessionConfigOptions", "JSON.parse($payload)"))
+}
+
+internal fun AcpBridge.pushAvailableCommands(adapterId: String, commands: List<AvailableCommandPayload>) {
+    val payloadJson = adapterJson.encodeToString(commands)
+    val escapedAdapterId = adapterId.jsStringLiteral()
+    val escapedPayload = payloadJson.jsStringLiteral()
+    host.eval(jsCallback("__onAvailableCommands", escapedAdapterId, "JSON.parse($escapedPayload)"))
+}
+
+internal fun AcpBridge.pushAllAvailableCommands() {
+    service.allAvailableCommands().forEach { (adapterId, commands) ->
+        pushAvailableCommands(adapterId, commands)
+    }
+}
+
+internal fun AcpBridge.pushSessionId(chatId: String, sid: String?) {
+    if (sid == null) return
+    val escapedSessionId = sid.jsStringLiteral()
+    val escapedChatId = chatId.jsStringLiteral()
+    host.eval(jsCallback("__onSessionId", escapedChatId, escapedSessionId))
+}
+
+internal fun AcpBridge.pushPermissionRequest(request: PermissionRequest) {
+    val payload = buildJsonObject {
+        put("requestId", request.requestId)
+        put("chatId", request.chatId)
+        put("title", request.title)
+        put("options", buildJsonArray {
+            request.options.forEach { opt ->
+                add(buildJsonObject {
+                    put("optionId", opt.optionId.value)
+                    put("label", opt.name)
+                    put("kind", Json.encodeToJsonElement(opt.kind))
+                })
+            }
+        })
+    }.toString().jsStringLiteral()
+    host.eval(jsCallback("__onPermissionRequest", "JSON.parse($payload)"))
+    host.eval(jsCallback("__agentDockPlaySound", "'permissionRequest'"))
+}
+
+internal fun AcpBridge.pushUndoResult(chatId: String, result: agentdock.changes.UndoResult) {
+    val payloadJson = buildJsonObject {
+        put("success", result.success)
+        put("message", result.message)
+        put("fileResults", Json.encodeToJsonElement(result.fileResults.map { fileResult ->
+            buildJsonObject {
+                put("filePath", fileResult.filePath)
+                put("success", fileResult.success)
+                put("message", fileResult.message)
+                fileResult.reason?.let { put("reason", it) }
+            }
+        }))
+    }.toString().jsStringLiteral()
+    val chatIdLiteral = chatId.jsStringLiteral()
+    host.eval(jsCallback("__onUndoResult", chatIdLiteral, "JSON.parse($payloadJson)"))
+}
+
+internal fun AcpBridge.pushConversationTranscriptSaved(result: SaveConversationTranscriptResultPayload) {
+    val payloadJson = adapterJson.encodeToString(result)
+    val escaped = payloadJson.jsStringLiteral()
+    host.eval(jsCallback("__onConversationTranscriptSaved", "JSON.parse($escaped)"))
+}
+
+internal fun AcpBridge.pushFileChangeStats(result: FileChangeStatsResultPayload) {
+    val payloadJson = adapterJson.encodeToString(result)
+    val escaped = payloadJson.jsStringLiteral()
+    host.eval(jsCallback("__onFileChangeStats", "JSON.parse($escaped)"))
+}
+
+internal fun AcpBridge.pushChangesState(chatId: String, state: ChangesState, hasPluginEdits: Boolean) {
+    val payload = JsonObject(adapterJson.encodeToJsonElement(state).jsonObject + ("hasPluginEdits" to JsonPrimitive(hasPluginEdits)))
+        .toString().jsStringLiteral()
+    val chatIdLiteral = chatId.jsStringLiteral()
+    host.eval(jsCallback("__onChangesState", chatIdLiteral, "JSON.parse($payload)"))
+}
+
+/**
+ * Create the per-session changes state when the first live file edit arrives.
+ */
+internal fun AcpBridge.ensureChangesStateForLiveDiffs(chatId: String, content: List<ToolCallContent>?) {
+    val sessionId = service.sessionId(chatId) ?: return
+    val adNameValue = service.activeAdapterName(chatId) ?: return
+    val diffs = content?.filterIsInstance<ToolCallContent.Diff>() ?: return
+    if (diffs.isEmpty()) return
+
+    val projectPath = service.project.basePath.orEmpty()
+    pushChangesState(chatId, ChangesStateService.ensureState(projectPath, sessionId, adNameValue), true)
+}
+
+internal fun AcpBridge.pushPromptDoneChunk(
+    chatId: String,
+    metadata: ConversationAssistantMetadata,
+    outcome: String
+) {
+    val json = buildJsonObject {
+        put("chatId", chatId)
+        put("role", "assistant")
+        put("type", "prompt_done")
+        put("promptOutcome", outcome)
+        metadata.agentId?.let { put("agentId", it) }
+        metadata.agentName?.let { put("agentName", it) }
+        metadata.promptStartedAtMillis?.let { put("promptStartedAtMillis", it) }
+        metadata.durationSeconds?.let { put("durationSeconds", it) }
+        metadata.contextTokensUsed?.let { put("contextTokensUsed", it) }
+        metadata.contextWindowSize?.let { put("contextWindowSize", it) }
+        put("configOptions", Json.encodeToJsonElement(metadata.configOptions))
+    }.toString()
+    dispatchContentChunkJson(json)
+}
+
+internal fun AcpBridge.pushBridgeOperationResult(result: BridgeOperationResultPayload) {
+    val payloadJson = adapterJson.encodeToString(result)
+    val escaped = payloadJson.jsStringLiteral()
+    host.eval(jsCallback("__onBridgeOperationResult", "JSON.parse($escaped)"))
+}

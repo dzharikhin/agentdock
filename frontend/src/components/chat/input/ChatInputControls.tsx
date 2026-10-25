@@ -42,8 +42,7 @@ interface ChatInputControlsProps {
   approvalMode: ApprovalMode;
   isSending: boolean;
   hasSelectedAgent: boolean;
-  status: string;
-  usageSessionKey?: string;
+  isActive: boolean;
   contextTokensUsed?: number;
   contextWindowSize?: number;
   inputValue: string;
@@ -59,7 +58,6 @@ interface ChatInputControlsProps {
   onApprovalModeChange: (mode: ApprovalMode) => void;
   onSend: () => void;
   onStop: () => void;
-  promptQueueEnabled?: boolean;
   scheduleEnabled?: boolean;
   onScheduleModeChange?: (enabled: boolean) => void;
   hasAttachments?: boolean;
@@ -82,8 +80,7 @@ export function ChatInputControls({
   approvalMode,
   isSending,
   hasSelectedAgent,
-  status,
-  usageSessionKey,
+  isActive,
   contextTokensUsed,
   contextWindowSize,
   inputValue,
@@ -99,7 +96,6 @@ export function ChatInputControls({
   onApprovalModeChange,
   onSend,
   onStop,
-  promptQueueEnabled = false,
   scheduleEnabled = false,
   onScheduleModeChange,
   hasAttachments = false,
@@ -335,7 +331,7 @@ export function ChatInputControls({
 
       <div className="ml-auto flex shrink-0 items-stretch">
         {selectedAgentId && (
-          <AdapterUsageLifecycleProvider value={{ mode: 'chat', enabled: true, isSending, sessionKey: status === 'ready' ? usageSessionKey : undefined }}>
+          <AdapterUsageLifecycleProvider value={{ mode: 'chat', enabled: isActive, isSending }}>
             <ChatUsageIndicator agentId={selectedAgentId} modelId={selectedModelId} />
           </AdapterUsageLifecycleProvider>
         )}
@@ -346,7 +342,7 @@ export function ChatInputControls({
 
         {isSending ? (
           <>
-          {promptQueueEnabled && hasInput && (
+          {hasInput && (
             <Tooltip variant="minimal" content="Add to queue" className="h-full">
               <button key="queue-button" type="button" onClick={onSend} aria-label="Add to queue"
                 className={`flex items-center h-full px-1.5 rounded appearance-none border-0 bg-background-secondary outline-none

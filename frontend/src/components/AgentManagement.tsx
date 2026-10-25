@@ -315,7 +315,7 @@ export function AgentManagementView({
                         {isStatusUnknown ? (<LoadingSpinner className="w-3 h-3" />) : (
                           <span className={`${statusClass} font-semibold`}>{statusLabel}</span>
                         )}
-                        <Tooltip variant="minimal" content="Refresh status" className="flex relative top-[-1px]">
+                        <Tooltip variant="minimal" content="Refresh status" className="flex">
                           <button
                             onClick={() => ACPBridge.requestAdapters(agent.id)}
                             disabled={agent.refreshing || isProcessing}
@@ -323,7 +323,7 @@ export function AgentManagementView({
                               ${linkButtonFocusClassName}`}
                             aria-label={`Refresh ${agent.name} status`}
                           >
-                            <RefreshCw className={`h-3 w-3 ${agent.refreshing ? 'animate-spin' : ''}`} />
+                            <RefreshCw className={`h-3.5 w-3.5 ${agent.refreshing ? 'animate-spin' : ''}`} />
                           </button>
                         </Tooltip>
                         {isStarting && initializationDetail && (

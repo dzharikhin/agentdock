@@ -8,7 +8,7 @@ export function AntigravityChatUsage() {
   if (rows.length === 0) return null;
 
   return (
-    <UsageIcon adapterId="antigravity" percent={Math.max(...rows.map((row) => row.percent))}>
+    <UsageIcon percent={Math.max(...rows.map((row) => row.percent))}>
       <AntigravityUsage stacked />
     </UsageIcon>
   );

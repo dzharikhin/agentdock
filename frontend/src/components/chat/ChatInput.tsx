@@ -23,14 +23,11 @@ export default function ChatInput(props: ChatInputProps) {
     queueError,
     onStop,
     isSending,
-    promptQueueEnabled,
     agentOptions,
     selectedAgentId,
     onAgentChange,
     selectedModelId,
     onModelChange,
-    usageSessionKey,
-    status,
     modeOptions,
     selectedModeId,
     onModeChange,
@@ -150,8 +147,7 @@ export default function ChatInput(props: ChatInputProps) {
             approvalMode={approvalMode}
             isSending={isSending}
             hasSelectedAgent={hasSelectedAgent}
-            status={status}
-            usageSessionKey={usageSessionKey}
+            isActive={isActive}
             contextTokensUsed={contextTokensUsed}
             contextWindowSize={contextWindowSize}
             inputValue={inputValue}
@@ -175,7 +171,6 @@ export default function ChatInput(props: ChatInputProps) {
             onScheduleModeChange={onScheduleModeChange}
             hasAttachments={attachments.length > 0}
             onStop={onStop}
-            promptQueueEnabled={promptQueueEnabled}
           />
         </div>
       </div>

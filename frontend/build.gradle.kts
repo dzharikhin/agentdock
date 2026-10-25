@@ -11,24 +11,9 @@ dependencies {
 
 kotlin {
     jvmToolchain(25)
+    // The client half: JCEF, AWT, the microphone, sounds and the status bar. It must not
+    // reference backend classes - in Split Mode they are not loaded in this process.
     compilerOptions.freeCompilerArgs.add("-jvm-default=no-compatibility")
-    sourceSets["main"].kotlin.apply {
-        srcDir(rootProject.layout.projectDirectory.dir("src/main/kotlin"))
-        // The client half: JCEF, AWT, the microphone, sounds and the status bar. It must not
-        // reference backend classes - in Split Mode they are not loaded in this process.
-        include("agentdock/AddCodeReferenceToChatAction.kt")
-        include("agentdock/AddFileReferenceToChatAction.kt")
-        include("agentdock/AgentDockToolWindowFactory.kt")
-        include("agentdock/AssetLoader.kt")
-        include("agentdock/ExternalCodeReferenceDispatcher.kt")
-        include("agentdock/IdeTheme.kt")
-        include("agentdock/JcefDragAndDropSupport.kt")
-        include("agentdock/acp/AcpAudioPlayer.kt")
-        include("agentdock/acp/IdeTerminalBridge.kt")
-        include("agentdock/bridge/frontend/**")
-        include("agentdock/audio/**")
-        include("agentdock/ui/**")
-    }
 }
 
 sourceSets["main"].resources.apply {

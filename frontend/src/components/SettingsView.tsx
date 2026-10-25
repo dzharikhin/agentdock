@@ -80,12 +80,6 @@ function contentMaxWidthOptions(currentPx: number): DropdownOption[] {
   }));
 }
 
-function readUiZoom() {
-  (
-    window as Window & { __agentDockInvoke?: (name: string, payload?: string) => void }
-  ).__agentDockInvoke?.('readUiZoom', '');
-}
-
 function normalizeGlobalSettings(payload: Partial<GlobalSettingsPayload> | undefined): GlobalSettingsPayload {
   return {
     settings: {
@@ -191,13 +185,13 @@ export function SettingsView({ section }: { section: SettingsSectionType }) {
     window.addEventListener('agent-dock-ui-zoom', onUiZoom);
 
     persistLiveZoomRef.current = false;
-    readUiZoom();
+    window.__readUiZoom?.();
 
     let zoomReadTimer: number | undefined;
     const scheduleZoomRead = () => {
       persistLiveZoomRef.current = true;
       window.clearTimeout(zoomReadTimer);
-      zoomReadTimer = window.setTimeout(() => readUiZoom(), 50);
+      zoomReadTimer = window.setTimeout(() => window.__readUiZoom?.(), 50);
     };
     const onWheel = (event: WheelEvent) => {
       if (!event.ctrlKey && !event.metaKey) return;

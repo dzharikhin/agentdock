@@ -1,4 +1,4 @@
-<idea-plugin>
+<idea-plugin require-restart="true">
     <id>agentdock</id>
     <name>Agent Dock</name>
     <vendor url="https://github.com/edgarsr/agentdock">EdgarsR</vendor>

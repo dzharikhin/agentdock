@@ -1,0 +1,564 @@
+package agentdock.acp
+
+import com.agentclientprotocol.client.Client
+import com.agentclientprotocol.client.ClientSession
+import com.agentclientprotocol.common.ClientSessionOperations
+import com.agentclientprotocol.model.*
+import com.agentclientprotocol.protocol.Protocol
+import com.agentclientprotocol.rpc.JsonRpcNotification
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.json.*
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
+
+data class PermissionRequest(
+    val requestId: String,
+    val chatId: String,
+    val title: String,
+    val options: List<PermissionOption>
+)
+
+class AcpClientService private constructor(val project: Project) {
+    internal data class AdapterRuntimeMetadata(
+        val configOptions: List<AcpConfigOption>,
+        val configOptionsByModel: Map<String, List<AcpConfigOption>> = emptyMap()
+    ) {
+        private fun option(vararg categories: String): AcpConfigOption? =
+            configOptions.firstOrNull { option -> categories.any(option::matchesCategory) }
+
+        private val modelOption get() = option("model")
+        private val modeOption get() = option("mode")
+        private val reasoningOption get() = configOptions.findReasoningEffortOption()
+
+        val currentModelId get() = modelOption?.currentValue?.takeIf(String::isNotEmpty)
+        val availableModels get() = modelOption?.options.orEmpty().map {
+            AcpAdapterConfig.ModelInfo(it.value, it.name, it.description)
+        }
+        val modelConfigId get() = modelOption?.id
+        val currentModeId get() = modeOption?.currentValue?.takeIf(String::isNotEmpty)
+        val availableModes get() = modeOption?.options.orEmpty().map {
+            AcpAdapterConfig.ModeInfo(it.value, it.name, it.description)
+        }
+        val currentReasoningEffortId get() = reasoningOption?.currentValue?.takeIf(String::isNotEmpty)
+        val availableReasoningEfforts get() = reasoningOption?.options.orEmpty().map {
+            AcpAdapterConfig.ModeInfo(it.value, it.name, it.description)
+        }
+
+        fun configOptionsForModel(modelId: String?): List<AcpConfigOption> =
+            modelId?.let { configOptionsByModel[it] } ?: configOptions
+    }
+
+    companion object {
+        private const val CLEANUP_JOIN_TIMEOUT_MS = 3000L
+
+        private val instances = ConcurrentHashMap<Project, AcpClientService>()
+
+        private val pendingCleanups: MutableSet<Thread> =
+            Collections.newSetFromMap(ConcurrentHashMap())
+        private val shutdownTaskRegistered = AtomicBoolean(false)
+
+        // Kept free of side effects: this runs on the EDT from the tool window and the commit action,
+        // so registry I/O and adapter initialization belong to AcpStartupActivity instead.
+        fun getInstance(project: Project): AcpClientService =
+            instances.computeIfAbsent(project) { p ->
+                val created = AcpClientService(p)
+                Disposer.register(p) { cleanupInBackground(created, p) }
+                created
+            }
+
+        internal fun stopCustomAdapterInAllProjects(adapterId: String) {
+            instances.values.forEach { it.stopSharedProcess(adapterId) }
+        }
+
+        /**
+         * Project disposal runs on the EDT, and stopping agent processes must never hold the IDE
+         * window open. The work is handed to a plain thread that JVM shutdown waits for, so the
+         * kill is still guaranteed to be issued - see "Files written on the user's disk" in
+         * AGENTS.md.
+         */
+        private fun cleanupInBackground(service: AcpClientService, project: Project) {
+            instances.remove(project)
+            val lastOwner = instances.isEmpty()
+            registerShutdownTaskOnce()
+
+            val thread = Thread({
+                try {
+                    service.shutdown()
+                    if (lastOwner) {
+                        AcpProcessRegistry.closeOwnerAndCleanupIfLast()
+                    }
+                } finally {
+                    pendingCleanups.remove(Thread.currentThread())
+                }
+            }, "AgentDock process cleanup")
+            thread.isDaemon = true
+            pendingCleanups.add(thread)
+            thread.start()
+        }
+
+        private fun registerShutdownTaskOnce() {
+            if (!shutdownTaskRegistered.compareAndSet(false, true)) return
+            runCatching {
+                Runtime.getRuntime().addShutdownHook(Thread {
+                    pendingCleanups.toList().forEach { thread ->
+                        runCatching { thread.join(CLEANUP_JOIN_TIMEOUT_MS) }
+                    }
+                })
+            }
+        }
+    }
+    @Volatile
+    internal var logCallback: ((AcpLogEntry) -> Unit)? = null
+
+    fun setOnLogEntry(callback: (AcpLogEntry) -> Unit) {
+        logCallback = callback
+    }
+
+    internal fun onLogEntry(entry: AcpLogEntry) {
+        logCallback?.invoke(entry)
+    }
+
+    @Volatile
+    internal var permissionRequestHandler: ((PermissionRequest) -> Unit)? = null
+
+    fun setOnPermissionRequest(handler: (PermissionRequest) -> Unit) {
+        permissionRequestHandler = handler
+    }
+
+    @Volatile
+    internal var sessionUpdateHandler: ((String, SessionUpdate, Boolean, JsonElement?) -> Unit)? = null
+
+    fun setOnSessionUpdate(handler: (String, SessionUpdate, Boolean, JsonElement?) -> Unit) {
+        sessionUpdateHandler = handler
+    }
+
+    @Volatile
+    internal var availableCommandsHandler: ((String, List<AvailableCommandPayload>) -> Unit)? = null
+
+    internal fun setOnAvailableCommands(handler: (String, List<AvailableCommandPayload>) -> Unit) {
+        availableCommandsHandler = handler
+    }
+
+    @Volatile
+    internal var adapterInitializationStateHandler: ((String, AdapterInitializationStatus, String?) -> Unit)? = null
+
+    fun setOnAdapterInitializationStateChanged(handler: (String, AdapterInitializationStatus, String?) -> Unit) {
+        adapterInitializationStateHandler = handler
+    }
+
+    @Volatile
+    internal var sessionConfigOptionsHandler: ((String, AdapterRuntimeMetadata, Boolean) -> Unit)? = null
+
+    internal fun setOnSessionConfigOptionsChanged(handler: (String, AdapterRuntimeMetadata, Boolean) -> Unit) {
+        sessionConfigOptionsHandler = handler
+    }
+
+    /**
+     * The handlers above capture the bridge, and through it the JCEF browser. This service outlives
+     * the tool window content, so the content has to hand them back when it goes away. The owner
+     * check keeps a late disposal of an old bridge from unhooking a newer one.
+     */
+    @Volatile
+    internal var callbackOwner: Any? = null
+
+    internal fun releaseUiCallbacks(owner: Any) {
+        if (callbackOwner !== owner) return
+        callbackOwner = null
+        logCallback = null
+        permissionRequestHandler = null
+        sessionUpdateHandler = null
+        availableCommandsHandler = null
+        adapterInitializationStateHandler = null
+        sessionConfigOptionsHandler = null
+    }
+
+    internal fun bindLiveSessionOwner(chatId: String, sessionId: String?) {
+        val normalizedSessionId = sessionId?.trim().orEmpty()
+        synchronized(liveOwnerBySessionId) {
+            liveOwnerBySessionId.entries.removeIf { it.value == chatId }
+            if (normalizedSessionId.isNotBlank()) {
+                liveOwnerBySessionId[normalizedSessionId] = chatId
+            }
+        }
+    }
+
+    fun activeAdapterName(chatId: String): String? = sessions[chatId]?.activeAdapterNameRef?.get()
+
+    enum class Status { NotStarted, Initializing, Ready, Prompting, Error }
+    enum class AdapterInitializationStatus { NotStarted, Initializing, Ready, Failed }
+
+    internal inner class SharedProcess(val adapterName: String) {
+        val mutex = Mutex()
+        @Volatile var process: Process? = null
+        @Volatile var client: Client? = null
+        @Volatile var protocol: Protocol? = null
+        @Volatile var authMethods: List<AuthMethod> = emptyList()
+        @Volatile var logoutAvailable: Boolean = false
+        @Volatile var sessionListAvailable: Boolean = false
+        @Volatile var sessionDeleteAvailable: Boolean = false
+        @Volatile var sessionCloseAvailable: Boolean = false
+        @Volatile var protocolScope: CoroutineScope? = null
+        @Volatile var isInitialized: Boolean = false
+        @Volatile var sessionUpdateWrapped: Boolean = false
+        @Volatile var sessionUpdateScope: CoroutineScope? = null
+        @Volatile var sessionUpdateQueue: Channel<QueuedSessionUpdate>? = null
+        @Volatile var sessionUpdateWorker: Job? = null
+        val configGeneration = AtomicLong(0)
+
+        /** Set once this object leaves [activeProcesses]; it must never start another process. */
+        @Volatile var retired: Boolean = false
+            private set
+
+        fun markConfigMutated() {
+            configGeneration.incrementAndGet()
+        }
+
+        /** Publishes a started process, or kills it when this object was retired meanwhile. */
+        fun attachProcess(newProcess: Process) {
+            synchronized(this) {
+                if (!retired) {
+                    process = newProcess
+                    return
+                }
+            }
+            AcpProcessUtils.destroyProcessTree(newProcess.toHandle())
+            throw IllegalStateException("The agent process was stopped during initialization.")
+        }
+
+        fun retire() {
+            synchronized(this) { retired = true }
+            stop()
+        }
+
+        fun stop() {
+            val runningProcess = process
+            val processHandle = runCatching { runningProcess?.toHandle() }.getOrNull()
+            val stopped = runCatching {
+                processHandle?.let { AcpProcessUtils.destroyProcessTree(it) } ?: run {
+                    runningProcess?.destroyForcibly()
+                    runningProcess?.waitFor(2, TimeUnit.SECONDS)
+                }
+                true
+            }.getOrDefault(false)
+            if (!stopped) {
+                runCatching {
+                    runningProcess?.destroyForcibly()
+                    runningProcess?.waitFor(2, TimeUnit.SECONDS)
+                }
+            }
+            AcpProcessRegistry.unregisterProcess(runningProcess)
+            process = null
+            client = null
+            protocol = null
+            authMethods = emptyList()
+            logoutAvailable = false
+            sessionListAvailable = false
+            sessionDeleteAvailable = false
+            sessionCloseAvailable = false
+            protocolScope?.coroutineContext?.cancel()
+            protocolScope = null
+            isInitialized = false
+            sessionUpdateQueue?.close()
+            sessionUpdateQueue = null
+            sessionUpdateWorker?.cancel()
+            sessionUpdateWorker = null
+            sessionUpdateScope?.coroutineContext?.cancel()
+            sessionUpdateScope = null
+            sessionUpdateWrapped = false
+            configGeneration.incrementAndGet()
+        }
+    }
+
+    internal val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    internal val sessions = ConcurrentHashMap<String, AgentContext>()
+    internal val activeProcesses = ConcurrentHashMap<String, SharedProcess>()
+    internal val liveOwnerBySessionId = ConcurrentHashMap<String, String>()
+    internal val replayOwnerBySessionId = ConcurrentHashMap<String, String>()
+    internal val configProbeSessionKeys: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    internal val startupInitializationStarted = AtomicBoolean(false)
+    internal val adapterInitializationJobs = ConcurrentHashMap<String, Job>()
+    internal val adapterInitializationState = ConcurrentHashMap<String, AdapterInitializationStatus>()
+    internal val adapterInitializationErrors = ConcurrentHashMap<String, String>()
+    internal val adapterInitializationDetails = ConcurrentHashMap<String, String>()
+    internal val adapterRuntimeMetadataMap = ConcurrentHashMap<String, AdapterRuntimeMetadata>()
+    internal val loginStatusStates = ConcurrentHashMap<String, Boolean>()
+    internal val availableCommandsByAdapter = ConcurrentHashMap<String, List<AvailableCommandPayload>>()
+    internal val systemInstructionsInjectedSessionIds: MutableSet<String> = ConcurrentHashMap.newKeySet()
+    internal val historySyncAfterInitializationInFlight = AtomicBoolean(false)
+
+    fun status(chatId: String): Status = sessions[chatId]?.statusRef?.get() ?: Status.NotStarted
+    fun sessionId(chatId: String): String? = sessions[chatId]?.sessionIdRef?.get()
+    fun activeModeId(chatId: String): String? = sessions[chatId]?.activeModeIdRef?.get()
+    internal fun sessionRuntimeMetadata(chatId: String): AdapterRuntimeMetadata? =
+        sessions[chatId]?.runtimeMetadataRef?.get()
+    fun adapterInitializationStatus(adapterName: String): AdapterInitializationStatus {
+        return adapterInitializationState[adapterName] ?: AdapterInitializationStatus.NotStarted
+    }
+    fun adapterInitializationError(adapterName: String): String? = adapterInitializationErrors[adapterName]
+    fun adapterInitializationDetail(adapterName: String): String? = adapterInitializationDetails[adapterName]
+    internal fun adapterRuntimeMetadata(adapterName: String): AdapterRuntimeMetadata? = adapterRuntimeMetadataMap[adapterName]
+    internal fun allAvailableCommands(): Map<String, List<AvailableCommandPayload>> = availableCommandsByAdapter.toMap()
+    fun isAdapterReady(adapterName: String): Boolean {
+        val sharedProc = activeProcesses[adapterName] ?: return false
+        return sharedProc.isHealthy()
+    }
+
+    fun adapterAuthMethods(adapterName: String): List<AuthMethod> =
+        activeProcesses[adapterName]?.authMethods.orEmpty()
+
+    fun isAdapterLogoutAvailable(adapterName: String): Boolean =
+        activeProcesses[adapterName]?.logoutAvailable == true
+
+    internal fun updateAvailableCommands(adapterName: String, commands: List<AvailableCommandPayload>) {
+        availableCommandsByAdapter[adapterName] = commands
+        runCatching { availableCommandsHandler?.invoke(adapterName, commands) }
+    }
+
+    internal fun updateAdapterInitializationState(
+        adapterName: String,
+        state: AdapterInitializationStatus,
+        error: String? = null,
+        detail: String? = null
+    ) {
+        adapterInitializationState[adapterName] = state
+        if (error.isNullOrBlank()) {
+            adapterInitializationErrors.remove(adapterName)
+        } else {
+            adapterInitializationErrors[adapterName] = error
+        }
+        if (state == AdapterInitializationStatus.Initializing && !detail.isNullOrBlank()) {
+            adapterInitializationDetails[adapterName] = detail
+        } else if (state != AdapterInitializationStatus.Initializing) {
+            adapterInitializationDetails.remove(adapterName)
+        }
+        runCatching { adapterInitializationStateHandler?.invoke(adapterName, state, error) }
+    }
+
+    internal fun SharedProcess.isHealthy(): Boolean = failureReason() == null
+
+    /** Why the process cannot serve requests, or null when it is healthy. */
+    internal fun SharedProcess.failureReason(): String? {
+        val runningProcess = process ?: return "Connection to the agent process is unavailable."
+        if (!runningProcess.isAlive) {
+            val exitCode = runCatching { runningProcess.exitValue() }.getOrNull()
+            return if (exitCode != null) {
+                "Connection to the agent process was lost (exit code $exitCode)."
+            } else {
+                "Connection to the agent process was lost."
+            }
+        }
+        if (client == null || !isInitialized) {
+            return "Agent connection is not initialized."
+        }
+
+        val protocolActive = protocolScope?.coroutineContext?.get(Job)?.isActive == true
+        if (!protocolActive) {
+            return "The ACP transport is no longer active."
+        }
+
+        if (sessionUpdateWrapped) {
+            val updateScopeActive = sessionUpdateScope?.coroutineContext?.get(Job)?.isActive == true
+            val updateWorkerActive = sessionUpdateWorker?.isActive == true
+            if (!updateScopeActive || !updateWorkerActive) {
+                return "The ACP update stream stopped unexpectedly."
+            }
+        }
+
+        return null
+    }
+
+    internal inner class AgentContext(val chatId: String) {
+        val lifecycleMutex = Mutex()
+        val statusRef = AtomicReference(Status.NotStarted)
+        val sessionIdRef = AtomicReference<String?>(null)
+        val activeAdapterNameRef = AtomicReference<String?>(null)
+        val activeModeIdRef = AtomicReference<String?>(null)
+        val activeConfigValues = ConcurrentHashMap<String, String>()
+        val runtimeMetadataRef = AtomicReference<AdapterRuntimeMetadata?>(null)
+        @Volatile var appliedConfigGeneration: Long = -1L
+        @Volatile var configOptionsUpdateInProgress: Boolean = false
+        val promptGeneration = AtomicLong(0)
+        @Volatile var allowReplayDelivery: Boolean = true
+        @Volatile var ignoreUpdatesUntilPrompt: Boolean = false
+
+        val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<RequestPermissionResponse>>()
+        val observedToolCallIds = mutableSetOf<String>()
+
+        fun deliverSessionUpdate(update: SessionUpdate, isReplay: Boolean, meta: JsonElement?, isPermission: Boolean = false) {
+            synchronized(observedToolCallIds) {
+                val toolCallId = when (update) {
+                    is SessionUpdate.ToolCall -> update.toolCallId.value
+                    is SessionUpdate.ToolCallUpdate -> update.toolCallId.value
+                    else -> null
+                }
+                if (!isReplay && toolCallId != null) {
+                    val isNew = observedToolCallIds.add(toolCallId)
+                    // Permission metadata describes the grant, not the already reported operation.
+                    if (isPermission && !isNew) return
+                }
+                sessionUpdateHandler?.invoke(chatId, update, isReplay, meta)
+            }
+        }
+
+        @Volatile var sharedProcess: SharedProcess? = null
+        @Volatile var session: ClientSession? = null
+
+        fun stop() {
+            statusRef.set(Status.NotStarted)
+            sessionIdRef.get()?.let { systemInstructionsInjectedSessionIds.remove(it) }
+            sessionIdRef.set(null)
+            synchronized(liveOwnerBySessionId) { liveOwnerBySessionId.entries.removeIf { it.value == chatId } }
+            replayOwnerBySessionId.entries.removeIf { it.value == chatId }
+            activeAdapterNameRef.set(null)
+            activeModeIdRef.set(null)
+            activeConfigValues.clear()
+            runtimeMetadataRef.set(null)
+            releaseConnection()
+        }
+
+        fun markBroken() {
+            releaseConnection()
+            statusRef.set(Status.Error)
+        }
+
+        /** Detaches the chat from its agent connection; the session identity is kept. */
+        private fun releaseConnection() {
+            synchronized(observedToolCallIds) { observedToolCallIds.clear() }
+            session = null
+            sharedProcess = null
+            promptGeneration.incrementAndGet()
+            appliedConfigGeneration = -1L
+            configOptionsUpdateInProgress = false
+            ignoreUpdatesUntilPrompt = false
+            allowReplayDelivery = true
+            cancelPendingPermissions()
+        }
+
+        fun cancelPendingPermissions() {
+            // Each request is removed before it completes, so one added meanwhile is never dropped unanswered.
+            pendingRequests.keys.forEach { requestId ->
+                pendingRequests.remove(requestId)?.complete(RequestPermissionResponse(RequestPermissionOutcome.Cancelled))
+            }
+        }
+    }
+
+    internal fun createAgentContext(chatId: String): AgentContext = AgentContext(chatId)
+    internal fun createSharedProcess(adapterName: String): SharedProcess = SharedProcess(adapterName)
+    internal fun createSharedSessionOperations(sessionId: String): ClientSessionOperations =
+        SharedSessionOperations(sessionId)
+
+    private inner class SharedSessionOperations(
+        val sessionId: String
+    ) : ClientSessionOperations {
+        override suspend fun requestPermissions(
+            toolCall: SessionUpdate.ToolCallUpdate,
+            permissions: List<PermissionOption>,
+            _meta: JsonElement?
+        ): RequestPermissionResponse {
+            if (permissions.isEmpty()) {
+                return RequestPermissionResponse(RequestPermissionOutcome.Cancelled)
+            }
+
+            val primaryCtx = synchronized(liveOwnerBySessionId) {
+                liveOwnerBySessionId[sessionId]
+                    ?.let { ownerChatId -> sessions[ownerChatId] }
+                    ?.takeIf { it.sessionIdRef.get() == sessionId }
+            } ?: return RequestPermissionResponse(RequestPermissionOutcome.Cancelled)
+
+            // Create a missing operation before showing the dialog, but preserve an existing one.
+            primaryCtx.deliverSessionUpdate(toolCall, false, _meta, isPermission = true)
+
+            val requestId = java.util.UUID.randomUUID().toString()
+            val title = toolCall.title ?: "Action"
+
+            val request = PermissionRequest(
+                requestId,
+                primaryCtx.chatId,
+                title,
+                permissions
+            )
+
+            val deferred = CompletableDeferred<RequestPermissionResponse>()
+            primaryCtx.pendingRequests[requestId] = deferred
+
+            permissionRequestHandler?.invoke(request)
+                ?: deferred.complete(RequestPermissionResponse(RequestPermissionOutcome.Cancelled))
+
+            return deferred.await()
+        }
+
+        override suspend fun notify(notification: SessionUpdate, _meta: JsonElement?) {
+            val replayOwnerChatId = replayOwnerBySessionId[sessionId]
+            val targetContext = if (replayOwnerChatId != null) {
+                sessions[replayOwnerChatId]?.takeIf { it.allowReplayDelivery }
+            } else {
+                liveOwnerBySessionId[sessionId]
+                    ?.let { ownerChatId -> sessions[ownerChatId] }
+                    ?.takeIf { it.allowReplayDelivery && it.sessionIdRef.get() == sessionId }
+            }
+            if (targetContext == null) {
+                return
+            }
+
+            if (notification is SessionUpdate.CurrentModeUpdate) {
+                targetContext.activeModeIdRef.set(notification.currentModeId.value)
+            }
+
+            val handler = sessionUpdateHandler
+            if (handler == null || targetContext.ignoreUpdatesUntilPrompt) {
+                return
+            }
+
+            val isReplayDelivery =
+                replayOwnerChatId != null &&
+                replayOwnerChatId == targetContext.chatId
+            targetContext.deliverSessionUpdate(notification, isReplayDelivery, _meta)
+        }
+    }
+
+}
+
+internal fun AcpClientService.promptDispatchFailure(chatId: String): String? {
+    val context = sessions[chatId] ?: return "No active agent session."
+    val session = context.session ?: return "No active agent session."
+    val sharedProcess = context.sharedProcess ?: return "Connection to the agent process is unavailable."
+    sharedProcess.failureReason()?.let { return it }
+    return if (session.sessionId.value.isBlank()) "No active agent session." else null
+}
+
+internal fun AcpClientService.cancelDispatchFailure(chatId: String): String? {
+    val context = sessions[chatId] ?: return "No active prompt is running."
+    val sharedProcess = context.sharedProcess ?: return "Connection to the agent process is unavailable."
+    return sharedProcess.failureReason()
+}
+
+internal suspend fun AcpClientService.markChatSessionBroken(chatId: String) {
+    val context = sessions[chatId] ?: return
+    context.lifecycleMutex.withLock {
+        context.markBroken()
+    }
+}
+
+internal sealed interface QueuedSessionUpdate {
+    val completed: CompletableDeferred<Unit>
+
+    data class Notification(
+        val notification: JsonRpcNotification,
+        override val completed: CompletableDeferred<Unit>
+    ) : QueuedSessionUpdate
+    data class Barrier(override val completed: CompletableDeferred<Unit>) : QueuedSessionUpdate
+}

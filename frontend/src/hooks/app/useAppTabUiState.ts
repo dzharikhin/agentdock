@@ -1,7 +1,7 @@
 import { MutableRefObject, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AttentionLevel, TabUiFlags } from '../../types/chat';
 
-const DEFAULT_TAB_UI: TabUiFlags = { unread: false, atBottom: true, canMarkRead: true, warning: false, processing: false, queued: false };
+const DEFAULT_TAB_UI: TabUiFlags = { unread: false, canMarkRead: true, warning: false, processing: false, queued: false };
 
 export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRefObject<string>) {
   const [tabUi, setTabUi] = useState<Record<string, TabUiFlags>>({});
@@ -89,28 +89,6 @@ export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRef
     });
   }, [activeTabIdRef]);
 
-  const handleAtBottomChange = useCallback((tabId: string, isAtBottom: boolean) => {
-    setTabUi(prev => {
-      const current = prev[tabId] ?? DEFAULT_TAB_UI;
-      const next = {
-        ...current,
-        atBottom: isAtBottom,
-      };
-
-      if (
-        current.atBottom === next.atBottom &&
-        current.canMarkRead === next.canMarkRead &&
-        current.unread === next.unread &&
-        current.warning === next.warning &&
-        current.processing === next.processing
-      ) {
-        return prev;
-      }
-
-      return { ...prev, [tabId]: next };
-    });
-  }, []);
-
   const handleCanMarkReadChange = useCallback((tabId: string, canMarkRead: boolean) => {
     setTabUi(prev => {
       const current = prev[tabId] ?? DEFAULT_TAB_UI;
@@ -122,7 +100,6 @@ export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRef
       };
 
       if (
-        current.atBottom === next.atBottom &&
         current.canMarkRead === next.canMarkRead &&
         current.unread === next.unread &&
         current.warning === next.warning &&
@@ -210,7 +187,6 @@ export function useAppTabUiState(activeTabId: string, activeTabIdRef: MutableRef
     markTabReadIfAllowed,
     clearTabUnread,
     handleAssistantActivity,
-    handleAtBottomChange,
     handleCanMarkReadChange,
     handlePermissionRequestChange,
     handleProcessingChange,

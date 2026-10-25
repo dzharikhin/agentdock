@@ -27,7 +27,6 @@ interface ChatSessionProps extends UseChatSessionOptions {
   isActive?: boolean;
   promptNavigationHoverOnly: boolean;
   onAssistantActivity?: () => void;
-  onAtBottomChange?: (isAtBottom: boolean) => void;
   onCanMarkReadChange?: (canMarkRead: boolean) => void;
   onPermissionRequestChange?: (hasPendingPermission: boolean) => void;
   onProcessingChange?: (isProcessing: boolean) => void;
@@ -111,7 +110,6 @@ export default function ChatSessionView({
   promptNavigationHoverOnly,
   onUserMessageSent,
   onAssistantActivity,
-  onAtBottomChange,
   onCanMarkReadChange,
   onPermissionRequestChange,
   onProcessingChange,
@@ -238,7 +236,6 @@ export default function ChatSessionView({
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const {
-    handleAtBottomChange,
     handleCanMarkReadChange,
   } = useChatSessionNotifications({
     messages,
@@ -249,7 +246,6 @@ export default function ChatSessionView({
     acpSessionId,
     adapterName: selectedAgentId,
     onAssistantActivity,
-    onAtBottomChange,
     onCanMarkReadChange,
     onPermissionRequestChange,
     onProcessingChange,
@@ -324,7 +320,6 @@ export default function ChatSessionView({
             messages={messages} 
             promptNavigationHoverOnly={promptNavigationHoverOnly}
             onImageClick={setPreviewImage} 
-            onAtBottomChange={handleAtBottomChange}
             onCanMarkReadChange={handleCanMarkReadChange}
             isSending={isSending}
             status={status}
@@ -392,9 +387,6 @@ export default function ChatSessionView({
             queueError={queueError}
             onStop={handleStop}
             isSending={isSending}
-            promptQueueEnabled
-            usageSessionKey={acpSessionId || undefined}
-            status={status}
 
             agentOptions={agentOptions}
             selectedAgentId={selectedAgentId}

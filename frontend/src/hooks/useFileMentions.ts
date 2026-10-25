@@ -28,10 +28,14 @@ export function useFileMentions({
   
   const [queryMatch, setQueryMatch] = useState<{ query: string, startOffset: number, endOffset: number, nodeKey: string } | null>(null);
   const searchTimeoutRef = useRef<number | undefined>(undefined);
+  // Only this input's latest search is shown: an older one may answer later, and other inputs search too.
+  const searchRequestIdRef = useRef('');
 
   const searchFilesDebounced = useCallback((query: string) => {
     window.clearTimeout(searchTimeoutRef.current);
-    searchTimeoutRef.current = window.setTimeout(() => ACPBridge.searchFiles(query), FILE_SEARCH_DEBOUNCE_MS);
+    searchTimeoutRef.current = window.setTimeout(() => {
+      searchRequestIdRef.current = ACPBridge.searchFiles(query);
+    }, FILE_SEARCH_DEBOUNCE_MS);
   }, []);
 
   const clearMention = useCallback(() => {
@@ -43,7 +47,7 @@ export function useFileMentions({
 
   useEffect(() => {
     return ACPBridge.onFilesResult((e) => {
-      setFiles(e.detail.files);
+      if (e.detail.payload.requestId === searchRequestIdRef.current) setFiles(e.detail.payload.files);
     });
   }, []);
 

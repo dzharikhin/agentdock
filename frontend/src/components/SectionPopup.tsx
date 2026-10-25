@@ -43,8 +43,8 @@ const clampOffset = (dialog: HTMLElement | null, { x, y }: Offset): Offset => {
 /**
  * Dialog over the plugin window, as wide as the window allows up to 900px. Its height follows the content, at least
  * 650px where the window allows, and its top edge is fixed, so the title bar does not move when the content changes.
- * A full-height sidebar switches between the sections; the title bar, above the section only, leaves the title to it
- * unless `compact`. The title bar and the sidebar's top drag the dialog, partly out of the plugin window too; it opens at
+ * The full-width title bar shows the plugin icon and version, as the IDE dialogs show theirs, and a sidebar under it
+ * switches between the sections. The title bar drags the dialog, partly out of the plugin window too; it opens at
  * its initial position and keeps the dragged one while switching sections. What lies around it stays usable: a press
  * outside it closes it and still acts there, except on `[data-section-opener]` controls, which switch the section
  * instead; Esc inside it closes it too. Row menus portaled out of it count as inside. It stays mounted while closed so cached sections keep their state.
@@ -113,16 +113,38 @@ export function SectionPopup({ sections, activeSection, compact, sidebarLayout, 
           onClose();
         }}
         style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
-        className="pointer-events-auto flex max-h-full min-h-[min(650px,100%)] w-full max-w-[900px]
+        className="pointer-events-auto grid max-h-full min-h-[min(650px,100%)] w-full max-w-[900px]
+          grid-cols-[auto_minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)]
           overflow-hidden rounded-[8px] border border-border bg-background shadow-popup focus:outline-none"
       >
+        <div className="col-span-2 flex h-10 select-none items-center gap-2 pl-4 pr-2" onPointerDown={startDrag}>
+          {/* The plugin icon drawn on the 16px pixel grid, so it stays sharp at this size. */}
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor"
+            strokeLinecap="square" className="shrink-0 text-foreground-secondary" aria-hidden="true">
+            <path d="M2 0.5H14A1.5 1.5 0 0 1 15.5 2V10A1.5 1.5 0 0 1 14 11.5H10.5L8 14L5.5 11.5H2A1.5 1.5 0 0 1 0.5 10V2A1.5 1.5 0 0 1 2 0.5Z" />
+            <polyline points="5.5,4 3.5,6 5.5,8" />
+            <line x1="7.5" y1="8" x2="8.5" y2="4" />
+            <polyline points="10.5,4 12.5,6 10.5,8" />
+          </svg>
+          <span className="-translate-y-px truncate text-ide-small text-foreground-secondary">
+            v{window.__pluginVersion}{compact && label ? ` – ${label}` : ''}
+          </span>
+          <Tooltip variant="minimal" placement="bottom" content="Close" className="ml-auto flex">
+            <button
+              type="button"
+              onClick={onClose}
+              className={iconButtonClassName}
+              aria-label={label ? `Close ${label}` : 'Close'}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </Tooltip>
+        </div>
         <nav
           aria-label="Sections"
           data-section-nav
-          className="flex w-max max-w-[240px] shrink-0 flex-col overflow-y-auto border-r border-border px-2 pb-2 text-ide-small"
+          className="flex w-max max-w-[240px] flex-col overflow-y-auto border-r border-border px-2 pb-2 pt-3 text-ide-small"
         >
-          {/* Drags like the title bar. */}
-          <div className="h-[44px] shrink-0 select-none" onPointerDown={startDrag} />
           {sections.map((section) => {
             const active = section.type === activeSection;
             const button = (
@@ -162,25 +184,8 @@ export function SectionPopup({ sections, activeSection, compact, sidebarLayout, 
             );
           })}
         </nav>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div className="flex h-10 shrink-0 select-none items-center gap-2 pl-4 pr-2" onPointerDown={startDrag}>
-            {compact ? (
-              <span className="truncate text-ide-regular text-foreground-secondary">{label}</span>
-            ) : null}
-            <Tooltip variant="minimal" placement="bottom" content="Close" className="ml-auto flex">
-              <button
-                type="button"
-                onClick={onClose}
-                className={iconButtonClassName}
-                aria-label={label ? `Close ${label}` : 'Close'}
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </Tooltip>
-          </div>
-          <div ref={contentRef} className="flex min-h-0 min-w-0 flex-1 flex-col [container-type:inline-size] [container-name:section]">
-            {children}
-          </div>
+        <div ref={contentRef} className="flex min-h-0 min-w-0 flex-col [container-type:inline-size] [container-name:section]">
+          {children}
         </div>
       </div>
     </div>

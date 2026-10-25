@@ -7,6 +7,10 @@ interface AudioInputControllerProps {
   insertTranscript: (text: string) => void;
 }
 
+// AudioCaptureManager has a slightly longer limit of its own, for when the UI cannot stop the recording.
+const MAX_RECORDING_MS = 2 * 60 * 1000;
+const RECORDING_LIMIT_MARKER = '[Recording stopped: 2-minute limit reached.]';
+
 function formatAudioError(error: unknown): string {
   const message = error instanceof Error ? error.message.trim() : String(error ?? '').trim();
   return `[${message || 'Error'}]`;
@@ -53,7 +57,7 @@ export function useAudioInputController({
     };
   }, [ownerId]);
 
-  const handleVoiceInput = useCallback(async () => {
+  const handleVoiceInput = useCallback(async (limitReached = false) => {
     if (isTranscribing) return;
 
     if (isRecording) {
@@ -69,7 +73,8 @@ export function useAudioInputController({
           activeRequestRef.current === requestId &&
           cancellationRequestedRef.current !== requestId
         ) {
-          insertTranscriptRef.current(result.text || '');
+          const text = result.text || '';
+          insertTranscriptRef.current(limitReached ? `${text} ${RECORDING_LIMIT_MARKER}` : text);
         }
       } catch (error) {
         console.error('[ChatInput] Voice transcription failed:', error);
@@ -100,6 +105,13 @@ export function useAudioInputController({
       setIsRecording(false);
     }
   }, [isRecording, isTranscribing, ownerId]);
+
+  // Stop at the limit the same way as a click, so the recording is transcribed instead of lost.
+  useEffect(() => {
+    if (!isRecording || isTranscribing) return;
+    const timer = setTimeout(() => void handleVoiceInput(true), MAX_RECORDING_MS);
+    return () => clearTimeout(timer);
+  }, [isRecording, isTranscribing, handleVoiceInput]);
 
   const handleCancelVoiceInput = useCallback(() => {
     const requestId = activeRequestRef.current;

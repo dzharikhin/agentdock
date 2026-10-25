@@ -186,17 +186,6 @@ export const FIXTURES: Record<string, ConversationReplayData> = {
     }])],
   },
 
-  userCommandMarkup: {
-    sessions: [session([{
-      blocks: [{
-        type: 'text',
-        text: '<command-name>/init</command-name><command-args>x</command-args>Actual request',
-      }],
-      events: [{ role: 'assistant', type: 'text', text: 'Done.' }],
-      assistantMeta: meta(),
-    }])],
-  },
-
   transferredContext: {
     sessions: [session([{
       blocks: [{

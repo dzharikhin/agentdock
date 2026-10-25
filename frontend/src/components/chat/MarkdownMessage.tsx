@@ -4,7 +4,6 @@ import { Check, Copy } from 'lucide-react';
 import { marked } from 'marked';
 import { markedHighlight } from 'marked-highlight';
 import hljs from '../../utils/highlight';
-import { openFile } from '../../utils/openFile';
 import { sanitizeMarkdownHtml } from '../../utils/sanitizeHtml';
 import { Tooltip } from './shared/Tooltip';
 import '../../styles/markdown.css';
@@ -85,29 +84,6 @@ export const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, enabl
     };
   }, []);
 
-  const handleClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-    const target = event.target as HTMLElement | null;
-    const anchor = target?.closest('a');
-    if (!anchor) return;
-
-    const rawHref = anchor.getAttribute('href')?.trim();
-    if (!rawHref) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const href = decodeHtmlHref(rawHref);
-    const localFileTarget = parseLocalFileTarget(href);
-    if (localFileTarget) {
-      openFile(localFileTarget.path, localFileTarget.line);
-      return;
-    }
-
-    if (/^https?:\/\//i.test(href)) {
-      window.__openUrl?.(href);
-    }
-  }, []);
-
   const handleCopyCodeBlock = useCallback(async (slot: HTMLElement, index: number) => {
     const code = slot.closest(`.${codeBlockClassName}`)?.querySelector('pre code')?.textContent;
     if (!code || !navigator.clipboard?.writeText) return;
@@ -132,7 +108,6 @@ export const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, enabl
         ref={containerRef}
         className="markdown-body"
         data-search-text={searchable || undefined}
-        onClick={handleClick}
         dangerouslySetInnerHTML={{ __html: html as string }}
       />
       {enableCodeCopy && copySlots.map((slot, index) => createPortal(
@@ -198,74 +173,4 @@ function decorateCodeBlocks(html: string): string {
   const container = document.createElement('div');
   container.appendChild(template.content.cloneNode(true));
   return container.innerHTML;
-}
-
-function decodeHtmlHref(href: string): string {
-  const textarea = document.createElement('textarea');
-  textarea.innerHTML = href;
-  return textarea.value;
-}
-
-function parseLocalFileTarget(href: string): { path: string; line?: number } | null {
-  const trimmed = href.trim();
-  if (!trimmed) {
-    return null;
-  }
-
-  const normalizedHref = normalizeLocalFileHref(trimmed);
-  if (!normalizedHref) {
-    return null;
-  }
-
-  const normalized = normalizedHref.replace(/\\/g, '/');
-  const hashLineMatch = normalized.match(/^(.*?)#L(\d+)(?:-L\d+)?$/i);
-  const pathWithOptionalLine = hashLineMatch
-    ? { path: hashLineMatch[1], line: Number(hashLineMatch[2]) - 1 }
-    : { path: normalized, line: undefined };
-
-  const colonLineMatch = pathWithOptionalLine.path.match(/^(.*?):(\d+)(?::\d+|-\d+)?$/);
-  const rawPath = colonLineMatch ? colonLineMatch[1] : pathWithOptionalLine.path;
-  const line = colonLineMatch
-    ? Number(colonLineMatch[2]) - 1
-    : pathWithOptionalLine.line;
-
-  if (!isLikelyLocalFilePath(rawPath)) {
-    return null;
-  }
-
-  return {
-    path: rawPath,
-    line: line !== undefined && Number.isFinite(line) && line >= 0 ? line : undefined,
-  };
-}
-
-function isLikelyLocalFilePath(path: string): boolean {
-  if (!path || path.startsWith('#')) return false;
-  if (/^[A-Za-z]:\//.test(path)) return true;
-  if (path.startsWith('./') || path.startsWith('../') || path.startsWith('/')) return true;
-  if (path.includes('/')) return true;
-
-  return /^(?!\.)[^\\/:*?"<>|\r\n]+\.[^\\/:*?"<>|\r\n]+$/.test(path);
-}
-
-function normalizeLocalFileHref(href: string): string | null {
-  if (/^file:/i.test(href)) {
-    try {
-      const url = new URL(href);
-      if (url.protocol !== 'file:') {
-        return null;
-      }
-      const path = decodeURIComponent(url.pathname.replace(/^\/([A-Za-z]:\/)/, '$1'));
-      const lineFragment = /^#L\d+(?:-L\d+)?$/i.test(url.hash) ? url.hash : '';
-      return path + lineFragment;
-    } catch {
-      return null;
-    }
-  }
-
-  if (/^[a-z][a-z0-9+.-]*:/i.test(href) && !/^[A-Za-z]:[\\/]/.test(href)) {
-    return null;
-  }
-
-  return href;
 }

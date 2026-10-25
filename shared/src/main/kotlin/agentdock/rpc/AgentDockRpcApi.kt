@@ -9,6 +9,7 @@ import com.intellij.platform.rpc.RemoteApiProviderService
 import fleet.rpc.RemoteApi
 import fleet.rpc.Rpc
 import fleet.rpc.remoteApiDescriptor
+import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.Serializable
 
@@ -25,6 +26,19 @@ data class UiMessage(val topic: String, val payload: String) {
         const val TOPIC_FRONTEND_CAPABILITIES: String = "frontend-capabilities"
         const val TOPIC_TERMINAL: String = "terminal"
     }
+}
+
+/** One bridge command from the frontend to the backend. */
+@Serializable
+data class BridgeCommand(val name: String, val payload: String)
+
+/** Takes [first] and everything already queued behind it, so one round trip carries all of them. */
+fun <T> ReceiveChannel<T>.batchWith(first: T): List<T> {
+    val batch = arrayListOf(first)
+    while (true) {
+        batch.add(tryReceive().getOrNull() ?: break)
+    }
+    return batch
 }
 
 @Serializable
@@ -44,8 +58,11 @@ data class NativeState(
 @Rpc
 interface AgentDockRpcApi : RemoteApi<Unit> {
 
-    /** Frontend -> backend: run a bridge command. */
-    suspend fun invokeCommand(projectId: ProjectId, command: String, payload: String)
+    /**
+     * Frontend -> backend: run bridge commands in order. Commands queued while the previous call
+     * was in flight travel together, like [uiMessages] batches in the other direction.
+     */
+    suspend fun invokeCommands(projectId: ProjectId, commands: List<BridgeCommand>)
 
     /**
      * Backend -> frontend: messages for the tool window, in emission order.

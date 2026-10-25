@@ -1,0 +1,68 @@
+package agentdock.changes
+
+import kotlinx.serialization.Serializable
+import agentdock.history.HistorySessionChangesStore
+import agentdock.history.ProcessedFileState
+
+@Serializable
+data class ChangesState(
+    val sessionId: String,
+    val adapterName: String,
+    val keptToolCallIds: List<String> = emptyList(),
+    val processedFileStates: List<ProcessedFileState> = emptyList()
+)
+
+object ChangesStateService {
+    fun loadState(projectPath: String, sessionId: String, adapterName: String): ChangesState? {
+        val current = HistorySessionChangesStore.loadSessionChanges(projectPath, sessionId, adapterName) ?: return null
+        return ChangesState(sessionId, adapterName, current.keptToolCallIds, current.processedFileStates)
+    }
+
+    fun saveState(projectPath: String, state: ChangesState) {
+        HistorySessionChangesStore.saveSessionChanges(
+            projectPath = projectPath,
+            sessionId = state.sessionId,
+            adapterName = state.adapterName,
+            keptToolCallIds = state.keptToolCallIds,
+            processedFileStates = state.processedFileStates
+        )
+    }
+
+    fun ensureState(projectPath: String, sessionId: String, adapterName: String): ChangesState {
+        val existing = loadState(projectPath, sessionId, adapterName)
+        if (existing != null) return existing
+        val created = ChangesState(sessionId, adapterName)
+        saveState(projectPath, created)
+        return created
+    }
+
+    fun markFileProcessed(
+        projectPath: String,
+        sessionId: String,
+        adapterName: String,
+        filePath: String,
+        toolCallIds: List<String>
+    ) {
+        val current = loadState(projectPath, sessionId, adapterName) ?: ChangesState(sessionId, adapterName)
+        // Paths are the agent's diff paths as sent, so the same spelling identifies the same file.
+        val previous = current.processedFileStates.firstOrNull { it.filePath == filePath }
+        val updated = current.processedFileStates
+            .filterNot { it.filePath == filePath } + ProcessedFileState(
+                filePath = filePath,
+                toolCallIds = (previous?.toolCallIds.orEmpty() + toolCallIds).distinct()
+            )
+        saveState(projectPath, current.copy(processedFileStates = updated))
+    }
+
+    fun markAllProcessed(projectPath: String, sessionId: String, adapterName: String, toolCallIds: List<String>) {
+        val current = loadState(projectPath, sessionId, adapterName) ?: ChangesState(sessionId, adapterName)
+        saveState(projectPath, current.copy(
+            keptToolCallIds = (
+                current.keptToolCallIds
+                    + current.processedFileStates.flatMap { it.toolCallIds }
+                    + toolCallIds
+                ).distinct(),
+            processedFileStates = emptyList()
+        ))
+    }
+}

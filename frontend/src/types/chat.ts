@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react';
+
 export interface ToolCallDiffEntry {
   type: 'diff';
   path: string;
@@ -210,7 +212,7 @@ export interface DropdownOption {
   label: string;
   description?: string;
   className?: string;
-  icon?: string | React.ReactNode;
+  icon?: string | ReactNode;
   iconPath?: string;
   subOptions?: DropdownOption[];
 }
@@ -219,7 +221,6 @@ export type AttentionLevel = 'warning' | 'processing' | 'unread' | '';
 
 export interface TabUiFlags {
   unread: boolean;
-  atBottom: boolean;
   canMarkRead: boolean;
   warning: boolean;
   processing: boolean;
@@ -412,6 +413,11 @@ export interface FileChangeStatsResultPayload {
   files: FileChangeStatsPayload[];
 }
 
+export interface FileSearchResultPayload {
+  requestId: string;
+  files: { path: string; name: string }[];
+}
+
 export interface ProcessedFileState {
   filePath: string;
   toolCallIds: string[];
@@ -482,7 +488,7 @@ export interface ConversationTranscriptSavedPayload {
 export interface BridgeOperationResultPayload {
   requestId: string;
   chatId: string;
-  operation: 'start_agent' | 'send_prompt' | 'cancel_prompt' | 'recover_runtime';
+  operation: 'start_agent' | 'send_prompt' | 'cancel_prompt';
   ok: boolean;
   error?: string;
 }
@@ -625,11 +631,10 @@ declare global {
     __renameHistoryGroup?: (payload: { projectPath: string; group: string; newGroup: string }) => void;
     __searchHistoryConversations?: (payload: { projectPath: string; conversationIds: string[]; query: string }) => void;
     __loadHistoryConversation?: (conversationId: string, projectPath: string, historyConversationId: string) => void;
-    __recoverRuntime?: (reason?: string, requestId?: string) => void;
     __loginAgent?: (adapterId: string, methodId: string) => void;
     __logoutAgent?: (adapterId: string) => void;
     __cancelAgentAuth?: (adapterId: string) => void;
-    __fetchAdapterUsage?: (adapterId: string, force?: boolean) => void;
+    __fetchAdapterUsage?: (adapterId: string, view?: boolean) => void;
     __openAgentCli?: (adapterId: string) => void;
     __openHistoryConversationCli?: (payload: { projectPath: string; conversationId: string }) => void;
     __undoFile?: (payload: string) => void;
@@ -648,6 +653,8 @@ declare global {
     __requestHostRepaint?: (reason?: string) => void;
     /** Answered with an `agent-dock-ui-visibility` event telling whether the UI is on screen. */
     __readUiVisibility?: () => void;
+    /** Answered with an `agent-dock-ui-zoom` event carrying the current UI zoom. */
+    __readUiZoom?: () => void;
     /** Mirrors the open chats' dot on the plugin icon: `warning`, `unread`, or empty for none. */
     __setAttentionBadge?: (level: AttentionLevel) => void;
 
@@ -679,8 +686,8 @@ declare global {
     __onMcpStatus?: (update: unknown) => void;
     __onCustomAcpConfigs?: (configs: unknown) => void;
     __onCustomAcpStatus?: (update: import('./customAcp').CustomAcpStatusUpdate) => void;
-    __onFilesResult?: (filesJson: unknown) => void;
-    __searchFiles?: (query: string) => void;
+    __onFilesResult?: (payload: FileSearchResultPayload) => void;
+    __searchFiles?: (payload: string) => void;
     __requestFileIcon?: (path: string) => void;
     __onFileIconResult?: (result: { path: string; icon: string }) => void;
     __readLocalImage?: (path: string) => void;
@@ -702,6 +709,7 @@ declare global {
     __saveSystemInstructions?: (json: string) => void;
     __loadAudioTranscriptionFeature?: (payload?: string) => void;
     __installAudioTranscriptionFeature?: (payload?: string) => void;
+    __cancelAudioTranscriptionFeatureInstall?: (payload?: string) => void;
     __uninstallAudioTranscriptionFeature?: (payload?: string) => void;
     __onAudioTranscriptionFeature?: (state: AudioTranscriptionFeatureState) => void;
     __onAudioTranscriptionResult?: (payload: AudioTranscriptionResultPayload) => void;
@@ -718,5 +726,7 @@ declare global {
     __onGlobalSettings?: (payload: GlobalSettingsPayload) => void;
     __onAdapterDeleted?: (adapterId: string) => void;
     __settingsBridgeReady?: boolean;
+    // Injected into the HTML by AssetLoader.kt.
+    __pluginVersion?: string;
   }
 }

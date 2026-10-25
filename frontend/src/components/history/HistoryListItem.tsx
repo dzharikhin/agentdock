@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { EllipsisVertical, Pencil, Pin, SquareTerminal, Trash2 } from 'lucide-react';
 import { ACPBridge } from '../../utils/bridge';
 import type { AgentOption, HistorySessionMeta, TabUiFlags } from '../../types/chat';
@@ -79,6 +80,9 @@ export function HistoryListItem({
   const canDelete = item.deletable !== false;
   const query = searchQuery.trim();
   const activate = () => onOpenSession(item);
+  // Shown until the history list brings the new title, so the old one does not flash back.
+  const [renamed, setRenamed] = useState<{ from: string; to: string } | null>(null);
+  const title = renamed?.from === item.title ? renamed.to : item.title;
 
   return (
     <div className="group relative border-b border-border last:border-b-0">
@@ -94,11 +98,14 @@ export function HistoryListItem({
           {/* The current agent before the title; the previous ones lead the details below it. */}
           <span className="flex self-center pt-0.5 pb-1 opacity-80">{getAgentIcon(item.adapterName, agents)}</span>
           {isEditing ? (
-            <div className="flex">
+            // As tall as the title below, so the editor does not move it or the details.
+            <div className="flex pb-0.5">
               <TabTitleInput
-                initialTitle={item.title}
-                onCommit={(title) =>
-                  ACPBridge.updateHistoryConversations(item.projectPath, [conversationId], { newTitle: title })}
+                initialTitle={title}
+                onCommit={(newTitle) => {
+                  setRenamed({ from: item.title, to: newTitle });
+                  ACPBridge.updateHistoryConversations(item.projectPath, [conversationId], { newTitle });
+                }}
                 onClose={() => onEditingChange(false)}
                 className="-ml-1 rounded-[3px] bg-background px-1 py-0.5 font-semibold"
               />
@@ -106,7 +113,7 @@ export function HistoryListItem({
           ) : (
             <div className="flex min-w-0 items-center pt-0.5 pb-1 text-ide-small font-semibold">
               <span className="truncate">
-                <HighlightedText text={item.title} pattern={query ? searchPattern(query) : null} />
+                <HighlightedText text={title} pattern={query ? searchPattern(query) : null} />
               </span>
               <ChatStatusIndicator flags={status} className="ml-1" />
             </div>
@@ -144,7 +151,7 @@ export function HistoryListItem({
               <Tooltip variant="minimal" content="More actions">
                 <button
                   type="button"
-                  aria-label={`More actions for ${item.title}`}
+                  aria-label={`More actions for ${title}`}
                   {...trigger}
                   className={sectionRowButtonClassName}
                 >
@@ -191,7 +198,7 @@ export function HistoryListItem({
               onCheckedChange={() => onToggleSelection(conversationId)}
               onClick={(e) => e.stopPropagation()}
               className="!top-0 ml-1"
-              aria-label={`Select ${item.title}`}
+              aria-label={`Select ${title}`}
             />
           ) : null}
         </div>

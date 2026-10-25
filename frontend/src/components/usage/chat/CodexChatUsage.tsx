@@ -48,7 +48,7 @@ export function CodexChatUsage() {
   if (!hasData) return null;
 
   return (
-    <UsageIcon adapterId="codex" percent={displayPercent}>
+    <UsageIcon percent={displayPercent}>
       <CodexUsage stacked />
     </UsageIcon>
   );

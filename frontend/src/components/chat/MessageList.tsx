@@ -68,7 +68,6 @@ interface MessageListProps {
   messages: Message[];
   promptNavigationHoverOnly: boolean;
   onImageClick: (src: string) => void;
-  onAtBottomChange?: (isAtBottom: boolean) => void;
   onCanMarkReadChange?: (canMarkRead: boolean) => void;
   isSending?: boolean;
   status?: string;
@@ -86,7 +85,6 @@ function MessageList({
   messages,
   promptNavigationHoverOnly,
   onImageClick,
-  onAtBottomChange,
   onCanMarkReadChange,
   isSending,
   status,
@@ -112,9 +110,7 @@ function MessageList({
   }, []);
   const followBottomRef = useRef(true);
   const lastScrollTopRef = useRef(0);
-  const atBottomChangeRef = useRef(onAtBottomChange);
   const canMarkReadChangeRef = useRef(onCanMarkReadChange);
-  const lastAtBottomRef = useRef(true);
   const lastCanMarkReadRef = useRef(true);
   const prevIsReplaying = useRef(isHistoryReplaying);
   const prevIsSendingForScroll = useRef(isSending);
@@ -126,25 +122,13 @@ function MessageList({
   const [navigationEdges, setNavigationEdges] = useState({ atTop: true, atBottom: true });
 
   useEffect(() => {
-    atBottomChangeRef.current = onAtBottomChange;
-  }, [onAtBottomChange]);
-
-  useEffect(() => {
     canMarkReadChangeRef.current = onCanMarkReadChange;
   }, [onCanMarkReadChange]);
 
   const getDistanceFromBottom = (el: HTMLDivElement) => el.scrollHeight - el.scrollTop - el.clientHeight;
 
   const publishViewportState = useCallback((el: HTMLDivElement) => {
-    const distanceFromBottom = getDistanceFromBottom(el);
-    const isAtBottom = distanceFromBottom < BOTTOM_PIN_THRESHOLD_PX;
-    const canMarkRead = distanceFromBottom < READ_ACK_THRESHOLD_PX;
-
-    if (lastAtBottomRef.current !== isAtBottom) {
-      lastAtBottomRef.current = isAtBottom;
-      atBottomChangeRef.current?.(isAtBottom);
-    }
-
+    const canMarkRead = getDistanceFromBottom(el) < READ_ACK_THRESHOLD_PX;
     if (lastCanMarkReadRef.current !== canMarkRead) {
       lastCanMarkReadRef.current = canMarkRead;
       canMarkReadChangeRef.current?.(canMarkRead);
@@ -444,13 +428,10 @@ function MessageList({
     const el = containerRef.current;
     if (!el) return;
     const distanceFromBottom = getDistanceFromBottom(el);
-    const isAtBottom = distanceFromBottom < BOTTOM_PIN_THRESHOLD_PX;
     const canMarkRead = distanceFromBottom < READ_ACK_THRESHOLD_PX;
-    lastAtBottomRef.current = isAtBottom;
-    followBottomRef.current = isAtBottom;
+    followBottomRef.current = distanceFromBottom < BOTTOM_PIN_THRESHOLD_PX;
     lastScrollTopRef.current = el.scrollTop;
     lastCanMarkReadRef.current = canMarkRead;
-    atBottomChangeRef.current?.(isAtBottom);
     canMarkReadChangeRef.current?.(canMarkRead);
   }, []);
 

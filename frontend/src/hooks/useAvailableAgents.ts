@@ -6,23 +6,12 @@ export function useAvailableAgents() {
   const [availableAgents, setAvailableAgents] = useState<AgentOption[]>([]);
   const [adaptersResolved, setAdaptersResolved] = useState(false);
   const lastStableNewTabAgentIdRef = useRef<string>('');
-  const stableAgentSnapshotsRef = useRef<Record<string, AgentOption>>({});
 
   useEffect(() => {
+    // Earlier versions cached the adapter list here without ever reading it.
+    localStorage.removeItem('agent-dock.adapters');
     const dispose = ACPBridge.onAdapters((e) => {
       const safeAdapters = Array.isArray(e.detail.adapters) ? e.detail.adapters : [];
-      const nextSnapshots = { ...stableAgentSnapshotsRef.current };
-      safeAdapters.forEach((agent) => {
-        const previous = nextSnapshots[agent.id];
-        nextSnapshots[agent.id] = {
-          ...previous,
-          ...agent,
-          iconPath: agent.iconPath || previous?.iconPath,
-          name: agent.name || previous?.name,
-        };
-      });
-      stableAgentSnapshotsRef.current = nextSnapshots;
-
       const stableLastUsedRunnableId = safeAdapters.find((agent) => agent.isLastUsed && agent.downloaded === true)?.id;
       if (stableLastUsedRunnableId) {
         lastStableNewTabAgentIdRef.current = stableLastUsedRunnableId;
@@ -38,13 +27,6 @@ export function useAvailableAgents() {
 
       setAvailableAgents(safeAdapters);
       setAdaptersResolved(true);
-      if (safeAdapters.length > 0) {
-        try {
-          localStorage.setItem('agent-dock.adapters', JSON.stringify(safeAdapters));
-        } catch (e) {
-          console.warn('[App] Failed to cache adapters:', e);
-        }
-      }
     });
     ACPBridge.requestAdapters();
     return dispose;
