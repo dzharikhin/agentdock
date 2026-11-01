@@ -1,5 +1,3 @@
-@file:Suppress("UnstableApiUsage")
-
 package agentdock.bridge.frontend
 
 import agentdock.acp.AcpAudioPlayer
@@ -16,7 +14,6 @@ import com.intellij.platform.project.projectId
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
@@ -24,16 +21,13 @@ import kotlinx.coroutines.launch
 @Service(Service.Level.PROJECT)
 class FrontendNativeStateService(
     private val project: Project,
-    private val scope: CoroutineScope,
+    scope: CoroutineScope,
 ) {
     private val audio = AcpAudioPlayer(scope)
 
     init {
         scope.launch(Dispatchers.IO) { collectState() }
     }
-
-    fun launch(block: suspend CoroutineScope.() -> Unit): Job =
-        scope.launch(Dispatchers.IO, block = block)
 
     private suspend fun collectState() {
         val local = LocalBridgeHost.getInstanceOrNull(project)
@@ -65,10 +59,14 @@ class FrontendNativeStateService(
     }
 }
 
-/** Starts native state synchronization without waiting for the JCEF tool window to be opened. */
+/**
+ * Starts native state synchronization without waiting for the JCEF tool window to be opened, and
+ * the web server, so a browser can open the UI before the IDE does.
+ */
 class FrontendNativeStateActivity : ProjectActivity {
     override suspend fun execute(project: Project) {
         project.getService(FrontendNativeStateService::class.java)
+        AgentDockWebServer.getInstance().update()
     }
 
 }

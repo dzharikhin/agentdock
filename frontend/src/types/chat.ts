@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import type { ElicitationAction, ElicitationContent, ElicitationRequest } from './elicitation';
 
 export interface ToolCallDiffEntry {
   type: 'diff';
@@ -10,7 +11,7 @@ export interface ToolCallDiffEntry {
 export interface AcpLogEntryPayload {
   adapterId: string;
   direction: 'SENT' | 'RECEIVED';
-  category: 'PROTOCOL' | 'INTERNAL' | 'STDERR';
+  category: 'PROTOCOL' | 'STDERR';
   json: string;
   timestamp: number;
 }
@@ -22,12 +23,16 @@ export interface ChatAttachment {
   data?: string;
   path?: string;
   isInline?: boolean;
-  attachmentType?: 'file' | 'code_ref';
+  attachmentType?: 'file' | 'code_ref' | 'quote';
   startLine?: number;
   endLine?: number;
+  quote?: string;
 }
 
 export interface TextBlock { type: 'text'; text: string; }
+/** A user's form reply within an existing prompt, rather than a new prompt. */
+export interface ElicitationAnswer { question: string; answer: string; }
+export interface ElicitationAnswerBlock { type: 'elicitation_answer'; text: string; answers?: ElicitationAnswer[]; }
 export interface ImageBlock { type: 'image'; data: string; mimeType: string; isInline?: boolean; }
 export interface AudioBlock { type: 'audio'; data: string; mimeType: string; isInline?: boolean; }
 export interface VideoBlock { type: 'video'; data: string; mimeType: string; name?: string; path?: string; isInline?: boolean; }
@@ -41,6 +46,8 @@ export interface CodeReferenceBlock {
   endLine?: number;
   isInline?: boolean;
 }
+/** Text the user selected in an assistant response and quoted in the prompt. */
+export interface QuoteBlock { type: 'quote'; quote: string; }
 
 export interface ToolCallEntry {
   toolCallId: string;
@@ -64,7 +71,7 @@ export interface PlanEntry {
 
 export interface PlanBlock { type: 'plan'; entries: PlanEntry[]; isReplay?: boolean; }
 
-export type RichContentBlock = TextBlock | ImageBlock | AudioBlock | VideoBlock | FileBlock | CodeReferenceBlock | ExploringBlock | ToolCallBlock | PlanBlock;
+export type RichContentBlock = TextBlock | ElicitationAnswerBlock | ImageBlock | AudioBlock | VideoBlock | FileBlock | CodeReferenceBlock | QuoteBlock | ExploringBlock | ToolCallBlock | PlanBlock;
 
 export interface MessageConfigOption {
   id: string;
@@ -217,7 +224,7 @@ export interface DropdownOption {
   subOptions?: DropdownOption[];
 }
 
-export type AttentionLevel = 'warning' | 'processing' | 'unread' | '';
+export type AttentionLevel = 'warning' | 'unread' | '';
 
 export interface TabUiFlags {
   unread: boolean;
@@ -245,6 +252,8 @@ export interface ChatTab {
   forkBase?: ForkConversationBase;
   /** A pinned conversation listed among the chats without being open. */
   closed?: boolean;
+  /** Reopened from the saved workspace: the backend sends the conversation, nothing is loaded again. */
+  restored?: boolean;
 }
 
 /** The conversation a chat continues, the key of its history entry. */
@@ -291,8 +300,10 @@ export interface HistorySessionMeta {
 export interface ContentChunk {
   chatId: string;
   role: 'user' | 'assistant';
-  type: 'text' | 'thinking' | 'image' | 'audio' | 'video' | 'file' | 'code_ref' | 'tool_call' | 'tool_call_update' | 'plan' | 'prompt_done';
+  type: 'text' | 'elicitation_answer' | 'thinking' | 'image' | 'audio' | 'video' | 'file' | 'code_ref' | 'quote' | 'tool_call' | 'tool_call_update' | 'plan' | 'prompt_done';
   text?: string;
+  answers?: ElicitationAnswer[];
+  quote?: string;
   data?: string;
   path?: string;
   name?: string;
@@ -322,6 +333,8 @@ export interface ReplayContentBlock {
   role?: 'user' | 'assistant';
   type?: string;
   text?: string;
+  answers?: ElicitationAnswer[];
+  quote?: string;
   data?: string;
   path?: string;
   name?: string;
@@ -367,6 +380,18 @@ export interface ConversationReplayData {
 export interface ConversationReplayLoadedPayload {
   chatId: string;
   data: ConversationReplayData;
+}
+
+/** A chat as the backend knows it, sent to a UI taking it over; its later events follow as usual. */
+export interface ChatAttachedPayload {
+  chatId: string;
+  data?: ConversationReplayData | null;
+  /** The prompt the agent is still answering, stored like a finished one. */
+  livePrompt?: { sessionId: string; adapterName: string; prompt: ReplayPromptEntry } | null;
+  status?: string | null;
+  sessionId?: string | null;
+  permissions: PermissionRequest[];
+  elicitations: ElicitationRequest[];
 }
 
 
@@ -488,7 +513,7 @@ export interface ConversationTranscriptSavedPayload {
 export interface BridgeOperationResultPayload {
   requestId: string;
   chatId: string;
-  operation: 'start_agent' | 'send_prompt' | 'cancel_prompt';
+  operation: 'start_agent' | 'send_prompt' | 'cancel_prompt' | 'respond_elicitation';
   ok: boolean;
   error?: string;
 }
@@ -524,6 +549,8 @@ export interface AudioTranscriptionProviderSettings {
 export interface AudioTranscriptionSettings {
   provider: string;
   language: string;
+  /** Null is a temporary empty input; saved values are 1–600 seconds. */
+  recordingLimitSeconds: number | null;
   providers: Record<string, AudioTranscriptionProviderSettings>;
 }
 
@@ -573,12 +600,17 @@ export interface GlobalSettings {
   systemInstructionsEnabled: boolean;
   quotaWidgetEnabled: boolean;
   openInEditor: boolean;
+  browserAccessEnabled: boolean;
+  browserAccessPort: number;
+  // At least 4 characters; null until the backend generates one.
+  browserAccessCode: string | null;
   promptNavigationHoverOnly: boolean;
   userMessageDetailsHoverOnly: boolean;
-  sidebarEnabled: boolean;
   sidebarPosition: 'left' | 'right';
   historyGroupsExpanded: boolean;
   rememberModelAndEffort: boolean;
+  approvalMode: ApprovalMode;
+  sendMode: 'enter' | 'ctrl-enter';
   shortcuts: ShortcutSettings;
 }
 
@@ -611,6 +643,13 @@ declare global {
     ) => void;
     __notifyReady?: () => void;
     __respondPermission?: (requestId: string, decision: string) => void;
+    __respondElicitation?: (
+      chatId: string,
+      elicitationId: string,
+      action: ElicitationAction,
+      content: ElicitationContent | undefined,
+      requestId: string
+    ) => void;
     __cancelPrompt?: (conversationId: string, requestId?: string) => void;
     __stopAgent?: (conversationId: string) => void;
     __downloadAgent?: (adapterId: string) => void;
@@ -631,6 +670,7 @@ declare global {
     __renameHistoryGroup?: (payload: { projectPath: string; group: string; newGroup: string }) => void;
     __searchHistoryConversations?: (payload: { projectPath: string; conversationIds: string[]; query: string }) => void;
     __loadHistoryConversation?: (conversationId: string, projectPath: string, historyConversationId: string) => void;
+    __attachChat?: (chatId: string, projectPath: string) => void;
     __loginAgent?: (adapterId: string, methodId: string) => void;
     __logoutAgent?: (adapterId: string) => void;
     __cancelAgentAuth?: (adapterId: string) => void;
@@ -655,6 +695,8 @@ declare global {
     __readUiVisibility?: () => void;
     /** Answered with an `agent-dock-ui-zoom` event carrying the current UI zoom. */
     __readUiZoom?: () => void;
+    /** Answered with an `agent-dock-browser-address` event carrying the page's web server address, empty while it does not run. */
+    __readBrowserAddress?: () => void;
     /** Mirrors the open chats' dot on the plugin icon: `warning`, `unread`, or empty for none. */
     __setAttentionBadge?: (level: AttentionLevel) => void;
 
@@ -669,10 +711,12 @@ declare global {
     __onMode?: (chatId: string, modeId: string) => void;
     __onSessionConfigOptions?: (payload: SessionConfigOptionsPayload) => void;
     __onPermissionRequest?: (request: PermissionRequest) => void;
+    __onElicitationRequests?: (chatId: string, requests: ElicitationRequest[]) => void;
     __onHistoryList?: (list: HistorySessionMeta[]) => void;
     __onHistoryDeleteResult?: (result: HistoryDeleteResultPayload) => void;
     __onHistorySearchResult?: (result: HistorySearchResultPayload) => void;
     __onConversationReplayLoaded?: (payload: ConversationReplayLoadedPayload) => void;
+    __onChatAttached?: (payload: ChatAttachedPayload) => void;
     __onAttachmentsAdded?: (chatId: string, files: ChatAttachment[]) => void;
     __onConversationTranscriptSaved?: (payload: ConversationTranscriptSavedPayload) => void;
     __onBridgeOperationResult?: (payload: BridgeOperationResultPayload) => void;
@@ -713,7 +757,7 @@ declare global {
     __uninstallAudioTranscriptionFeature?: (payload?: string) => void;
     __onAudioTranscriptionFeature?: (state: AudioTranscriptionFeatureState) => void;
     __onAudioTranscriptionResult?: (payload: AudioTranscriptionResultPayload) => void;
-    __startAudioRecording?: (ownerId: string) => void;
+    __startAudioRecording?: (payload: string) => void;
     __stopAudioRecording?: (payload: string) => void;
     __cancelAudioTranscription?: (payload: string) => void;
     __cancelAudioRecording?: (ownerId: string) => void;
@@ -724,8 +768,24 @@ declare global {
     __loadGlobalSettings?: () => void;
     __saveGlobalSettings?: (payload: string) => void;
     __onGlobalSettings?: (payload: GlobalSettingsPayload) => void;
+    // Answered by the client itself, which keeps the workspace while the page is reloaded.
+    __loadUiWorkspace?: () => void;
+    __saveUiWorkspace?: (json: string) => void;
+    __onUiWorkspace?: (json: string) => void;
     __onAdapterDeleted?: (adapterId: string) => void;
     __settingsBridgeReady?: boolean;
+    // The kind of page showing the UI, set by BridgeScripts.kt.
+    __AGENT_DOCK_CLIENT?: 'jcef' | 'browser';
+    // Set with an `agent-dock-elsewhere` event when another page shows the UI.
+    __agentDockElsewhere?: boolean;
+    // Set with an `agent-dock-disconnected` event when a browser page loses the IDE.
+    __agentDockDisconnected?: boolean;
+    // Defined by JcefUi.kt and, in a web browser, by BridgeScripts.browserBridge.
+    __takeOverUi?: () => void;
+    // Loads the page again, which restores the UI. Defined like `__takeOverUi`.
+    __reloadUi?: () => void;
+    // JCEF only.
+    __openInBrowser?: () => void;
     // Injected into the HTML by AssetLoader.kt.
     __pluginVersion?: string;
   }

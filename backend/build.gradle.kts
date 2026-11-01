@@ -1,3 +1,10 @@
+plugins {
+    id("org.jetbrains.intellij.platform.module")
+    id("org.jetbrains.kotlin.jvm")
+    id("org.jetbrains.kotlin.plugin.serialization")
+    id("rpc")
+}
+
 dependencies {
     intellijPlatform {
         bundledModule("intellij.platform.backend")
@@ -10,7 +17,7 @@ dependencies {
     implementation(project(":shared"))
     // Runtime copies are packaged as separate JARs in the root plugin lib directory. The
     // agent-dock.backend-libraries embedded module exposes that classpath to this content module.
-    compileOnly("com.agentclientprotocol:acp:0.30.1") {
+    compileOnly("com.agentclientprotocol:acp:0.34.0") {
         exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
         exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-bom")
         exclude(group = "org.jetbrains.kotlinx", module = "kotlinx-coroutines-core")

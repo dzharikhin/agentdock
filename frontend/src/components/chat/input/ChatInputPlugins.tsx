@@ -4,10 +4,10 @@ import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext
 import {
   $createLineBreakNode,
   $createTextNode,
+  $getNodeByKey,
   $getRoot,
   $getSelection,
   $isElementNode,
-  $nodesOfType,
   $isRangeSelection,
   $isTextNode,
   COMMAND_PRIORITY_HIGH,
@@ -17,10 +17,11 @@ import {
   KEY_ENTER_COMMAND,
   PASTE_COMMAND,
   LexicalEditor,
-  LexicalNode
+  LexicalNode,
+  type MutationListener
 } from 'lexical';
 import { $createImageNode, ImageNode } from './ImageNode';
-import { CodeReferenceNode, $createCodeReferenceNode, $isCodeReferenceNode } from './CodeReferenceNode';
+import { ReferenceNode, $createReferenceNode, $isReferenceNode, type ReferenceKind } from './ReferenceNode';
 import { ChatAttachment, RichContentBlock } from '../../../types/chat';
 import { pastedPrompt, PROMPT_MIME } from '../../../utils/promptClipboard';
 import { restoreComposerContent } from './composerContent';
@@ -32,41 +33,38 @@ export function AttachmentsSyncPlugin({ attachments, onAttachmentsChange }: {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {
-    const syncRemovedAttachments = () => {
-      editor.read(() => {
-        const existingIds = new Set([
-          ...$nodesOfType(ImageNode).map((node) => node.__id),
-          ...$nodesOfType(CodeReferenceNode).map((node) => node.__id),
-        ]);
-        const filtered = attachments.filter((attachment) => !attachment.isInline || existingIds.has(attachment.id));
-        if (filtered.length !== attachments.length) {
-          onAttachmentsChange(filtered);
+    const attachmentIdsByKey = new Map<string, string>();
+    let hasRemovals = false;
+    const trackNodes: MutationListener = (mutations) => {
+      editor.getEditorState().read(() => {
+        for (const [key, mutation] of mutations) {
+          if (mutation === 'destroyed') {
+            attachmentIdsByKey.delete(key);
+            hasRemovals = true;
+          } else {
+            const node = $getNodeByKey<ImageNode | ReferenceNode>(key);
+            if (node) attachmentIdsByKey.set(key, node.__id);
+          }
         }
       });
     };
 
-    const unregisterImage = editor.registerMutationListener(ImageNode, (mutations) => {
-      for (const [, mutation] of mutations) {
-        if (mutation === 'destroyed') {
-          syncRemovedAttachments();
-          break;
-        }
-      }
-    });
+    const unregister = [ImageNode, ReferenceNode].map((nodeClass) =>
+      editor.registerMutationListener(nodeClass, trackNodes, { skipInitialization: false })
+    );
 
-    const unregisterCodeReference = editor.registerMutationListener(CodeReferenceNode, (mutations) => {
-      for (const [, mutation] of mutations) {
-        if (mutation === 'destroyed') {
-          syncRemovedAttachments();
-          break;
-        }
+    // Both node types must be tracked before reconciling a commit that replaces attachments.
+    unregister.push(editor.registerUpdateListener(() => {
+      if (!hasRemovals) return;
+      hasRemovals = false;
+      const existingIds = new Set(attachmentIdsByKey.values());
+      const filtered = attachments.filter((attachment) => !attachment.isInline || existingIds.has(attachment.id));
+      if (filtered.length !== attachments.length) {
+        onAttachmentsChange(filtered);
       }
-    });
+    }));
 
-    return () => {
-      unregisterImage();
-      unregisterCodeReference();
-    };
+    return () => unregister.forEach((stop) => stop());
   }, [editor, attachments, onAttachmentsChange]);
 
   return null;
@@ -85,7 +83,11 @@ function insertPrompt(editor: LexicalEditor, blocks: RichContentBlock[], attachm
     } else if (block.type === 'code_ref') {
       const id = crypto.randomUUID();
       added.push({ id, name: block.name, path: block.path, mimeType: 'application/x-code-reference', attachmentType: 'code_ref', isInline: true, startLine: block.startLine, endLine: block.endLine });
-      nodes.push(() => $createCodeReferenceNode(id, block.path, block.name, block.startLine, block.endLine));
+      nodes.push(() => $createReferenceNode(id, 'code-ref'));
+    } else if (block.type === 'quote') {
+      const id = crypto.randomUUID();
+      added.push(quoteAttachment(id, block.quote));
+      nodes.push(() => $createReferenceNode(id, 'quote'));
     } else if (block.type === 'image' || block.type === 'audio' || block.type === 'video' || block.type === 'file') {
       const id = crypto.randomUUID();
       const isInline = block.type === 'image' && block.isInline !== false;
@@ -277,7 +279,7 @@ export function InlineAttachmentBackspacePlugin() {
             previousNode = anchorNode.getChildAtIndex(selection.anchor.offset - 1);
           }
 
-          if (previousNode && (previousNode instanceof ImageNode || $isCodeReferenceNode(previousNode))) {
+          if (previousNode && (previousNode instanceof ImageNode || $isReferenceNode(previousNode))) {
             previousNode.remove();
             removed = true;
           }
@@ -292,7 +294,12 @@ export function InlineAttachmentBackspacePlugin() {
   return null;
 }
 
-export function ExternalCodeReferencePlugin({
+function quoteAttachment(id: string, quote: string): ChatAttachment {
+  return { id, name: 'Quote', mimeType: 'text/plain', isInline: true, attachmentType: 'quote', quote };
+}
+
+/** Inserts code references from the IDE and quotes from the chat into the active composer. */
+export function ExternalReferencePlugin({
   isActive,
   attachments,
   onAttachmentsChange,
@@ -311,13 +318,21 @@ export function ExternalCodeReferencePlugin({
   useEffect(() => {
     if (!isActive) return;
 
+    const insert = (attachment: ChatAttachment, kind: ReferenceKind) => {
+      onAttachmentsChangeRef.current([...attachmentsRef.current, attachment]);
+
+      editor.update(() => {
+        if (!$isRangeSelection($getSelection())) $getRoot().selectEnd();
+        $getSelection()?.insertNodes([$createReferenceNode(attachment.id, kind), $createTextNode(' ')]);
+      });
+    };
+
     const handleExternalReference = (event: Event) => {
       const detail = (event as CustomEvent<{ path: string; fileName: string; startLine?: number; endLine?: number }>).detail;
       if (!detail?.path || !detail?.fileName) return;
 
-      const id = crypto.randomUUID();
-      const attachment: ChatAttachment = {
-        id,
+      insert({
+        id: crypto.randomUUID(),
         path: detail.path,
         name: detail.fileName,
         mimeType: 'application/x-code-reference',
@@ -325,31 +340,23 @@ export function ExternalCodeReferencePlugin({
         attachmentType: 'code_ref',
         startLine: detail.startLine,
         endLine: detail.endLine,
-      };
+      }, 'code-ref');
+    };
 
-      onAttachmentsChangeRef.current([...attachmentsRef.current, attachment]);
+    const handleQuote = (event: Event) => {
+      const quote = (event as CustomEvent<{ quote: string }>).detail?.quote;
+      if (!quote) return;
 
-      editor.update(() => {
-        const selection = $getSelection();
-        const node = $createCodeReferenceNode(
-          id,
-          detail.path,
-          detail.fileName,
-          detail.startLine,
-          detail.endLine
-        );
-        if ($isRangeSelection(selection)) {
-          selection.insertNodes([node, $createTextNode(' ')]);
-        } else {
-          $getRoot().selectEnd();
-          $getSelection()?.insertNodes([node, $createTextNode(' ')]);
-        }
-      });
+      insert(quoteAttachment(crypto.randomUUID(), quote), 'quote');
+      // The user comments on the quote next.
+      editor.focus();
     };
 
     window.addEventListener('external-code-reference', handleExternalReference as EventListener);
+    window.addEventListener('external-quote', handleQuote as EventListener);
     return () => {
       window.removeEventListener('external-code-reference', handleExternalReference as EventListener);
+      window.removeEventListener('external-quote', handleQuote as EventListener);
     };
   }, [isActive, editor]);
 
@@ -467,7 +474,7 @@ export function AutoHeightPlugin({
   return null;
 }
 
-export function ClickToFocusPlugin({ containerRef }: { containerRef: React.RefObject<HTMLDivElement> }) {
+export function ClickToFocusPlugin({ containerRef }: { containerRef: RefObject<HTMLDivElement> }) {
   const [editor] = useLexicalComposerContext();
 
   useEffect(() => {

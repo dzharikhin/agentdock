@@ -1,15 +1,18 @@
 package agentdock.settings
 
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import agentdock.acp.AcpAdapterPaths
 import agentdock.utils.atomicWriteText
 import java.io.File
 import java.io.RandomAccessFile
+import java.security.SecureRandom
+import java.util.Base64
 
 object GlobalSettingsStore {
     private val storeLock = Any()
@@ -25,19 +28,29 @@ object GlobalSettingsStore {
 
     private fun settingsFile(): File = File(AcpAdapterPaths.getBaseRuntimeDir(), "settings.json")
 
-    fun load(): GlobalSettings = withStoreLock {
+    fun load(): GlobalSettings = withStoreLock { loadLocked() }
+
+    private fun loadLocked(): GlobalSettings {
         val file = settingsFile()
         if (!file.isFile) {
-            return@withStoreLock saveLocked(GlobalSettings())
+            return saveLocked(GlobalSettings())
         }
 
         val loaded = decodeSettings(file)
         gitCommitGenerationEnabled = loaded.gitCommitGeneration.enabled
-        loaded
+        // Saved at once, so every load gives the same generated code; an empty one from earlier versions is replaced.
+        return if (validAccessCode(loaded.browserAccessCode) == null) saveLocked(loaded) else loaded
     }
 
-    fun save(settings: GlobalSettings): GlobalSettings = withStoreLock {
-        saveLocked(settings)
+    /**
+     * Saves the top-level fields of [patch] over the saved settings and keeps the others, so a page
+     * with an older copy of the settings changes only what it set. Returns `null`, saving nothing,
+     * when the result does not decode.
+     */
+    fun update(patch: JsonObject): GlobalSettings? = withStoreLock {
+        val merged = JsonObject(json.encodeToJsonElement(loadLocked()).jsonObject + patch)
+        val updated = runCatching { json.decodeFromJsonElement<GlobalSettings>(merged) }.getOrNull()
+        updated?.let(::saveLocked)
     }
 
     private fun saveLocked(settings: GlobalSettings): GlobalSettings {
@@ -46,6 +59,13 @@ object GlobalSettingsStore {
             userMessageBackgroundStyle = normalizeUserMessageBackgroundStyle(settings.userMessageBackgroundStyle),
             userMessageCustomColor = settings.userMessageCustomColor.takeIf { Regex("#[0-9a-fA-F]{6}").matches(it) } ?: "#193d70",
             sidebarPosition = normalizeSidebarPosition(settings.sidebarPosition),
+            approvalMode = if (settings.approvalMode == "auto") "auto" else "ask",
+            sendMode = if (settings.sendMode == "ctrl-enter") "ctrl-enter" else "enter",
+            browserAccessPort = settings.browserAccessPort.takeIf { it in 1..65535 } ?: 47823,
+            // An invalid code keeps the saved one.
+            browserAccessCode = validAccessCode(settings.browserAccessCode)
+                ?: validAccessCode(settingsFile().takeIf { it.isFile }?.let(::decodeSettings)?.browserAccessCode)
+                ?: Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(12).also(SecureRandom()::nextBytes)),
             shortcuts = normalizeShortcuts(settings.shortcuts),
             audioTranscription = normalizeAudioTranscriptionSettings(settings.audioTranscription),
             gitCommitGeneration = settings.gitCommitGeneration.copy(
@@ -61,6 +81,16 @@ object GlobalSettingsStore {
         gitCommitGenerationEnabled = normalized.gitCommitGeneration.enabled
         return normalized
     }
+
+    /**
+     * At least 4 letters, digits, `-` or `_`, which are safe in an address and a cookie as they are.
+     *
+     * The generated code has 96 random bits, so the chance of guessing it is too small to matter. A
+     * shorter code is the user's own choice, easier to type on a phone. The web server limits wrong
+     * codes to 10 an hour, which makes guessing slow enough that it needs no Host check.
+     */
+    private fun validAccessCode(code: String?): String? =
+        code?.takeIf { it.length >= 4 && it.all { c -> c in 'a'..'z' || c in 'A'..'Z' || c in '0'..'9' || c in "-_" } }
 
     fun isGitCommitGenerationEnabled(): Boolean = gitCommitGenerationEnabled
 
@@ -94,6 +124,7 @@ object GlobalSettingsStore {
         settings.copy(
             provider = normalizeProvider(settings.provider),
             language = normalizeLanguage(settings.language),
+            recordingLimitSeconds = settings.recordingLimitSeconds?.takeIf { it > 0 }?.coerceAtMost(600) ?: 120,
             providers = settings.providers.mapValues { (_, provider) ->
                 provider.copy(apiKey = normalizeApiKey(provider.apiKey))
             }

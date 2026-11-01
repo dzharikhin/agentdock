@@ -1,4 +1,5 @@
 import {
+  ChatAttachedPayload,
   ContentChunk,
   ConversationReplayData,
   Message,
@@ -17,6 +18,7 @@ import {
 
 const ASSISTANT_EVENT_TYPES = new Set([
   'text',
+  'elicitation_answer',
   'thinking',
   'image',
   'audio',
@@ -84,6 +86,7 @@ function replayAssistantChunks(prompt: ReplayPromptEntry, promptKey: string): Co
       ...baseChunk('assistant'),
       type: type as ContentChunk['type'],
       text: event.text,
+      answers: event.answers,
       data: event.data,
       path: event.path,
       name: event.name,
@@ -136,6 +139,8 @@ function userChunkFromBlock(block: ReplayContentBlock): ContentChunk | null {
         startLine: block.startLine,
         endLine: block.endLine,
       };
+    case 'quote':
+      return block.quote ? { ...baseChunk('user'), type: 'quote', quote: block.quote } : null;
     default: {
       const text = stripTransferredContextForDisplay(block.text || '', 'user', true);
       if (!text.trim()) return null;
@@ -160,13 +165,10 @@ function promptDoneChunk(prompt: ReplayPromptEntry): ContentChunk | null {
   };
 }
 
-function buildPromptMessages(
-  prompt: ReplayPromptEntry,
-  sessionIndex: number,
-  promptIndex: number
-): Message[] {
+/** A [live] prompt is the one the agent is still answering: its assistant message stays open. */
+function buildPromptMessages(prompt: ReplayPromptEntry, key: string, live = false): Message[] {
   const messages: Message[] = [];
-  const promptKey = `replay-${sessionIndex}-${promptIndex}`;
+  const promptKey = `replay-${key}`;
 
   const userChunks = (prompt.blocks || [])
     .map(userChunkFromBlock)
@@ -175,33 +177,58 @@ function buildPromptMessages(
     applyChunks([], userChunks).forEach((message, messageIndex) => {
       messages.push({
         ...message,
-        id: messageIndex === 0
-          ? `replay-user-${sessionIndex}-${promptIndex}`
-          : `replay-user-${sessionIndex}-${promptIndex}-${messageIndex}`,
+        id: messageIndex === 0 ? `replay-user-${key}` : `replay-user-${key}-${messageIndex}`,
         timestamp: prompt.assistantMeta?.promptStartedAtMillis,
       });
     });
   }
 
   const assistantChunks = replayAssistantChunks(prompt, promptKey);
-  const doneChunk = promptDoneChunk(prompt);
-  if (assistantChunks.length === 0 && !doneChunk) return messages;
+  const doneChunk = live ? null : promptDoneChunk(prompt);
+  if (!live && assistantChunks.length === 0 && !doneChunk) return messages;
 
   // Seed the assistant message so every event is merged into an existing message,
   // exactly like a live prompt where the message is created before the agent replies.
+  const meta = prompt.assistantMeta;
   const seed: Message = {
-    id: `replay-assistant-${sessionIndex}-${promptIndex}`,
+    id: `replay-assistant-${key}`,
     role: 'assistant',
     content: '',
     contentBlocks: [],
     metaComplete: false,
+    ...(live ? {
+      timestamp: meta?.promptStartedAtMillis,
+      agentId: meta?.agentId,
+      agentName: meta?.agentName,
+      configOptions: meta?.configOptions,
+      promptStartedAtMillis: meta?.promptStartedAtMillis,
+    } : {}),
   };
   const chunks = doneChunk ? [...assistantChunks, doneChunk] : assistantChunks;
   applyChunks([seed], chunks)
-    .filter((message) => (message.contentBlocks?.length ?? 0) > 0 || message.metaComplete)
+    .filter((message) => live || (message.contentBlocks?.length ?? 0) > 0 || message.metaComplete)
     .forEach((message) => messages.push(message));
 
   return messages;
+}
+
+/** The prompt the agent is still answering, for a UI taking the chat over; its later events continue it. */
+export function buildLivePromptMessages(prompt: ReplayPromptEntry): Message[] {
+  return buildPromptMessages(prompt, 'live', true);
+}
+
+/** The stored conversation followed by the prompt the agent is still answering. */
+export function attachedConversation(payload: ChatAttachedPayload): ConversationReplayData {
+  const sessions = [...(payload.data?.sessions || [])];
+  const live = payload.livePrompt;
+  if (!live) return { sessions };
+  const last = sessions[sessions.length - 1];
+  if (last?.sessionId === live.sessionId && last.adapterName === live.adapterName) {
+    sessions[sessions.length - 1] = { ...last, prompts: [...(last.prompts || []), live.prompt] };
+  } else {
+    sessions.push({ sessionId: live.sessionId, adapterName: live.adapterName, prompts: [live.prompt] });
+  }
+  return { sessions };
 }
 
 /**
@@ -212,7 +239,7 @@ export function buildReplayMessages(data: ConversationReplayData): Message[] {
   const messages: Message[] = [];
   (data.sessions || []).forEach((session, sessionIndex) => {
     (session.prompts || []).forEach((prompt, promptIndex) => {
-      messages.push(...buildPromptMessages(prompt, sessionIndex, promptIndex));
+      messages.push(...buildPromptMessages(prompt, `${sessionIndex}-${promptIndex}`));
     });
   });
   return messages;

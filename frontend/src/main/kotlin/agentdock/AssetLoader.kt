@@ -1,7 +1,5 @@
 package agentdock
 
-import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.openapi.extensions.PluginId
 import java.nio.charset.StandardCharsets
 
 /**
@@ -51,9 +49,16 @@ object AssetLoader {
 
             val fontFaceCss = generateFontFaceCss(resourceClass)
 
-            val pluginVersion = PluginManagerCore.getPlugin(PluginId.getId("agentdock"))?.version.orEmpty()
+            val pluginVersion = BuildConfig.PLUGIN_VERSION
+
+            // The web browser tab's icon, in the colour the IDE shows the tool window icon in.
+            val icon = readBinaryResourceAsBase64(
+                resourceClass,
+                if (IdeTheme.isDarkTheme()) "/icons/agent_dock_toolwindow_dark.svg" else "/icons/agent_dock_toolwindow.svg",
+            )
 
             val injection = """
+                <link rel="icon" href="data:image/svg+xml;base64,$icon">
                 <style>
                 $fontFaceCss
                 $cssContent
@@ -68,7 +73,7 @@ object AssetLoader {
             """.trimIndent()
 
             html.replace("</head>", "$injection</head>")
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "<html><body style='background:#1e1e1e;color:white;padding:20px;'>" +
                 "<h2>Error loading UI</h2><p>Failed to load plugin UI.</p></body></html>"
         }

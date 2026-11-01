@@ -35,9 +35,17 @@ data class AudioTranscriptionResultPayload(
 )
 
 @Serializable
+data class StartRecordingRequest(
+    val ownerId: String,
+    val recordingLimitSeconds: Int
+)
+
+@Serializable
 data class StopRecordingRequest(
     val requestId: String,
-    val ownerId: String = ""
+    val ownerId: String = "",
+    /** The base64 WAV a web browser page recorded itself; empty when the IDE records. */
+    val audio: String = ""
 )
 
 @Serializable
@@ -51,11 +59,12 @@ data class AudioRecordingStatePayload(
 data class AudioTranscriptionSettings(
     val provider: String = AudioTranscriptionProviders.NONE,
     val language: String = "auto",
+    /** Null is accepted from older settings and normalized to the default. */
+    val recordingLimitSeconds: Int? = 120,
     val providers: Map<String, AudioTranscriptionProviderSettings> = emptyMap()
 )
 
 object AudioOutputProviders {
-    const val NONE = "none"
     const val SYSTEM = "system"
     const val GPT_SPEECH = "gpt-speech"
     const val GEMINI_SPEECH = "gemini-speech"
@@ -123,14 +132,23 @@ data class GlobalSettings(
     val systemInstructionsEnabled: Boolean = false,
     val quotaWidgetEnabled: Boolean = false,
     val openInEditor: Boolean = true,
+    /** The web server showing the UI in a web browser, and "Open in browser". */
+    val browserAccessEnabled: Boolean = true,
+    /** Tried first; one in use gives way to a free one. */
+    val browserAccessPort: Int = 47823,
+    /** At least 4 letters, digits, `-` and `_`. `null` until the backend generates one. */
+    val browserAccessCode: String? = null,
     val promptNavigationHoverOnly: Boolean = true,
     val userMessageDetailsHoverOnly: Boolean = false,
-    val sidebarEnabled: Boolean = true,
     val sidebarPosition: String = "left",
     /** The history groups are listed under "Chat History" in the section popup. */
     val historyGroupsExpanded: Boolean = false,
     /** Switching the mode restores the model last used in it, and switching the model restores its last effort. */
     val rememberModelAndEffort: Boolean = false,
+    /** The approval mode new chats start in: "ask" or "auto". */
+    val approvalMode: String = "ask",
+    /** "enter" or "ctrl-enter". */
+    val sendMode: String = "enter",
     val shortcuts: ShortcutSettings = ShortcutSettings()
 )
 

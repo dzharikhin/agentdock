@@ -14,9 +14,11 @@ import {
   SessionMetadataUpdatePayload,
   ToolCallEvent,
 } from '../types/chat';
+import { browserMicrophone } from './browserMicrophone';
 import { extractToolCallDiffEntries, ToolCallRawInputCache } from './toolCallUtils';
 import { McpServerConfig } from '../types/mcp';
 import { CustomAcpConfig } from '../types/customAcp';
+import { ElicitationAction, ElicitationContent, ElicitationRequest } from '../types/elicitation';
 import { PromptLibraryItem } from '../types/promptLibrary';
 import { SystemInstruction } from '../types/systemInstructions';
 import {
@@ -29,10 +31,12 @@ import {
   AvailableCommandsEvent,
   BridgeOperationResultEvent,
   ChangesStateEvent,
+  ChatAttachedEvent,
   ContentChunkEvent,
   ConversationReplayLoadedEvent,
   ConversationTranscriptSavedEvent,
   EVENT_NAMES,
+  ElicitationRequestsEvent,
   FileChangeStatsEvent,
   FilesResultEvent,
   GlobalSettingsEvent,
@@ -227,6 +231,10 @@ export const ACPBridge = {
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.PERMISSION, { detail: { request } }));
     };
 
+    window.__onElicitationRequests = (chatId, requests) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.ELICITATIONS, { detail: { chatId, requests } }));
+    };
+
     window.__onAcpLog = (payload) => {
       const isDev = !!(window as any).__IS_DEV;
       let parsed: unknown = payload.json;
@@ -259,8 +267,6 @@ export const ACPBridge = {
             }
           }
         }
-      } else if (payload.category === 'INTERNAL') {
-        if (isDev) console.log('[ACP INTERNAL]', payload.json);
       }
     };
 
@@ -298,6 +304,10 @@ export const ACPBridge = {
 
     window.__onConversationReplayLoaded = (payload) => {
       window.dispatchEvent(new CustomEvent(EVENT_NAMES.CONVERSATION_REPLAY_LOADED, { detail: { payload } }));
+    };
+
+    window.__onChatAttached = (payload) => {
+      window.dispatchEvent(new CustomEvent(EVENT_NAMES.CHAT_ATTACHED, { detail: { payload } }));
     };
 
     window.__onMcpServers = (servers) => {
@@ -391,6 +401,16 @@ export const ACPBridge = {
 
   onPermissionRequest: (callback: (e: CustomEvent<PermissionRequestEvent>) => void) => onBridgeEvent(EVENT_NAMES.PERMISSION, callback),
 
+  onElicitationRequests: (callback: (e: CustomEvent<ElicitationRequestsEvent>) => void) =>
+    onBridgeEvent(EVENT_NAMES.ELICITATIONS, callback),
+
+  respondToElicitation: (request: ElicitationRequest, action: ElicitationAction, content?: ElicitationContent) => {
+    if (!window.__respondElicitation) return Promise.reject(new Error('Question response bridge is not available.'));
+    return awaitBridgeOperation('respond_elicitation', (requestId) => {
+      window.__respondElicitation?.(request.chatId, request.requestId, action, content, requestId);
+    });
+  },
+
   /** Lists the adapters; with an id, restarts that adapter's status checks. */
   requestAdapters: (adapterIdToRefresh?: string) => {
     window.__requestAdapters?.(adapterIdToRefresh);
@@ -468,6 +488,11 @@ export const ACPBridge = {
 
   loadHistoryConversation: (conversationId: string, projectPath: string, historyConversationId: string) => {
     window.__loadHistoryConversation?.(conversationId, projectPath, historyConversationId);
+  },
+
+  /** Asks for the chat as the backend knows it, for a UI taking it over; the answer is [onChatAttached]. */
+  attachChat: (chatId: string, projectPath = '') => {
+    window.__attachChat?.(chatId, projectPath);
   },
 
   deleteHistoryConversations: (projectPath: string, conversationIds: string[]) => {
@@ -564,6 +589,8 @@ export const ACPBridge = {
   onConversationTranscriptSaved: (callback: (e: CustomEvent<ConversationTranscriptSavedEvent>) => void) => onBridgeEvent(EVENT_NAMES.CONVERSATION_TRANSCRIPT_SAVED, callback),
 
   onConversationReplayLoaded: (callback: (e: CustomEvent<ConversationReplayLoadedEvent>) => void) => onBridgeEvent(EVENT_NAMES.CONVERSATION_REPLAY_LOADED, callback),
+
+  onChatAttached: (callback: (e: CustomEvent<ChatAttachedEvent>) => void) => onBridgeEvent(EVENT_NAMES.CHAT_ATTACHED, callback),
 
   /** Starts a file search and returns its request ID, which the result carries. */
   searchFiles: (query: string): string => {
@@ -701,20 +728,24 @@ export const ACPBridge = {
 
   onAudioTranscriptionResult: (callback: (e: CustomEvent<AudioTranscriptionResultEvent>) => void) => onBridgeEvent(EVENT_NAMES.AUDIO_TRANSCRIPTION_RESULT, callback),
 
-  startAudioRecording: (ownerId: string) => {
-    window.__startAudioRecording?.(ownerId);
+  // A web browser records with the microphone of the device showing the page, and the IDE transcribes the recording.
+  startAudioRecording: (ownerId: string, recordingLimitSeconds: number) => {
+    if (window.__AGENT_DOCK_CLIENT === 'browser') void browserMicrophone.start(ownerId);
+    else window.__startAudioRecording?.(JSON.stringify({ ownerId, recordingLimitSeconds }));
   },
 
-  stopAudioRecording: (requestId: string, ownerId: string): Promise<AudioTranscriptionResultPayload> => {
+  stopAudioRecording: async (requestId: string, ownerId: string): Promise<AudioTranscriptionResultPayload> => {
     if (typeof window.__stopAudioRecording !== 'function') {
-      return Promise.reject(new Error('Audio recording bridge is not available.'));
+      throw new Error('Audio recording bridge is not available.');
     }
+    const audio = window.__AGENT_DOCK_CLIENT === 'browser' ? await browserMicrophone.stop(ownerId) : undefined;
+    if (audio === null) return { requestId, success: false, cancelled: true };
     return awaitBridgeResponse(
       ACPBridge.onAudioTranscriptionResult,
       requestId,
-      () => window.__stopAudioRecording?.(JSON.stringify({ requestId, ownerId })),
+      () => window.__stopAudioRecording?.(JSON.stringify({ requestId, ownerId, audio })),
       {
-        timeoutMs: 30_000,
+        timeoutMs: 60_000,
         timeoutMessage: 'Audio transcription timed out.',
         failure: (payload) => (payload.cancelled || payload.success ? undefined : payload.error || 'Audio transcription failed'),
         onTimeout: () => {
@@ -730,6 +761,7 @@ export const ACPBridge = {
   },
 
   cancelAudioRecording: (ownerId: string) => {
+    browserMicrophone.cancel(ownerId);
     window.__cancelAudioRecording?.(ownerId);
   },
 
@@ -751,8 +783,9 @@ export const ACPBridge = {
 
   getGlobalSettingsSnapshot: () => latestGlobalSettings,
 
-  saveGlobalSettings: (settings: GlobalSettingsPayload['settings']) => {
-    window.__saveGlobalSettings?.(JSON.stringify(settings));
+  /** Saves only the given fields; the backend keeps the saved value of every other one. */
+  saveGlobalSettings: (changes: Partial<GlobalSettingsPayload['settings']>) => {
+    window.__saveGlobalSettings?.(JSON.stringify(changes));
   },
 
   onGlobalSettings: (callback: (e: CustomEvent<GlobalSettingsEvent>) => void) => onBridgeEvent(EVENT_NAMES.GLOBAL_SETTINGS, callback),

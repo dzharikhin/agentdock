@@ -16,6 +16,7 @@ import ChatInput from './ChatInput';
 import { ScheduleBar } from './input/ScheduleBar';
 import { PromptQueueList } from './input/PromptQueueList';
 import PermissionBar from './PermissionBar';
+import { ElicitationForm } from './ElicitationForm';
 import FileChangesPanel from './FileChangesPanel';
 import ConfirmationModal from '../ConfirmationModal';
 import { ImageOverlayModal } from './shared/ImageOverlayModal';
@@ -106,6 +107,7 @@ export default function ChatSessionView({
   metadataTitleOverride,
   inheritedAdapterNames,
   forkBase,
+  restored,
   isActive = false,
   promptNavigationHoverOnly,
   onUserMessageSent,
@@ -153,6 +155,7 @@ export default function ChatSessionView({
     approvalMode,
     setApprovalMode,
     permissionRequest,
+    elicitationRequest,
     handleSend,
     handleStop,
     handlePermissionDecision,
@@ -173,6 +176,7 @@ export default function ChatSessionView({
     metadataTitleOverride,
     inheritedAdapterNames,
     forkBase,
+    restored,
     onHandoffConsumed,
     onUserMessageSent
   });
@@ -241,7 +245,7 @@ export default function ChatSessionView({
     messages,
     isSending,
     isHistoryReplaying,
-    permissionRequest,
+    hasPendingRequest: !!permissionRequest || !!elicitationRequest,
     conversationId,
     acpSessionId,
     adapterName: selectedAgentId,
@@ -350,6 +354,8 @@ export default function ChatSessionView({
             onRespond={handlePermissionDecision}
           />
         )}
+
+        {elicitationRequest && <ElicitationForm key={elicitationRequest.requestId} request={elicitationRequest} />}
 
         {queuedPrompts.length > 0 && (
           <PromptQueueList

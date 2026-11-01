@@ -1,3 +1,4 @@
+import type * as React from 'react';
 import { useState } from 'react';
 import { EllipsisVertical, Pencil, Pin, SquareTerminal, Trash2 } from 'lucide-react';
 import { ACPBridge } from '../../utils/bridge';
@@ -145,8 +146,9 @@ export function HistoryListItem({
           {deleteError ? <div className="col-start-2 mt-1 text-xs text-error">{deleteError}</div> : null}
         </div>
 
-        <div className="flex shrink-0 items-center self-stretch relative z-10 ml-2" onClick={(e) => e.stopPropagation()}>
+        <div className="flex shrink-0 items-center self-stretch relative ml-2" onClick={(e) => e.stopPropagation()}>
           <PopupMenu
+            inline
             renderTrigger={(trigger) => (
               <Tooltip variant="minimal" content="More actions">
                 <button

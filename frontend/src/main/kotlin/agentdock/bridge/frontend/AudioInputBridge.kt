@@ -8,6 +8,7 @@ import agentdock.settings.AudioTranscriptionFeatureState
 import agentdock.settings.AudioTranscriptionProviders
 import agentdock.settings.AudioTranscriptionResultPayload
 import agentdock.settings.AudioTranscriptionSettings
+import agentdock.settings.StartRecordingRequest
 import agentdock.settings.StopRecordingRequest
 import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runInterruptible
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.util.Base64
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -31,7 +33,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  * These commands never reach the backend: microphone capture and the API request run in the
  * process that owns the user's microphone. In Split Mode that keeps voice input on the client,
- * and in a monolithic IDE it is the same process anyway.
+ * and in a monolithic IDE it is the same process anyway. A web browser page records with its own
+ * device's microphone and sends the recording along with `stopAudioRecording`.
  */
 internal class AudioInputBridge(
     private val commands: FrontendCommands,
@@ -111,7 +114,10 @@ internal class AudioInputBridge(
         }
 
         commands.register("startAudioRecording") { payload ->
-            val ownerId = payload.trim()
+            val request = runCatching {
+                json.decodeFromString<StartRecordingRequest>(payload)
+            }.getOrNull() ?: return@register
+            val ownerId = request.ownerId.trim()
             if (disposed || ownerId.isBlank()) return@register
             if (recordingStartJobs.containsKey(ownerId) ||
                 recordingOwners.contains(ownerId) ||
@@ -137,7 +143,7 @@ internal class AudioInputBridge(
                     }
 
                     currentCoroutineContext().ensureActive()
-                    AudioCaptureManager.startRecording(ownerId) { message ->
+                    AudioCaptureManager.startRecording(ownerId, request.recordingLimitSeconds) { message ->
                         recordingOwners.remove(ownerId)
                         pushRecordingState(
                             AudioRecordingStatePayload(
@@ -209,7 +215,8 @@ internal class AudioInputBridge(
 
             val settings = selectedSettings()
             val service = selectedService(settings)
-            if (requestId.isBlank() || ownerId.isBlank() || service == null || !activeRecording) {
+            val uploaded = request.audio.isNotEmpty()
+            if (requestId.isBlank() || ownerId.isBlank() || service == null || !activeRecording && !uploaded) {
                 if (requestId.isNotBlank()) {
                     pushResult(
                         AudioTranscriptionResultPayload(
@@ -222,6 +229,10 @@ internal class AudioInputBridge(
                 return@register
             }
             launchTranscription(requestId, ownerId) {
+                if (uploaded) {
+                    val file = AudioCaptureManager.saveRecording(Base64.getDecoder().decode(request.audio))
+                    return@launchTranscription transcribe(requestId, file, service, settings)
+                }
                 if (pendingStart != null) {
                     pendingStart.join()
                     if (pendingStart.isCancelled ||!AudioCaptureManager.isRecording(ownerId)) {
@@ -308,11 +319,25 @@ internal class AudioInputBridge(
         service: AudioTranscriptionService,
         settings: AudioTranscriptionSettings,
     ): AudioTranscriptionResultPayload {
-        var recordedFile: File? = null
-        try {
-            val file = AudioCaptureManager.stopRecording(ownerId)
-            recordedFile = file
+        val file = try {
+            AudioCaptureManager.stopRecording(ownerId)
+        } catch (error: Throwable) {
+            AudioCaptureManager.cancelRecording(ownerId)
+            throw error
+        } finally {
             recordingOwners.remove(ownerId)
+        }
+        return transcribe(requestId, file, service, settings)
+    }
+
+    /** Transcribes [file] and deletes it. */
+    private suspend fun transcribe(
+        requestId: String,
+        file: File,
+        service: AudioTranscriptionService,
+        settings: AudioTranscriptionSettings,
+    ): AudioTranscriptionResultPayload {
+        try {
             currentCoroutineContext().ensureActive()
             val text = runInterruptible(Dispatchers.IO) {
                 service.transcribeAudioFile(file, settings)
@@ -323,11 +348,7 @@ internal class AudioInputBridge(
                 text = text
             )
         } finally {
-            recordedFile?.let { AudioCaptureManager.releaseRecording(it) }
-            if (recordedFile == null) {
-                AudioCaptureManager.cancelRecording(ownerId)
-                recordingOwners.remove(ownerId)
-            }
+            AudioCaptureManager.releaseRecording(file)
         }
     }
 

@@ -12,7 +12,7 @@ import {applySlashCommandToEditor, buildAgentSlashItems, buildPromptLibrarySlash
 import {useFileMentions} from '../../../hooks/useFileMentions';
 import {isShortcut, useKeyDown} from '../../../hooks/useShortcuts';
 import {ImageNode} from './ImageNode';
-import {CodeReferenceNode} from './CodeReferenceNode';
+import {ReferenceNode} from './ReferenceNode';
 import {ChatInputProps} from './chatInputState';
 
 export function useChatInputController({
@@ -37,7 +37,7 @@ export function useChatInputController({
   const [composerRevision, setComposerRevision] = useState(0);
   const registeredNodeClassesRef = useRef({
     imageNode: ImageNode,
-    codeReferenceNode: CodeReferenceNode,
+    referenceNode: ReferenceNode,
   });
 
   useEffect(() => {
@@ -48,15 +48,15 @@ export function useChatInputController({
 
   useEffect(() => {
     const previous = registeredNodeClassesRef.current;
-    if (previous.imageNode !== ImageNode || previous.codeReferenceNode !== CodeReferenceNode) {
+    if (previous.imageNode !== ImageNode || previous.referenceNode !== ReferenceNode) {
       registeredNodeClassesRef.current = {
         imageNode: ImageNode,
-        codeReferenceNode: CodeReferenceNode,
+        referenceNode: ReferenceNode,
       };
       lexicalEditorRef.current = null;
       setComposerRevision((value) => value + 1);
     }
-  }, [ImageNode, CodeReferenceNode]);
+  }, [ImageNode, ReferenceNode]);
 
   useEffect(() => {
     const handleDragHighlight = (e: Event) => {
@@ -71,9 +71,16 @@ export function useChatInputController({
     openFile(filePath, line);
   }, []);
 
-  const [sendMode, setSendMode] = useState<'enter' | 'ctrl-enter'>(() => {
-    return (localStorage.getItem('chat-send-mode') as 'enter' | 'ctrl-enter') || 'enter';
-  });
+  const [sendMode, setSendModeState] = useState<'enter' | 'ctrl-enter'>(
+    () => ACPBridge.getGlobalSettingsSnapshot()?.settings?.sendMode === 'ctrl-enter' ? 'ctrl-enter' : 'enter'
+  );
+  useEffect(() => ACPBridge.onGlobalSettings((e) => {
+    setSendModeState(e.detail?.payload?.settings?.sendMode === 'ctrl-enter' ? 'ctrl-enter' : 'enter');
+  }), []);
+  const setSendMode = useCallback((mode: 'enter' | 'ctrl-enter') => {
+    setSendModeState(mode);
+    ACPBridge.saveGlobalSettings({ sendMode: mode });
+  }, []);
 
   const agentSlashItems = useMemo(
     () => buildAgentSlashItems(availableCommands),

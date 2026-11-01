@@ -1,17 +1,16 @@
 package agentdock.acp
 
-import com.agentclientprotocol.model.ContentBlock
-import com.agentclientprotocol.model.SessionUpdate
-import com.agentclientprotocol.model.ToolCallContent
-import com.intellij.openapi.diagnostic.logger
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.*
 import agentdock.changes.ChangesState
 import agentdock.changes.ChangesStateService
 import agentdock.history.ConversationAssistantMetadata
 import agentdock.history.ConversationReplayData
 import agentdock.utils.jsCallback
 import agentdock.utils.jsStringLiteral
+import com.agentclientprotocol.model.ContentBlock
+import com.agentclientprotocol.model.SessionUpdate
+import com.agentclientprotocol.model.ToolCallContent
+import com.intellij.openapi.diagnostic.logger
+import kotlinx.serialization.json.*
 
 private val LOG = logger<AcpBridge>()
 
@@ -150,7 +149,7 @@ internal fun AcpBridge.recordUsageUpdate(
     }
 }
 
-internal fun AcpBridge.extractUsageUpdate(update: SessionUpdate, meta: JsonElement?): Pair<Long?, Long?>? {
+internal fun extractUsageUpdate(update: SessionUpdate, meta: JsonElement?): Pair<Long?, Long?>? {
     val updateObj = when {
         meta is JsonObject -> meta["update"]?.jsonObject ?: meta
         else -> try {
@@ -170,9 +169,9 @@ internal fun AcpBridge.extractUsageUpdate(update: SessionUpdate, meta: JsonEleme
     return used to size
 }
 
-internal fun AcpBridge.isPlanUpdate(update: SessionUpdate, _meta: JsonElement?): Boolean {
-    if (_meta is JsonObject) {
-        val updateObj = _meta["update"]?.jsonObject ?: _meta
+internal fun isPlanUpdate(update: SessionUpdate, meta: JsonElement?): Boolean {
+    if (meta is JsonObject) {
+        val updateObj = meta["update"]?.jsonObject ?: meta
         if (updateObj["sessionUpdate"]?.jsonPrimitive?.contentOrNull == "plan") return true
     }
     return try {
@@ -184,9 +183,9 @@ internal fun AcpBridge.isPlanUpdate(update: SessionUpdate, _meta: JsonElement?):
     }
 }
 
-internal fun AcpBridge.extractPlanEntries(plan: SessionUpdate, _meta: JsonElement?): JsonArray? {
-    if (_meta is JsonObject) {
-        val updateObj = _meta["update"]?.jsonObject ?: _meta
+internal fun extractPlanEntries(plan: SessionUpdate, meta: JsonElement?): JsonArray? {
+    if (meta is JsonObject) {
+        val updateObj = meta["update"]?.jsonObject ?: meta
         updateObj["entries"]?.jsonArray?.let { return it }
     }
     return try {
@@ -197,14 +196,14 @@ internal fun AcpBridge.extractPlanEntries(plan: SessionUpdate, _meta: JsonElemen
     }
 }
 
-internal fun AcpBridge.pushPlanChunk(chatId: String, plan: SessionUpdate, _meta: JsonElement? = null) {
+internal fun AcpBridge.pushPlanChunk(chatId: String, plan: SessionUpdate, meta: JsonElement? = null) {
     val entries = try {
-        extractPlanEntries(plan, _meta)
-    } catch (e: Exception) {
+        extractPlanEntries(plan, meta)
+    } catch (_: Exception) {
         null
     }
 
-    if (entries == null || entries.isEmpty()) {
+    if (entries.isNullOrEmpty()) {
         return
     }
 
@@ -227,7 +226,7 @@ internal fun AcpBridge.pushPlanChunk(chatId: String, entries: JsonArray) {
     dispatchContentChunkJson(json)
 }
 
-internal fun AcpBridge.pushStatus(chatId: String, status: String) {
+internal fun AcpBridge.pushStatus(chatId: String, status: String): Unit = withChatDelivery(chatId) {
     if (status != "ready") awaitingBackgroundOutput.remove(chatId)
     val previousStatus = lastStatusByChatId.put(chatId, status)
     val escapedStatus = status.jsStringLiteral()
@@ -281,23 +280,30 @@ internal fun AcpBridge.pushSessionId(chatId: String, sid: String?) {
     host.eval(jsCallback("__onSessionId", escapedChatId, escapedSessionId))
 }
 
+internal fun permissionRequestJson(request: PermissionRequest): JsonObject = buildJsonObject {
+    put("requestId", request.requestId)
+    put("chatId", request.chatId)
+    put("title", request.title)
+    put("options", buildJsonArray {
+        request.options.forEach { opt ->
+            add(buildJsonObject {
+                put("optionId", opt.optionId.value)
+                put("label", opt.name)
+                put("kind", Json.encodeToJsonElement(opt.kind))
+            })
+        }
+    })
+}
+
 internal fun AcpBridge.pushPermissionRequest(request: PermissionRequest) {
-    val payload = buildJsonObject {
-        put("requestId", request.requestId)
-        put("chatId", request.chatId)
-        put("title", request.title)
-        put("options", buildJsonArray {
-            request.options.forEach { opt ->
-                add(buildJsonObject {
-                    put("optionId", opt.optionId.value)
-                    put("label", opt.name)
-                    put("kind", Json.encodeToJsonElement(opt.kind))
-                })
-            }
-        })
-    }.toString().jsStringLiteral()
+    val payload = permissionRequestJson(request).toString().jsStringLiteral()
     host.eval(jsCallback("__onPermissionRequest", "JSON.parse($payload)"))
     host.eval(jsCallback("__agentDockPlaySound", "'permissionRequest'"))
+}
+
+internal fun AcpBridge.pushElicitationRequests(chatId: String) {
+    val requests = adapterJson.encodeToString(service.pendingElicitationRequests(chatId)).jsStringLiteral()
+    host.eval(jsCallback("__onElicitationRequests", chatId.jsStringLiteral(), "JSON.parse($requests)"))
 }
 
 internal fun AcpBridge.pushUndoResult(chatId: String, result: agentdock.changes.UndoResult) {

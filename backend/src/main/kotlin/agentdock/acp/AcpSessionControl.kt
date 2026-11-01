@@ -18,14 +18,9 @@ private val SESSION_CLOSE_TIMEOUT = 3.seconds
 
 internal fun AcpClientService.respondToPermissionRequest(requestId: String, decision: String) {
     for (context in sessions.values) {
-        val deferred = context.pendingRequests.remove(requestId)
+        val deferred = context.pendingRequests.remove(requestId)?.response
         if (deferred != null) {
-            val response = if (decision == "deny") {
-                RequestPermissionResponse(RequestPermissionOutcome.Cancelled)
-            } else {
-                RequestPermissionResponse(RequestPermissionOutcome.Selected(PermissionOptionId(decision)))
-            }
-            deferred.complete(response)
+            deferred.complete(RequestPermissionResponse(RequestPermissionOutcome.Selected(PermissionOptionId(decision))))
             return
         }
     }
@@ -51,7 +46,7 @@ internal fun AcpClientService.prompt(chatId: String, blocks: List<ContentBlock>)
     synchronized(context.observedToolCallIds) { context.observedToolCallIds.clear() }
     val promptGeneration = context.promptGeneration.incrementAndGet()
     context.ignoreUpdatesUntilPrompt = false
-    var stopReason: String? = null
+    var promptResponseReceived = false
     val activeAdapterName = context.activeAdapterNameRef.get()
     if (!activeAdapterName.isNullOrBlank()) {
         AcpAgentPreferencesStore.rememberAgent(activeAdapterName)
@@ -78,15 +73,15 @@ internal fun AcpClientService.prompt(chatId: String, blocks: List<ContentBlock>)
                         context.deliverSessionUpdate(event.update, false, null)
                     }
                 }
-                is Event.PromptResponseEvent -> stopReason = event.response.stopReason.toString()
+                is Event.PromptResponseEvent -> promptResponseReceived = true
             }
         }
         val isCurrentPrompt = context.promptGeneration.get() == promptGeneration && !context.ignoreUpdatesUntilPrompt
         if (isCurrentPrompt && !activeAdapterName.isNullOrBlank()) {
             awaitPendingSessionUpdates(activeAdapterName)
         }
-        if (isCurrentPrompt) {
-            stopReason?.let { emit(AcpEvent.PromptDone(it)) }
+        if (isCurrentPrompt && promptResponseReceived) {
+            emit(AcpEvent.PromptDone)
         }
     } catch (e: Exception) {
         if (e is CancellationException) throw e
@@ -102,11 +97,15 @@ internal fun AcpClientService.prompt(chatId: String, blocks: List<ContentBlock>)
 
 internal suspend fun AcpClientService.cancel(chatId: String) {
     val context = sessions[chatId] ?: return
-    context.lifecycleMutex.withLock { context.session }?.let { session ->
-        context.ignoreUpdatesUntilPrompt = true
-        session.cancel()
+    try {
+        context.lifecycleMutex.withLock { context.session }?.let { session ->
+            context.ignoreUpdatesUntilPrompt = true
+            session.cancel()
+        }
+    } finally {
+        context.cancelPendingPermissions()
+        context.cancelPendingElicitations()
     }
-    context.cancelPendingPermissions()
 }
 
 internal suspend fun AcpClientService.stopAgent(chatId: String) {
@@ -115,6 +114,7 @@ internal suspend fun AcpClientService.stopAgent(chatId: String) {
         try {
             context.ignoreUpdatesUntilPrompt = true
             context.cancelPendingPermissions()
+            context.cancelPendingElicitations()
             try {
                 context.session?.cancel()
             } catch (error: CancellationException) {

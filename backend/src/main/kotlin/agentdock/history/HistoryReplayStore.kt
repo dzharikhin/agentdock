@@ -1,10 +1,7 @@
 package agentdock.history
 
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
 import agentdock.utils.atomicWriteText
 import java.io.File
 
@@ -50,7 +47,8 @@ internal object HistoryReplayStore {
         val messages = data.sessions.flatMap { session ->
             session.prompts.flatMap { prompt -> prompt.blocks + prompt.events }
         }.mapNotNull { block ->
-            if ((block["type"] as? JsonPrimitive)?.content != "text") return@mapNotNull null
+            val type = (block["type"] as? JsonPrimitive)?.content
+            if (type != "text" && type != "elicitation_answer") return@mapNotNull null
             (block["text"] as? JsonPrimitive)?.content?.replace(whitespace, " ")?.trim()?.ifEmpty { null }
         }
         file.atomicWriteText(messages.joinToString("\n"))
@@ -86,6 +84,13 @@ internal object HistoryReplayStore {
     fun normalizeReplayBlocks(blocks: List<JsonObject>): List<JsonObject> {
         if (blocks.size < 2) return blocks
         val normalized = ArrayList<JsonObject>(blocks.size)
+        // The text merged into the last block so far, written into it once its run of chunks ends.
+        var mergedText: StringBuilder? = null
+        fun writeMergedText() {
+            val text = mergedText ?: return
+            normalized[normalized.lastIndex] = JsonObject(normalized.last() + ("text" to JsonPrimitive(text.toString())))
+            mergedText = null
+        }
         blocks.forEach { block ->
             val currentRole = (block["role"] as? JsonPrimitive)?.content
             val currentType = (block["type"] as? JsonPrimitive)?.content
@@ -102,16 +107,13 @@ internal object HistoryReplayStore {
                 currentType == lastType &&
                 (currentType == "thinking" || currentType == "text")
             if (!mergeable) {
+                writeMergedText()
                 normalized.add(block)
                 return@forEach
             }
-            normalized[normalized.lastIndex] = buildJsonObject {
-                last.forEach { (key, value) ->
-                    if (key != "text") put(key, value)
-                }
-                put("text", JsonPrimitive("${lastText}${currentText}"))
-            }
+            (mergedText ?: StringBuilder(lastText).also { mergedText = it }).append(currentText)
         }
+        writeMergedText()
         return normalized
     }
 

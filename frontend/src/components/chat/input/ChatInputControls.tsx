@@ -314,13 +314,11 @@ export function ChatInputControls({
               onScheduleModeChange?.(subId === 'on');
             } else if (parentId === 'send-mode') {
               setSendMode(subId as 'enter' | 'ctrl-enter');
-              localStorage.setItem('chat-send-mode', subId);
             } else if (parentId === 'approvals') {
               onApprovalModeChange(subId as ApprovalMode);
             } else if (parentId === 'remember-model-and-effort') {
-              const settings = ACPBridge.getGlobalSettingsSnapshot()?.settings;
               setRememberModelAndEffort(subId === 'on');
-              if (settings) ACPBridge.saveGlobalSettings({ ...settings, rememberModelAndEffort: subId === 'on' });
+              ACPBridge.saveGlobalSettings({ rememberModelAndEffort: subId === 'on' });
             } else {
               onConfigOptionChange(parentId, subId);
             }

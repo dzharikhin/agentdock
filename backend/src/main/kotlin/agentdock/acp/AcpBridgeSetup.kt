@@ -11,7 +11,6 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
-import java.io.File
 import kotlin.time.Duration
 internal fun AcpBridge.installServiceCallbacks() {
     service.callbackOwner = this
@@ -19,6 +18,13 @@ internal fun AcpBridge.installServiceCallbacks() {
         service.setOnLogEntry { pushLogEntry(it) }
     }
     service.setOnPermissionRequest { pushPermissionRequest(it) }
+    service.setOnElicitationRequestsChanged { chatId, newRequest ->
+        // Read the latest state under the same delivery lock as attachChat, including on removal.
+        withChatDelivery(chatId) {
+            pushElicitationRequests(chatId)
+            if (newRequest) host.eval(jsCallback("__agentDockPlaySound", "'permissionRequest'"))
+        }
+    }
     service.setOnAvailableCommands { adapterId, commands ->
         pushAvailableCommands(adapterId, commands)
     }
@@ -45,85 +51,89 @@ internal fun AcpBridge.installServiceCallbacks() {
             }
             return@setOnSessionUpdate
         }
-        // Replay is capture-only: it is collected into ConversationReplayData and delivered
-        // to the UI in one piece by pushConversationReplayLoaded, never as streamed chunks.
-        val sessionId = if (isReplay) {
-            historyReplayCaptures[chatId]?.currentSessionId.orEmpty()
-        } else {
-            service.sessionId(chatId).orEmpty()
-        }
-        val adapterName = if (isReplay) {
-            historyReplayCaptures[chatId]?.currentAdapterName.orEmpty()
-        } else {
-            service.activeAdapterName(chatId).orEmpty()
-        }
-        val hasAssistantOutput = when (update) {
-            is SessionUpdate.AgentMessageChunk -> contentBlockHasVisibleOutput(update.content)
-            is SessionUpdate.AgentThoughtChunk -> contentBlockHasVisibleOutput(update.content, textType = "thinking")
-            else -> false
-        }
-        if (!isReplay && hasAssistantOutput && awaitingBackgroundOutput.remove(chatId, sessionId)) {
-            val escapedChatId = chatId.jsStringLiteral()
-            host.eval(jsCallback("__onAssistantActivity", escapedChatId))
-            host.eval(jsCallback("__agentDockPlaySound", "'backgroundResumed'"))
-        }
-        when (update) {
-            is SessionUpdate.UserMessageChunk -> {
-                if (isReplay) {
-                    recordReplayUserBlock(
-                        chatId,
-                        sessionId,
-                        adapterName,
-                        sessionUpdateMessageIdFromMeta(meta),
-                        update.content
-                    )
-                }
+        withChatDelivery(chatId) { handleSessionUpdate(chatId, update, isReplay, meta) }
+    }
+}
+
+private fun AcpBridge.handleSessionUpdate(chatId: String, update: SessionUpdate, isReplay: Boolean, meta: JsonElement?) {
+    // Replay is capture-only: it is collected into ConversationReplayData and delivered
+    // to the UI in one piece by pushConversationReplayLoaded, never as streamed chunks.
+    val sessionId = if (isReplay) {
+        historyReplayCaptures[chatId]?.currentSessionId.orEmpty()
+    } else {
+        service.sessionId(chatId).orEmpty()
+    }
+    val adapterName = if (isReplay) {
+        historyReplayCaptures[chatId]?.currentAdapterName.orEmpty()
+    } else {
+        service.activeAdapterName(chatId).orEmpty()
+    }
+    val hasAssistantOutput = when (update) {
+        is SessionUpdate.AgentMessageChunk -> contentBlockHasVisibleOutput(update.content)
+        is SessionUpdate.AgentThoughtChunk -> contentBlockHasVisibleOutput(update.content, textType = "thinking")
+        else -> false
+    }
+    if (!isReplay && hasAssistantOutput && awaitingBackgroundOutput.remove(chatId, sessionId)) {
+        val escapedChatId = chatId.jsStringLiteral()
+        host.eval(jsCallback("__onAssistantActivity", escapedChatId))
+        host.eval(jsCallback("__agentDockPlaySound", "'backgroundResumed'"))
+    }
+    when (update) {
+        is SessionUpdate.UserMessageChunk -> {
+            if (isReplay) {
+                recordReplayUserBlock(
+                    chatId,
+                    sessionId,
+                    adapterName,
+                    sessionUpdateMessageIdFromMeta(meta),
+                    update.content
+                )
             }
-            is SessionUpdate.AgentMessageChunk -> {
-                recordContentBlock(chatId, sessionId, adapterName, "assistant", update.content, isThought = false, isReplay = isReplay)
+        }
+        is SessionUpdate.AgentMessageChunk -> {
+            recordContentBlock(chatId, sessionId, adapterName, "assistant", update.content, isThought = false, isReplay = isReplay)
+            if (!isReplay) {
+                if (contentBlockHasVisibleOutput(update.content)) {
+                    markLivePromptVisibleAssistantOutput(chatId)
+                }
+                pushContentBlock(chatId, "assistant", update.content, isThought = false)
+            }
+        }
+        is SessionUpdate.AgentThoughtChunk -> {
+            recordContentBlock(chatId, sessionId, adapterName, "assistant", update.content, isThought = true, isReplay = isReplay)
+            if (!isReplay) {
+                if (contentBlockHasVisibleOutput(update.content, textType = "thinking")) {
+                    markLivePromptVisibleAssistantOutput(chatId)
+                }
+                pushContentBlock(chatId, "assistant", update.content, isThought = true)
+            }
+        }
+        is SessionUpdate.CurrentModeUpdate -> {
+            if (!isReplay) {
+                pushMode(chatId, update.currentModeId.value)
+            }
+        }
+        is SessionUpdate.ToolCall -> {
+            if (!isReplay) ensureChangesStateForLiveDiffs(chatId, update.content)
+            val json = try { Json.encodeToJsonElement(update).jsonObject } catch (_: Exception) { JsonObject(emptyMap()) }
+            handleToolCall(chatId, sessionId, adapterName, update.toolCallId.value, json, isUpdate = false, isReplay)
+        }
+        is SessionUpdate.ToolCallUpdate -> {
+            if (!isReplay) ensureChangesStateForLiveDiffs(chatId, update.content)
+            val json = try { Json.encodeToJsonElement(update).jsonObject } catch (_: Exception) { JsonObject(emptyMap()) }
+            handleToolCall(chatId, sessionId, adapterName, update.toolCallId.value, json, isUpdate = true, isReplay)
+        }
+        else -> {
+            val usage = extractUsageUpdate(update, meta)
+            if (usage != null) {
+                recordUsageUpdate(chatId, sessionId, adapterName, usage.first, usage.second, isReplay)
+            } else if (isPlanUpdate(update, meta)) {
+                buildStoredPlanChunk(update, meta)?.let { recordStoredEvent(chatId, sessionId, adapterName, it, isReplay) }
                 if (!isReplay) {
-                    if (contentBlockHasVisibleOutput(update.content)) {
+                    if (extractPlanEntries(update, meta)?.isNotEmpty() == true) {
                         markLivePromptVisibleAssistantOutput(chatId)
                     }
-                    pushContentBlock(chatId, "assistant", update.content, isThought = false)
-                }
-            }
-            is SessionUpdate.AgentThoughtChunk -> {
-                recordContentBlock(chatId, sessionId, adapterName, "assistant", update.content, isThought = true, isReplay = isReplay)
-                if (!isReplay) {
-                    if (contentBlockHasVisibleOutput(update.content, textType = "thinking")) {
-                        markLivePromptVisibleAssistantOutput(chatId)
-                    }
-                    pushContentBlock(chatId, "assistant", update.content, isThought = true)
-                }
-            }
-            is SessionUpdate.CurrentModeUpdate -> {
-                if (!isReplay) {
-                    pushMode(chatId, update.currentModeId.value)
-                }
-            }
-            is SessionUpdate.ToolCall -> {
-                if (!isReplay) ensureChangesStateForLiveDiffs(chatId, update.content)
-                val json = try { Json.encodeToJsonElement(update).jsonObject } catch (_: Exception) { JsonObject(emptyMap()) }
-                handleToolCall(chatId, sessionId, adapterName, update.toolCallId.value, json, isUpdate = false, isReplay)
-            }
-            is SessionUpdate.ToolCallUpdate -> {
-                if (!isReplay) ensureChangesStateForLiveDiffs(chatId, update.content)
-                val json = try { Json.encodeToJsonElement(update).jsonObject } catch (_: Exception) { JsonObject(emptyMap()) }
-                handleToolCall(chatId, sessionId, adapterName, update.toolCallId.value, json, isUpdate = true, isReplay)
-            }
-            else -> {
-                val usage = extractUsageUpdate(update, meta)
-                if (usage != null) {
-                    recordUsageUpdate(chatId, sessionId, adapterName, usage.first, usage.second, isReplay)
-                } else if (isPlanUpdate(update, meta)) {
-                    buildStoredPlanChunk(update, meta)?.let { recordStoredEvent(chatId, sessionId, adapterName, it, isReplay) }
-                    if (!isReplay) {
-                        if (extractPlanEntries(update, meta)?.isNotEmpty() == true) {
-                            markLivePromptVisibleAssistantOutput(chatId)
-                        }
-                        pushPlanChunk(chatId, update, meta)
-                    }
+                    pushPlanChunk(chatId, update, meta)
                 }
             }
         }
@@ -259,24 +269,24 @@ private fun convertBrokenOtherPatchToolCallJson(parsed: JsonObject): JsonObject 
 
     flush()
     val diffs = mutableListOf<PatchDiff>()
-    for (file in files) {
-        when (file.mode) {
+    for ((filePath, fileMode, fileHunks) in files) {
+        when (fileMode) {
             "add" -> {
-                val newText = file.hunks.joinToString("\n") { it.newText }
+                val newText = fileHunks.joinToString("\n") { it.newText }
                 if (newText.isNotEmpty()) {
-                    diffs += PatchDiff(path = file.path, oldText = null, newText = newText)
+                    diffs += PatchDiff(path = filePath, oldText = null, newText = newText)
                 }
             }
             "delete" -> {
-                val oldText = file.hunks.joinToString("\n") { it.oldText }
+                val oldText = fileHunks.joinToString("\n") { it.oldText }
                 if (oldText.isNotEmpty()) {
-                    diffs += PatchDiff(path = file.path, oldText = oldText, newText = "")
+                    diffs += PatchDiff(path = filePath, oldText = oldText, newText = "")
                 }
             }
             else -> {
-                file.hunks.forEach { hunk ->
+                fileHunks.forEach { hunk ->
                     if (hunk.oldText != hunk.newText) {
-                        diffs += PatchDiff(path = file.path, oldText = hunk.oldText, newText = hunk.newText)
+                        diffs += PatchDiff(path = filePath, oldText = hunk.oldText, newText = hunk.newText)
                     }
                 }
             }
@@ -310,7 +320,8 @@ private class AdapterInstallTarget(val adapterInfo: AcpAdapterConfig.AdapterInfo
 
 /**
  * Runs the install job of [adapterId] unless one is already running. [prepare] stops the adapter and
- * returns what to install, or null to skip; the adapter files are replaced only after it returns.
+ * returns what to install, or null to skip. The install is made beside the adapter files, which are
+ * replaced only once it succeeds, so a failed or cancelled one keeps the installed version.
  */
 private fun AcpBridge.launchAdapterInstall(
     adapterId: String,
@@ -320,12 +331,11 @@ private fun AcpBridge.launchAdapterInstall(
     val cancellation = AcpAdapterInstallCancellation()
     adapterInstallCancellations[adapterId] = cancellation
     val job = scope.launch(Dispatchers.IO) {
-        var replacingRuntime = false
         try {
             val target = prepare(cancellation) ?: return@launch
-            replacingRuntime = true
-            val success = AcpAdapterPaths.installAdapterRuntime(
-                targetDir = File(AcpAdapterPaths.getDependenciesDir(), target.adapterInfo.id),
+            val stagingDir = AcpAdapterPaths.getInstallStagingDir(adapterId)
+            val installed = AcpAdapterPaths.installAdapterRuntime(
+                targetDir = stagingDir,
                 adapterInfo = target.adapterInfo,
                 statusCallback = { status ->
                     downloadStatuses[adapterId] = status
@@ -334,6 +344,10 @@ private fun AcpBridge.launchAdapterInstall(
                 versionOverride = target.versionOverride,
                 cancellation = cancellation
             )
+            cancellation.throwIfCancelled()
+            val success = installed && AcpAdapterPaths.replaceAdapterRuntime(adapterId, stagingDir).also { replaced ->
+                if (!replaced) downloadStatuses[adapterId] = "Error: Unable to replace the old adapter files"
+            }
 
             if (success) {
                 downloadStatuses.remove(adapterId)
@@ -350,13 +364,11 @@ private fun AcpBridge.launchAdapterInstall(
             }
         } catch (_: CancellationException) {
             downloadStatuses.remove(adapterId)
-            if (replacingRuntime) {
-                runCatching { AcpAdapterPaths.deleteAdapter(adapterId) }
-            }
             resetDownloadProbeState(adapterId)
         } catch (e: Exception) {
             downloadStatuses[adapterId] = "Error: ${e.message}"
         } finally {
+            runCatching { AcpAdapterPaths.getInstallStagingDir(adapterId).deleteRecursively() }
             adapterInstallJobs.remove(adapterId)
             adapterInstallCancellations.remove(adapterId)
             // Checks the files again, as a cancellation leaves the installed state unknown.
@@ -470,10 +482,6 @@ internal fun AcpBridge.installAdapterQueries() {
 
                 service.stopSharedProcess(adapterId)
                 AcpConfigOptionsCache.remove(adapterId)
-                val deleted = AcpAdapterPaths.deleteAdapter(adapterId)
-                if (!deleted) {
-                    throw IllegalStateException("Unable to remove old adapter files")
-                }
                 AdapterInstallTarget(adapterInfo, versionOverride = latestVersion)
             }
         }
