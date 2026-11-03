@@ -56,6 +56,25 @@ Any other ACP-compatible agent can be added through the custom configuration opt
 - **Frontend:** React, Tailwind
 - **Agent communication:** ACP (Agent Client Protocol)
 
+## Building in restricted networks
+
+The build normally fetches the IntelliJ Platform and the code-instrumentation toolchain
+from JetBrains' repositories. On networks where those CDNs are blocked (HTTP 451) or
+heavily throttled, the IDE can instead be provisioned from the official
+`com.jetbrains.IntelliJ-IDEA-Ultimate` flatpak on Flathub — entirely in-process, with no
+external tools:
+
+```
+./gradlew provisionSandboxIde       # or: ./gradlew buildPlugin -PfetchSandboxIde=true --no-configuration-cache
+```
+
+This populates `.repo/` (gitignored): `idea/` with the IDE and its bundled JBR, and
+`m2/` with a synthesized maven mirror for the instrumentation toolchain (assembled from
+jars shipped inside the IDE itself). The build picks it up automatically whenever
+`.repo/idea` is present. Selection can be forced with `-PsandboxIde=local|cdn`
+(default `auto`), and `.repo` can be relocated with `-PsandboxRepoDir=<path>`.
+Only `npm` (for the webview build) and Maven Central remain external in this mode.
+
 ## Screenshot
 
 ![Agent Dock chat interface](docs/images/chat.png)
