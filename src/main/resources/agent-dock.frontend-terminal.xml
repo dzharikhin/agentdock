@@ -2,6 +2,7 @@
     <dependencies>
         <module name="agent-dock.frontend"/>
         <module name="intellij.terminal.frontend"/>
+        <plugin id="org.jetbrains.plugins.terminal"/>
     </dependencies>
 
     <extensions defaultExtensionNs="com.intellij">

@@ -11,6 +11,12 @@ plugins {
 group = providers.gradleProperty("pluginGroup").get()
 version = providers.gradleProperty("pluginVersion").get()
 
+val openideHome = providers.gradleProperty("openide.home")
+    .orElse(providers.environmentVariable("OPENIDE_HOME"))
+    .map { it.trim() }
+    .filter { it.isNotEmpty() }
+    .map(::File)
+
 subprojects {
     group = rootProject.group
     version = rootProject.version
@@ -35,10 +41,15 @@ dependencies {
     implementation("io.github.java-diff-utils:java-diff-utils:4.15")
 
     intellijPlatform {
-        intellijIdea("2026.2") {
-            useInstaller = false
+        val openideDir = openideHome.orNull
+        if (openideDir?.isDirectory == true) {
+            local(openideDir.absolutePath)
+        } else {
+            intellijIdea("2026.2") {
+                useInstaller = false
+            }
+            jetbrainsRuntime()
         }
-        jetbrainsRuntime()
         pluginModule(implementation(project(":shared")))
         pluginModule(implementation(project(":frontend")))
         pluginModule(implementation(project(":backend")))
@@ -79,7 +90,12 @@ intellijPlatform {
     }
     pluginVerification {
         ides {
-            create(IntelliJPlatformType.IntellijIdea, "2026.2")
+            val openideDir = openideHome.orNull
+            if (openideDir?.isDirectory == true) {
+                local(openideDir.absolutePath)
+            } else {
+                create(IntelliJPlatformType.IntellijIdea, "2026.2")
+            }
         }
     }
 }
@@ -104,8 +120,18 @@ tasks.register("generateBuildConfig") {
 
 val npm = if (org.gradle.internal.os.OperatingSystem.current().isWindows) "npm.cmd" else "npm"
 
+val npmInstall = tasks.register<Exec>("npmInstall") {
+    description = "Installs the React UI dependencies from the lockfile."
+    workingDir = file("frontend")
+    commandLine(npm, "ci", "--no-audit", "--no-fund")
+
+    inputs.files("frontend/package.json", "frontend/package-lock.json")
+    outputs.dir("frontend/node_modules")
+}
+
 tasks.register<Exec>("npmBuild") {
     description = "Builds the React UI into src/main/resources/webview."
+    dependsOn(npmInstall)
     workingDir = file("frontend")
     commandLine(npm, "run", "build")
 
