@@ -11,15 +11,31 @@ plugins {
 group = providers.gradleProperty("pluginGroup").get()
 version = providers.gradleProperty("pluginVersion").get()
 
+val openideHome = providers.gradleProperty("openide.home")
+    .orElse(providers.environmentVariable("OPENIDE_HOME"))
+    .map { it.trim() }
+    .filter { it.isNotEmpty() }
+    .map(rootDir::resolve)
+
 subprojects {
     group = rootProject.group
     version = rootProject.version
 }
 
+val openideM2 = rootDir.resolve(".repo/m2").takeIf { it.isDirectory }
+
 repositories {
+    if (openideM2 != null) {
+        maven(openideM2)
+        maven("https://packages.jetbrains.team/maven/p/ij/intellij-dependencies/")
+    }
     mavenCentral()
     intellijPlatform {
-        defaultRepositories()
+        if (openideM2 == null) {
+            defaultRepositories()
+        } else {
+            localPlatformArtifacts()
+        }
     }
 }
 
@@ -35,10 +51,15 @@ dependencies {
     implementation("io.github.java-diff-utils:java-diff-utils:4.15")
 
     intellijPlatform {
-        intellijIdea("2026.2") {
-            useInstaller = false
+        val openideDir = openideHome.orNull
+        if (openideDir?.isDirectory == true) {
+            local(openideDir.absolutePath)
+        } else {
+            intellijIdea("2026.2") {
+                useInstaller = false
+            }
+            jetbrainsRuntime()
         }
-        jetbrainsRuntime()
         pluginModule(implementation(project(":shared")))
         pluginModule(implementation(project(":frontend")))
         pluginModule(implementation(project(":backend")))
@@ -79,7 +100,12 @@ intellijPlatform {
     }
     pluginVerification {
         ides {
-            create(IntelliJPlatformType.IntellijIdea, "2026.2")
+            val openideDir = openideHome.orNull
+            if (openideDir?.isDirectory == true) {
+                local(openideDir.absolutePath)
+            } else {
+                create(IntelliJPlatformType.IntellijIdea, "2026.2")
+            }
         }
     }
 }
@@ -102,11 +128,34 @@ tasks.register("generateBuildConfig") {
     }
 }
 
-val npm = if (org.gradle.internal.os.OperatingSystem.current().isWindows) "npm.cmd" else "npm"
+val repoNodeBin = rootDir.resolve(".repo/node/bin")
+val npm = if (org.gradle.internal.os.OperatingSystem.current().isWindows) {
+    "npm.cmd"
+} else if (File(repoNodeBin, "npm").canExecute()) {
+    repoNodeBin.resolve("npm").absolutePath
+} else {
+    "npm"
+}
+val npmPath = listOfNotNull(
+    repoNodeBin.takeIf { it.isDirectory }?.absolutePath,
+    System.getenv("PATH"),
+).joinToString(File.pathSeparator)
+
+val npmInstall = tasks.register<Exec>("npmInstall") {
+    description = "Installs the React UI dependencies from the lockfile."
+    workingDir = file("frontend")
+    environment("PATH", npmPath)
+    commandLine(npm, "ci", "--no-audit", "--no-fund")
+
+    inputs.files("frontend/package.json", "frontend/package-lock.json")
+    outputs.dir("frontend/node_modules")
+}
 
 tasks.register<Exec>("npmBuild") {
     description = "Builds the React UI into src/main/resources/webview."
+    dependsOn(npmInstall)
     workingDir = file("frontend")
+    environment("PATH", npmPath)
     commandLine(npm, "run", "build")
 
     inputs.dir("frontend/src")
